@@ -1,0 +1,3 @@
+[submodule "Edge_Reconst/FastNViewTriangulation"]
+	path = Edge_Reconst/FastNViewTriangulation
+	url = https://github.com/C-H-Chien/FastNViewTriangulation.git
