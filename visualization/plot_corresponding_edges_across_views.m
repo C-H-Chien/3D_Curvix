@@ -8,7 +8,7 @@ clear;
 close all;
 
 Dataset_Path = "/gpfs/data/bkimia/Datasets/ABC-NEF/";
-Object_Name = "00002211/";
+Object_Name = "00000006/";
 Image_Path = fullfile(Dataset_Path, Object_Name, "train_img");
 Pose_Path = fullfile(Dataset_Path, Object_Name, "RnT");
 Edges_Path = fullfile(Dataset_Path, Object_Name, "Edges");
@@ -41,14 +41,15 @@ end
 %> Get all files matching the pattern
 edges_3D_files = dir(fullfile(data_folder_path, file_pattern));
 edges_3D = importdata(strcat(edges_3D_files(end).folder, "/", edges_3D_files(end).name));
+disp(strcat(edges_3D_files(end).folder, "/", edges_3D_files(end).name));
 edge_pair_final = importdata(fullfile(data_folder_path, "paired_edge_final.txt"));
 
 %> Let's plot 3D edges first
 % figure(1);
 % plot3(edges_3D(:,1), edges_3D(:,2), edges_3D(:,3), 'Color', 'r', 'Marker', '.', 'LineStyle', 'none')
 
-H1_index = 49;
-H2_index = 5;
+H1_index = 9;
+H2_index = 39;
 image_indices = 0:1:49;
 image_indices = image_indices';
 image_indices(H1_index, :) = [];
@@ -56,7 +57,7 @@ image_indices(H2_index, :) = [];
 image_indices = [H1_index; H2_index; image_indices];
 
 % target_edge = [0.8290, 0.6586, 0.2873];
-target_edge = [0.4587, 0.5401, 0.4542];
+target_edge = [0.5913, 0.3053, 0.6723];
 target_index = find(abs(edges_3D(:,1)-target_edge(1))<0.001 & abs(edges_3D(:,2)-target_edge(2))<0.001 & abs(edges_3D(:,3)-target_edge(3))<0.001);
 if (length(target_index) > 1)
     error("More than one target index!\n");
@@ -74,7 +75,22 @@ Rs = [];
 Ts = [];
 edge_counter = 1;
 figure(1);
+
+reprojection_error = zeros(length(captured_edge_pairs_img_indx), 1);
+R1_hyp1 = R{captured_edge_pairs_img_indx(1)+1};
+T1_hyp1 = T{captured_edge_pairs_img_indx(1)+1};
+R1_hyp2 = R{captured_edge_pairs_img_indx(2)+1};
+T1_hyp2 = T{captured_edge_pairs_img_indx(2)+1};
+edgels_1 = Edgel_files{captured_edge_pairs_img_indx(1)+1};
+edges_2D_point_1 = [edgels_1(captured_edge_pairs_edg_indices(1)+1, 1), edgels_1(captured_edge_pairs_edg_indices(1)+1, 2)];
+point1 = [edges_2D_point_1(1); edges_2D_point_1(2); 1];
+edgels_2 = Edgel_files{captured_edge_pairs_img_indx(2)+1};
+edges_2D_point_2 = [edgels_2(captured_edge_pairs_edg_indices(2)+1, 1), edgels_2(captured_edge_pairs_edg_indices(2)+1, 2)];
+point2 = [edges_2D_point_2(1); edges_2D_point_2(2); 1];
+
+
 for i = 1:length(captured_edge_pairs_img_indx)
+
     % if i == 8 
     %     continue;
     % end
@@ -89,6 +105,7 @@ for i = 1:length(captured_edge_pairs_img_indx)
     edges_2D_point = [edgels(edg_indx+1, 1), edgels(edg_indx+1, 2)];
     edges_locations_pixels = [edges_locations_pixels, edges_2D_point'];
 
+
     Rot = R{img_indx+1};
     Transl = T{img_indx+1};
 
@@ -98,6 +115,36 @@ for i = 1:length(captured_edge_pairs_img_indx)
     subplot(subplot_rows, subplot_cols, edge_counter);
     imshow(img); hold on;
     plot(edges_2D_point(1), edges_2D_point(2), 'bs'); hold on;
+
+    point_camera = Rot * target_edge' + Transl;
+    point_image = K * point_camera;
+    edges2D = [point_image(1) / point_image(3), point_image(2) / point_image(3)];
+    reprojection_error(i, 1) = sqrt(sum((edges2D - edges_2D_point) .^ 2));
+
+    if(i ~= 1 && i ~= 2)
+        %plot epipolar line 1
+        Rel_R = Rot * R1_hyp1';
+        Rel_T = Transl - Rot * R1_hyp1' * T1_hyp1;
+        E21 = skew_T(Rel_T) * Rel_R;
+        F21 = K_inv' * E21 * K_inv;
+        l = F21 * point1;
+        imageWidth = size(img, 2);
+        x = [1, imageWidth]; 
+        y = (-l(1) * x - l(3)) / l(2); % Y-coordinates
+        plot(x, y, 'r', 'LineWidth', 2);hold on;
+    
+        %plot epipolar line 2
+        Rel_R = Rot * R1_hyp2';
+        Rel_T = Transl - Rot * R1_hyp2' * T1_hyp2;
+        E21 = skew_T(Rel_T) * Rel_R;
+        F21 = K_inv' * E21 * K_inv;
+        point1_3 = [point2(1); point2(2); 1];
+        l = F21 * point2;
+        imageWidth = size(img, 2);
+        x = [1, imageWidth]; 
+        y = (-l(1) * x - l(3)) / l(2); % Y-coordinates
+        plot(x, y, 'b', 'LineWidth', 2);
+    end
 
     edge_counter = edge_counter + 1;
 
@@ -119,8 +166,8 @@ for i = 1:length(captured_edge_pairs_img_indx)
 end
 
 debug = 0;
-[corrected_features, reproj_errs, is_sol_global_optimal, Gamma] = ...
-    fast_multiview_triangulation_mex(edges_locations_pixels, K_, Rs, Ts, debug);
+% [corrected_features, reproj_errs, is_sol_global_optimal, Gamma] = ...
+%     fast_multiview_triangulation_mex(edges_locations_pixels, K_, Rs, Ts, debug);
 
 % figure(3);
 % img_str = strcat(Image_Path, "/", string(H1_index), "_colors.png");
