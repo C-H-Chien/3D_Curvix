@@ -29,6 +29,7 @@
 #include "EdgeSketch_Core.hpp"
 #include "definitions.h"
 
+
 //> Constructor
 EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     : Edge_Sketch_Setting_YAML_File(Edge_Sketch_Setting_File)
@@ -137,7 +138,10 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 
     //> Compute epipolar wedge angles between HYPO1 and HYPO2 and valid angle range in HYPO1 for fast indexing from edges of HYPO2
     OreListdegree       = getOre->getOreList(hyp01_view_indx, hyp02_view_indx, Edges_HYPO2, All_R, All_T, K_HYPO1, K_HYPO2);
-    OreListBardegree    = getOre->getOreListBar(Edges_HYPO1, All_R, All_T, K_HYPO1, K_HYPO2, hyp02_view_indx, hyp01_view_indx);
+
+    auto result = getOre->getOreListBar(Edges_HYPO1, All_R, All_T, K_HYPO1, K_HYPO2, hyp02_view_indx, hyp01_view_indx);
+    OreListBardegree = result.first;
+    Eigen::Vector3d epipole = result.second;
 }
 
 void EdgeSketch_Core::Run_3D_Edge_Sketch() {
@@ -253,13 +257,18 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 Eigen::MatrixXd edge_tgt_gamma3    = getReprojEdgel->getGamma3Tgt(hyp01_view_indx, hyp02_view_indx, Edges_HYPO1_final, Edges_HYPO2_final, All_R, All_T, VALID_INDX, K_HYPO1, K_HYPO2);
                 
                 //> Calculate the epipolar angle range (Hypo1 --> Vali)
-                Eigen::MatrixXd OreListBardegree31 = getOre->getOreListBar(Edges_HYPO1_final, All_R, All_T, K_HYPO1, K3, VALID_INDX, hyp01_view_indx);
+                auto result1 = getOre->getOreListBar(Edges_HYPO1_final, All_R, All_T, K_HYPO1, K3, VALID_INDX, hyp01_view_indx);
+                Eigen::MatrixXd OreListBardegree31 = result1.first;
+                //Eigen::MatrixXd OreListBardegree31 = getOre->getOreListBar(Edges_HYPO1_final, All_R, All_T, K_HYPO1, K3, VALID_INDX, hyp01_view_indx);
                 Eigen::MatrixXd OreListdegree31    = getOre->getOreListVali(TO_Edges_VALID, All_R, All_T, K_HYPO1, K3, VALID_INDX, hyp01_view_indx);
 
                 //> Calculate the epipolar angle range (Hypo2 --> Vali)
-                Eigen::MatrixXd OreListBardegree32 = getOre->getOreListBar(Edges_HYPO2_final, All_R, All_T, K_HYPO2, K3, VALID_INDX, hyp02_view_indx);
+                auto result2 = getOre->getOreListBar(Edges_HYPO2_final, All_R, All_T, K_HYPO2, K3, VALID_INDX, hyp02_view_indx);
+                Eigen::MatrixXd OreListBardegree32 = result2.first;
+                //Eigen::MatrixXd OreListBardegree32 = getOre->getOreListBar(Edges_HYPO2_final, All_R, All_T, K_HYPO2, K3, VALID_INDX, hyp02_view_indx);
                 Eigen::MatrixXd OreListdegree32    = getOre->getOreListVali(TO_Edges_VALID, All_R, All_T, K_HYPO2, K3, VALID_INDX, hyp02_view_indx);
                 
+
                 //> Find the epipolar angle range of the epipolar wedge on the validation view arising from Edges_HYPO1_final, and parse the corresponding edgels on the validation view
                 double thresh_ore31_1 = OreListBardegree31(0,0);
                 double thresh_ore31_2 = OreListBardegree31(0,1);
@@ -412,7 +421,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
 
     ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
-    Create a new data structure to hold the reorganized paired edges
+    //Create a new data structure to hold the reorganized paired edges
     Eigen::MatrixXd paired_edge_final_reorganized = Eigen::MatrixXd::Constant(
         paired_edge_final.rows(), Num_Of_Total_Imgs, -2  // Initialize with -2 (no support)
     );
@@ -450,16 +459,16 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
     debug_file_paired_edges << paired_edge_final;
     debug_file_paired_edges.close();
 
-    // std::ofstream reorg_file_paired_edges;
-    // std::string Output_File_Path_Paired_Edges_reorg = "../../outputs/idx_paired_edge_final_"+ std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
-    // reorg_file_paired_edges.open(Output_File_Path_Paired_Edges_reorg);
-    // reorg_file_paired_edges << paired_edge_final_reorganized;
-    // reorg_file_paired_edges.close();
+//     std::ofstream reorg_file_paired_edges;
+//     std::string Output_File_Path_Paired_Edges_reorg = "../../outputs/idx_paired_edge_final_"+ std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
+//     reorg_file_paired_edges.open(Output_File_Path_Paired_Edges_reorg);
+//     reorg_file_paired_edges << paired_edge_final_reorganized;
+//     reorg_file_paired_edges.close();
 
-   // Write paired_edges_final_hypothesis1_hypothesis2.txt with actual edge locations and corresponding R and T matrices
-    std::ofstream paired_edges_locations_file;
-    std::string Output_File_Path_Edge_Locations = "../../outputs/paired_edges_final_with_frame_number" + std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
-    paired_edges_locations_file.open(Output_File_Path_Edge_Locations);
+//    Write paired_edges_final_hypothesis1_hypothesis2.txt with actual edge locations and corresponding R and T matrices
+//     std::ofstream paired_edges_locations_file;
+//     std::string Output_File_Path_Edge_Locations = "../../outputs/paired_edges_final_with_frame_number" + std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
+//     paired_edges_locations_file.open(Output_File_Path_Edge_Locations);
 
     for (int pair_idx = 0; pair_idx < paired_edge_final.rows(); ++pair_idx) {
         // Write Hypothesis 1 and Hypothesis 2 edge locations
@@ -469,32 +478,94 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         Eigen::Vector2d edge_hypo1 = Edges_HYPO1.row(hypo1_idx).head<2>();
         Eigen::Vector2d edge_hypo2 = Edges_HYPO2.row(hypo2_idx).head<2>();
 
-        paired_edges_locations_file << "Pair " << pair_idx + 1 << ":\n";
-        Eigen::RowVectorXd R_vector1 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp01_view_indx].data(), All_R[hyp01_view_indx].size());
-        Eigen::RowVectorXd R_vector2 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp02_view_indx].data(), All_R[hyp02_view_indx].size());
-        
-        paired_edges_locations_file << edge_hypo1(0) << " " << edge_hypo1(1) << " " << R_vector1 << " " << All_T[hyp01_view_indx].transpose() << "\n";
-        paired_edges_locations_file << edge_hypo2(0) << " " << edge_hypo2(1) << " " << R_vector2 << " " << All_T[hyp02_view_indx].transpose() << "\n";
+        Eigen::MatrixXd edgel_HYPO1   = Edges_HYPO1.row(int(paired_edge_final(pair_idx,0)));  //> edge index in hypo 1
+        Eigen::MatrixXd edgel_HYPO2   = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));  //> edge index in hypo 2
+        Eigen::MatrixXd HYPO2_idx_raw = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));
+
+        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
+        Edges_HYPO1_final << edgels_HYPO2_corrected.col(0), edgels_HYPO2_corrected.col(1), edgels_HYPO2_corrected.col(2), edgels_HYPO2_corrected.col(3);
+        Eigen::MatrixXd Edges_HYPO2_final(edgels_HYPO2_corrected.rows(), 4);
+        Edges_HYPO2_final << edgels_HYPO2_corrected.col(4), edgels_HYPO2_corrected.col(5), edgels_HYPO2_corrected.col(6), edgels_HYPO2_corrected.col(7);
 
 
-        // Loop through validation views and write actual edge locations and R, T matrices
-        int val_indx_in_paired_edge_array = 2;
-        for (int val_idx = 0; val_idx < Num_Of_Total_Imgs; ++val_idx) {
-            if (val_idx == hyp01_view_indx || val_idx == hyp02_view_indx) {
-                continue;  // Skip hypothesis views
-            }
-
-            int support_idx = paired_edge_final(pair_idx, val_indx_in_paired_edge_array);
-            if (support_idx != -2) {
-                Eigen::RowVectorXd R_vector = Eigen::Map<Eigen::RowVectorXd>(All_R[val_idx].data(), All_R[val_idx].size());
-                Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
-                paired_edges_locations_file <<val_idx<<" "<< supporting_edge(0) << " " << supporting_edge(1) << " " << R_vector<<" "<<All_T[val_idx].transpose() << "\n";
-            }
-            val_indx_in_paired_edge_array++;
+        if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
+            std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
+            continue;
         }
-        paired_edges_locations_file << "\n"; // Newline between pairs
+
+        
+        if (abs(edge_hypo1(0)-371.501036414962)<0.001  && abs(edge_hypo1(1)-343.024488952697)<0.001 &&
+            (abs(edge_hypo2(0)-411.980404064142)<0.001 && abs(edge_hypo2(1)-395.677179492381)<0.001) ){
+                std::cout<<"found"<<std::endl;
+                std::ofstream epipole_file;
+                std::string Epipole_File_Path = "../../outputs/epipole_and_angle_range.txt";
+                epipole_file.open(Epipole_File_Path);
+
+                int val_indx_in_paired_edge_array = 2;
+                for (int val_idx = 0; val_idx < Num_Of_Total_Imgs; ++val_idx) {
+                    if (val_idx == hyp01_view_indx || val_idx == hyp02_view_indx) {
+                        continue;  // Skip hypothesis views
+                    }
+
+                    int support_idx = paired_edge_final(pair_idx, val_indx_in_paired_edge_array);
+                    if (support_idx != -2) {
+                        double angle_range_hypo1_1, angle_range_hypo1_2, angle_range_hypo2_1, angle_range_hypo2_2;
+
+                        auto result1 = getOre->getOreListBar(Edges_HYPO1_final, All_R, All_T, K_HYPO1, K, val_idx, hyp01_view_indx);
+                        Eigen::MatrixXd OreListBardegree31 = result1.first;
+                        Eigen::Vector3d epipole1 = result1.second;
+                        angle_range_hypo1_1 = OreListBardegree31(0, 0);
+                        angle_range_hypo1_2 = OreListBardegree31(0, 1);
+                      
+                        //> Calculate the epipolar angle range (Hypo2 --> Vali)
+                        auto result2 = getOre->getOreListBar(Edges_HYPO2_final, All_R, All_T, K_HYPO2, K, val_idx, hyp02_view_indx);
+                        Eigen::MatrixXd OreListBardegree32 = result2.first;
+                        Eigen::Vector3d epipole2 = result2.second;
+                        angle_range_hypo2_1 = OreListBardegree32(0, 0);
+                        angle_range_hypo2_2 = OreListBardegree32(0, 1);
+
+                        // Write to the file
+                        epipole_file << "Validation View Index: " << val_idx << "\n";
+                        epipole_file << "Epipole 1: " << epipole1.transpose() << "\n";
+                        epipole_file << "Angle Range Hypothesis 1: [" << angle_range_hypo1_1 << ", " << angle_range_hypo1_2 << "]\n";
+                        epipole_file << "Epipole 2: " << epipole2.transpose() << "\n";
+                        epipole_file << "Angle Range Hypothesis 2: [" << angle_range_hypo2_1 << ", " << angle_range_hypo2_2 << "]\n";
+                        epipole_file << "-------------------------\n";
+                    }
+                    val_indx_in_paired_edge_array++;
+                }
+                epipole_file.close();
+
+
+        }
+
+    //     paired_edges_locations_file << "Pair " << pair_idx + 1 << ":\n";
+    //     Eigen::RowVectorXd R_vector1 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp01_view_indx].data(), All_R[hyp01_view_indx].size());
+    //     Eigen::RowVectorXd R_vector2 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp02_view_indx].data(), All_R[hyp02_view_indx].size());
+        
+    //     paired_edges_locations_file << edge_hypo1(0) << " " << edge_hypo1(1) << " " << R_vector1 << " " << All_T[hyp01_view_indx].transpose() << "\n";
+    //     paired_edges_locations_file << edge_hypo2(0) << " " << edge_hypo2(1) << " " << R_vector2 << " " << All_T[hyp02_view_indx].transpose() << "\n";
+
+
+    //    // Loop through validation views and write actual edge locations and R, T matrices
+    //     int val_indx_in_paired_edge_array = 2;
+    //     for (int val_idx = 0; val_idx < Num_Of_Total_Imgs; ++val_idx) {
+    //         if (val_idx == hyp01_view_indx || val_idx == hyp02_view_indx) {
+    //             continue;  // Skip hypothesis views
+    //         }
+
+    //         int support_idx = paired_edge_final(pair_idx, val_indx_in_paired_edge_array);
+    //         if (support_idx != -2) {
+    //             Eigen::RowVectorXd R_vector = Eigen::Map<Eigen::RowVectorXd>(All_R[val_idx].data(), All_R[val_idx].size());
+    //             Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
+    //             paired_edges_locations_file <<val_idx<<" "<< supporting_edge(0) << " " << supporting_edge(1) << " " << R_vector<<" "<<All_T[val_idx].transpose() << "\n";
+    //         }
+    //         val_indx_in_paired_edge_array++;
+    //     }
+    //     paired_edges_locations_file << "\n"; // Newline between pairs
     }
-    paired_edges_locations_file.close();
+    //paired_edges_locations_file.close();
 
 #endif
 
