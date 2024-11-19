@@ -48,16 +48,16 @@ edge_pair_final = importdata(fullfile(data_folder_path, "paired_edge_final.txt")
 % figure(1);
 % plot3(edges_3D(:,1), edges_3D(:,2), edges_3D(:,3), 'Color', 'r', 'Marker', '.', 'LineStyle', 'none')
 
-H1_index = 9;
-H2_index = 39;
+H1_index = 0;
+H2_index = 40;
 image_indices = 0:1:49;
 image_indices = image_indices';
-image_indices(H1_index, :) = [];
-image_indices(H2_index, :) = [];
+image_indices([H1_index+1, H2_index+1], :) = [];
+%image_indices(H2_index+1, :) = [];
 image_indices = [H1_index; H2_index; image_indices];
 
 % target_edge = [0.8290, 0.6586, 0.2873];
-target_edge = [0.5913, 0.3053, 0.6723];
+target_edge = [0.4407, 0.2829, 0.6423];
 target_index = find(abs(edges_3D(:,1)-target_edge(1))<0.001 & abs(edges_3D(:,2)-target_edge(2))<0.001 & abs(edges_3D(:,3)-target_edge(3))<0.001);
 if (length(target_index) > 1)
     error("More than one target index!\n");
@@ -166,8 +166,8 @@ for i = 1:length(captured_edge_pairs_img_indx)
 end
 
 debug = 0;
-% [corrected_features, reproj_errs, is_sol_global_optimal, Gamma] = ...
-%     fast_multiview_triangulation_mex(edges_locations_pixels, K_, Rs, Ts, debug);
+[corrected_features, reproj_errs, is_sol_global_optimal, Gamma] = ...
+    fast_multiview_triangulation_mex(edges_locations_pixels, K_, Rs, Ts, debug);
 
 % figure(3);
 % img_str = strcat(Image_Path, "/", string(H1_index), "_colors.png");
