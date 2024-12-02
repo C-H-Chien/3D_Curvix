@@ -304,25 +304,25 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     Eigen::VectorXd idxVector = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(v_intersection.data(), v_intersection.size());
                     Eigen::MatrixXd inliner(idxVector);
 
-                    ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
-                    if (abs(Edges_HYPO1_final(idx_pair,0)-408.499411771281)<0.001  && abs(Edges_HYPO1_final(idx_pair,1)-321.551396487509)<0.001 &&
-                    abs(Edges_HYPO2_final(idx_pair,0)-368.985851780834)<0.001  && abs(Edges_HYPO2_final(idx_pair,1)-300.328671357782)<0.001 &&
-                    !v_intersection.empty()){
-                        std::cout<<"found"<<std::endl;
-                        std::ofstream epipole_file;
-                        std::string Epipole_File_Path = "../../outputs/epipole_and_angle_range_val_" + std::to_string(VALID_INDX) + ".txt";
-                        epipole_file.open(Epipole_File_Path);
+                    // ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
+                    // if (abs(Edges_HYPO1_final(idx_pair,0)-232.669803511699)<0.001  && abs(Edges_HYPO1_final(idx_pair,1)-456.492553062112)<0.001 &&	
+                    // abs(Edges_HYPO2_final(idx_pair,0)-257.615692972776)<0.001  && abs(Edges_HYPO2_final(idx_pair,1)-488.98111082677)<0.001 &&
+                    // !v_intersection.empty()){
+                    //     std::cout<<"found"<<std::endl;
+                    //     std::ofstream epipole_file;
+                    //     std::string Epipole_File_Path = "../../outputs/epipole_and_angle_range_val_" + std::to_string(VALID_INDX) + ".txt";
+                    //     epipole_file.open(Epipole_File_Path);
 
-                        // Write to the file
-                        epipole_file << "Validation View Index: " << VALID_INDX << "\n";
-                        epipole_file << "Epipole 1: " << epipole1.transpose() << "\n";
-                        epipole_file << "Angle Range Hypothesis 1: [" << thresh_ore31_1 << ", " << thresh_ore31_2 << "]\n";
-                        epipole_file << "Epipole 2: " << epipole2.transpose() << "\n";
-                        epipole_file << "Angle Range Hypothesis 2: [" << thresh_ore32_1 << ", " << thresh_ore32_2 << "]\n";
-                        epipole_file << "-------------------------\n";
-                        epipole_file.close();
-                    }
-                    ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
+                    //     // Write to the file
+                    //     epipole_file << "Validation View Index: " << VALID_INDX << "\n";
+                    //     epipole_file << "Epipole 1: " << epipole1.transpose() << "\n";
+                    //     epipole_file << "Angle Range Hypothesis 1: [" << thresh_ore31_1 << ", " << thresh_ore31_2 << "]\n";
+                    //     epipole_file << "Epipole 2: " << epipole2.transpose() << "\n";
+                    //     epipole_file << "Angle Range Hypothesis 2: [" << thresh_ore32_1 << ", " << thresh_ore32_2 << "]\n";
+                    //     epipole_file << "-------------------------\n";
+                    //     epipole_file.close();
+                    // }
+                    // ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
 
                     
                     //> Calculate orientation of gamma 3 (the reprojected edge)
@@ -593,7 +593,8 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
             continue;
         }
 
-        if (pt_H1(0) ==351.52909213606 && pt_H1(1) ==338.133268304538 && pt_H2(0) ==335.384631986887 && pt_H2(1)==336.788068618203){
+        if (pt_H2(0) ==412.47224748142 && pt_H2(1) ==395.73765308129){
+            std::cout<<"2d point in hypothesis 1 is: " <<pt_H1(0)<<" "<<pt_H1(1)<<std::endl;
             std::cout<<"3d point is: " <<edge_pt_3D(0)<<" "<<edge_pt_3D(1)<<" "<<edge_pt_3D(2)<<std::endl;
             Eigen::Matrix3d R_new = All_R[hyp01_view_indx];
             Eigen::Vector3d T_new = All_T[hyp01_view_indx];
@@ -764,8 +765,10 @@ Eigen::MatrixXd EdgeSketch_Core::project3DEdgesToView(const Eigen::MatrixXd& edg
 }
 
 void EdgeSketch_Core::select_Next_Best_Hypothesis_Views( 
-    const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels, \
-    std::pair<int, int> &next_hypothesis_views, double &least_ratio ) 
+    const std::vector<int>& claimedEdges, 
+    std::vector<Eigen::MatrixXd> All_Edgels, 
+    std::pair<int, int>& next_hypothesis_views, 
+    double& least_ratio) 
 {
     std::vector<std::pair<int, double>> frameSupportCounts;
 
@@ -782,9 +785,37 @@ void EdgeSketch_Core::select_Next_Best_Hypothesis_Views(
 
     int bestView1 = frameSupportCounts[0].first;
     int bestView2 = frameSupportCounts[1].first;
+
+    // If the new best views are the same as hyp1 and hyp2, randomly select two new views
+    if ((bestView1 == hyp01_view_indx && bestView2 == hyp02_view_indx) || (bestView1 == hyp02_view_indx && bestView2 == hyp01_view_indx)) {
+        std::vector<int> availableViews;
+        for (int i = 0; i < claimedEdges.size(); i++) {
+            if (i != hyp01_view_indx && i != hyp02_view_indx) {
+                availableViews.push_back(i);
+            }
+        }
+
+        // Randomly select two unique views from the available views
+        if (availableViews.size() >= 2) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(0, availableViews.size() - 1);
+
+            int randomIndex1 = dis(gen);
+            int randomIndex2;
+            do {
+                randomIndex2 = dis(gen);
+            } while (randomIndex2 == randomIndex1);
+
+            bestView1 = availableViews[randomIndex1];
+            bestView2 = availableViews[randomIndex2];
+        }
+    }
+
     next_hypothesis_views = std::make_pair(bestView1, bestView2);
     least_ratio = frameSupportCounts[0].second;
 }
+
 
 void EdgeSketch_Core::Clear_Data() {
     all_supported_indices.clear();
