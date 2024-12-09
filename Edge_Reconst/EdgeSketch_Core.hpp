@@ -49,6 +49,15 @@ public:
     void Clear_Data();
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    void Compute_3D_Tangents(const Eigen::MatrixXd& pt_edge_view1,
+    const Eigen::MatrixXd& pt_edge_view2,
+    const Eigen::Matrix3d& K1,
+    const Eigen::Matrix3d& K2,
+    const Eigen::Matrix3d& R1,
+    const Eigen::Matrix3d& R2,
+    const Eigen::Vector3d& T1,
+    const Eigen::Vector3d& T2,
+    Eigen::MatrixXd& tangents_3D);
 
     //> Destructor
     ~EdgeSketch_Core();
@@ -89,6 +98,8 @@ public:
 
     std::vector< Eigen::MatrixXd > all_supported_indices;
     Eigen::MatrixXd Gamma1s;
+    Eigen::MatrixXd tangent3Ds;
+
     Eigen::MatrixXd all_3D_Edges;
     std::vector< int > claimedEdgesList;
     double least_ratio;
@@ -114,7 +125,7 @@ private:
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
-      std::pair<int, int> &next_hypothesis_views, double &least_ratio );
+      std::pair<int, int> &next_hypothesis_views, double &least_ratio);
 
     //> YAML file data parser
     YAML::Node Edge_Sketch_Setting_YAML_File;
