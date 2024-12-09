@@ -27,6 +27,8 @@
 #include <yaml-cpp/yaml.h>
 
 #include "EdgeSketch_Core.hpp"
+#include "getReprojectedEdgel.hpp"
+#include "util.hpp"
 #include "definitions.h"
 
 
@@ -606,7 +608,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         Gamma1s.row(pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
 
         Eigen::MatrixXd tangents_3D;
-        Compute_3D_Tangents(Edges_HYPO1_final,Edges_HYPO2_final,K_HYPO1,K_HYPO2,All_R[hyp01_view_indx],All_R[hyp02_view_indx],All_T[hyp01_view_indx],All_T[hyp02_view_indx],tangents_3D);
+        Compute_3D_Tangents(Edges_HYPO1_final,Edges_HYPO2_final, K_HYPO1,K_HYPO2,All_R[hyp01_view_indx],All_R[hyp02_view_indx],All_T[hyp01_view_indx],All_T[hyp02_view_indx],tangents_3D, pair_idx);
         tangent3Ds.row(pair_idx) = tangents_3D.row(0);
         
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, pt_H1, hyp01_view_indx);
@@ -852,33 +854,30 @@ void EdgeSketch_Core::Compute_3D_Tangents(
     const Eigen::Matrix3d& R2,
     const Eigen::Vector3d& T1,
     const Eigen::Vector3d& T2,
-    Eigen::MatrixXd& tangents_3D)
+    Eigen::MatrixXd& tangents_3D,
+    int pair_idx)
 {
-    tangents_3D.resize(pt_edge_view1.rows(), 3); // For storing 3D tangents
+    tangents_3D.resize(1, 3);
 
     Eigen::Matrix3d R21 = R1.transpose() * R2;  // Relative rotation
     Eigen::Vector3d T21 = R1.transpose() * (T2 - T1); // Relative translation
+    Eigen::Vector3d e1  = {1,0,0};
+    Eigen::Vector3d e3  = {0,0,1};
 
-    for (int i = 0; i < pt_edge_view1.rows(); ++i) {
-        // Normalize edge points
-        Eigen::Vector3d Gamma1 = K1.inverse() * Eigen::Vector3d(pt_edge_view1(i, 0), pt_edge_view1(i, 1), 1.0);
-        Eigen::Vector3d Gamma2 = K2.inverse() * Eigen::Vector3d(pt_edge_view2(i, 0), pt_edge_view2(i, 1), 1.0);
+    // Normalize edge points
+    Eigen::Vector3d Gamma1 = K1.inverse() * Eigen::Vector3d(pt_edge_view1(0, 0), pt_edge_view1(0, 1), 1.0);
+    Eigen::Vector3d Gamma2 = K2.inverse() * Eigen::Vector3d(pt_edge_view2(0, 0), pt_edge_view2(0, 1), 1.0);
 
-        // Compute depths
-        double rho1 = (T21.dot(Gamma2.cross(R21 * Gamma1))) /
-                      ((Gamma2.cross(R21 * Gamma1)).dot(Gamma1.cross(R21 * Gamma2)));
-        double rho2 = ((rho1 * Gamma1).dot(R21 * Gamma2) - T21.dot(Gamma1)) / Gamma2.dot(Gamma2);
-
-        // Reconstruct 3D points
-        Eigen::Vector3d P1 = rho1 * Gamma1;
-        Eigen::Vector3d P2 = rho2 * (R21 * Gamma2) + T21;
-
-        // Compute 3D tangent
-        Eigen::Vector3d T3D = (P2 - P1).normalized();
-        Eigen::Vector3d T3D_world = R1.transpose() * T3D;
-        tangents_3D.row(i) = T3D_world.transpose();
-    }
+    Eigen::Vector3d tgt1_meters = getReprojEdgel->getTGT_Meters(pt_edge_view1, K1);
+    double rho1 = (double(e1.transpose() * T21) - double(e3.transpose() * T21) * double(e1.transpose() *Gamma2))/(double(e3.transpose() * R21 * Gamma1)* double(e1.transpose() * Gamma2) - double(e1.transpose() * R21 * Gamma1));
+    Eigen::Vector3d tgt2_meters = getReprojEdgel->getTGT_Meters(pt_edge_view2, K2);
+    Eigen::Vector3d n1 = tgt1_meters.cross(Gamma1);
+    Eigen::Vector3d n2 = R21.transpose() * tgt2_meters.cross(Gamma2);
+    Eigen::Vector3d T3D = n1.cross(n2) / (n1.cross(n2) ).norm();
+    Eigen::Vector3d T3D_world = R1.transpose() * T3D;
+    tangents_3D.row(0) = T3D_world.transpose();
 }
+
 
 
 #endif
