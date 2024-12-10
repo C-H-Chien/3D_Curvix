@@ -589,6 +589,19 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         //> The resultant edge_pt_3D is 3D edges "under the first hypothesis view coordinate"
         Eigen::Vector3d edge_pt_3D = util->linearTriangulation(2, pts, Rs, Ts, K_HYPO1);
 
+        ///////////////// print R and T ///////////////////////
+        // std::cout<<"Rs is: ";
+        // for (const auto& r : Rs) {
+        //     std::cout << r.transpose() << " "; // Use transpose() to print as a row for readability
+        // }
+        // std::cout << std::endl;
+        // std::cout << "Ts is: ";
+        // for (const auto& t : Ts) {
+        //     std::cout << t.transpose() << " "; // Use transpose() to print as a row for readability
+        // }
+        // std::cout << std::endl;
+        ///////////////// print R and T ///////////////////////
+
         if (edge_pt_3D.hasNaN()) {
             LOG_ERROR("NaN values detected in edge_pt_3D for pair_idx: ");
             Gamma1s.row(pair_idx)<< 0, 0, 0;  //> TBD
@@ -608,7 +621,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         Gamma1s.row(pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
 
         Eigen::MatrixXd tangents_3D;
-        Compute_3D_Tangents(Edges_HYPO1_final,Edges_HYPO2_final, K_HYPO1,K_HYPO2,All_R[hyp01_view_indx],All_R[hyp02_view_indx],All_T[hyp01_view_indx],All_T[hyp02_view_indx],tangents_3D, pair_idx);
+        Compute_3D_Tangents(Edges_HYPO1_final,Edges_HYPO2_final, K_HYPO1,K_HYPO2,All_R[hyp01_view_indx],All_R[hyp02_view_indx],All_T[hyp01_view_indx],All_T[hyp02_view_indx],tangents_3D);
         tangent3Ds.row(pair_idx) = tangents_3D.row(0);
         
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, pt_H1, hyp01_view_indx);
@@ -657,6 +670,53 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
 
 void EdgeSketch_Core::Stack_3D_Edges() {
+    
+    ////////////////// test /////////////////////////
+    Eigen::Matrix3d R1_test;
+    Eigen::Matrix3d R2_test;
+    Eigen::Matrix3d R21_test;
+    Eigen::Matrix3d R12_test;
+    Eigen::Matrix3d K_test;
+    Eigen::Vector3d T12_test;
+    Eigen::Vector3d T21_test;
+    Eigen::MatrixXd Edges_HYPO1_final_test(2, 1); 
+    Eigen::MatrixXd Edges_HYPO2_final_test(2, 1); 
+
+    Edges_HYPO1_final_test << 313.1281,  221.2212;
+    Edges_HYPO2_final_test << 214.3858,  328.1279;
+
+    R1_test <<  0.283307133314224,   0.599568603826573,   0.748501541427090,
+              -0.799349013318374,  -0.283603601454719,   0.529726488056670,
+               0.529885103697223,  -0.748389261378974,   0.398917648559720;
+    Eigen::Vector3d T1_test(13.6410104166048, -9.11680242242608, 1127.72680230083);
+    R2_test << 0.198022493633256,  -0.935531843585112,  -0.292518822733696,
+            0.825113183290599,   0.320192735561566,  -0.465472713328778,
+            0.529126947693388,  -0.149187069586616,   0.835325021469390;    
+    Eigen::Vector3d T2_test(7.08308678814200 ,     5.40078420948800,    1123.03603126844);
+    K_test << 2584.93250981950,    0,   249.771375872214,
+         0, 2584.79186060577, 278.312679379194,
+         0, 0,1;
+
+
+    util->getRelativePoses(R1_test, T1_test, R2_test, T2_test, R21_test, T21_test, R12_test, T12_test);
+
+    std::vector<Eigen::Vector2d> pts_test;
+    pts_test.push_back(Edges_HYPO1_final_test);
+    pts_test.push_back(Edges_HYPO2_final_test);
+
+    std::vector<Eigen::Matrix3d> Rs_test;
+    Rs_test.push_back(R21_test);
+    std::vector<Eigen::Vector3d> Ts_test;
+    Ts_test.push_back(T21_test);
+
+    Eigen::MatrixXd tangents_3D_test;
+    Compute_3D_Tangents(Edges_HYPO1_final_test,Edges_HYPO2_final_test, K_test, K_test,R1_test,R2_test,T1_test,T2_test,tangents_3D_test);
+    std::cout<<"tangent is: "<<tangents_3D_test<<std::endl;
+    Eigen::Vector3d edge_pt_3D_test = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K_test);
+    Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D_test, R1_test, T1_test);
+    std::cout<<"3d point is: "<<edge_pt_3D_world.transpose()<<std::endl;
+
+    ////////////////// test /////////////////////////
     Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
     Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
 
@@ -854,8 +914,7 @@ void EdgeSketch_Core::Compute_3D_Tangents(
     const Eigen::Matrix3d& R2,
     const Eigen::Vector3d& T1,
     const Eigen::Vector3d& T2,
-    Eigen::MatrixXd& tangents_3D,
-    int pair_idx)
+    Eigen::MatrixXd& tangents_3D)
 {
     tangents_3D.resize(1, 3);
 
