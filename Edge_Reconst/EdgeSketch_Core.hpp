@@ -53,11 +53,11 @@ public:
     const Eigen::MatrixXd& pt_edge_view2,
     const Eigen::Matrix3d& K1,
     const Eigen::Matrix3d& K2,
-    const Eigen::Matrix3d& R1,
-    const Eigen::Matrix3d& R2,
-    const Eigen::Vector3d& T1,
-    const Eigen::Vector3d& T2,
+    const Eigen::Matrix3d& R21,
+    const Eigen::Vector3d& T21,
     Eigen::MatrixXd& tangents_3D);
+
+    void test_3D_tangent();
 
     //> Destructor
     ~EdgeSketch_Core();

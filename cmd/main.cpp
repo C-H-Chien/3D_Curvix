@@ -66,6 +66,10 @@ int main(int argc, char **argv) {
   //> Constructor
   EdgeSketch_Core MWV_Edge_Rec( Edge_Sketch_Settings_Map );
 
+  MWV_Edge_Rec.test_3D_tangent();
+
+  /*
+
   //> Read camera intrinsic and extrinsic matrices
   MWV_Edge_Rec.Read_Camera_Data();
 
@@ -118,6 +122,7 @@ int main(int argc, char **argv) {
   std::cout << "     - Time for Pairing up Edges:              " << MWV_Edge_Rec.pair_edges_time << " (s)" << std::endl;
   std::cout << "     - Time for Finalizing Edge Pairs:         " << MWV_Edge_Rec.finalize_edge_pair_time << " (s)" << std::endl;
   std::cout << "     - Time for Finding Next Hypothesis Views: " << MWV_Edge_Rec.find_next_hypothesis_view_time << " (s)" << std::endl;
+  */
 
   LOG_INFOR_MESG("3D Edge Sketch is Finished!");
   return 0;
