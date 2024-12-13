@@ -634,7 +634,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         util->getRelativePoses(All_R[hyp01_view_indx], All_T[hyp01_view_indx], All_R[hyp02_view_indx], All_T[hyp02_view_indx], R21_test, T21_test, R12_test, T12_test);
 
         Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_HYPO1, K_HYPO2, R21_test, T21_test, tangents_3D);
-        Eigen::Vector3d tangents_3D_world = All_R[hyp01_view_indx] * tangents_3D;
+        Eigen::Vector3d tangents_3D_world = (All_R[hyp01_view_indx]).transpose() * tangents_3D;
         tangent3Ds.row(pair_idx) = tangents_3D_world;
 //std::cout << "Assigned tangent3Ds.row(pair_idx): " << tangent3Ds.row(pair_idx) << std::endl;
         
