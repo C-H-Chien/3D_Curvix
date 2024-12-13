@@ -620,9 +620,23 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
         Gamma1s.row(pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
 
-        Eigen::Matrix3d tangents_3D = Eigen::Matrix3d::Zero();
-        //Compute_3D_Tangents(Edges_HYPO1_final,Edges_HYPO2_final, K_HYPO1,K_HYPO2,All_R[hyp01_view_indx],All_R[hyp02_view_indx],All_T[hyp01_view_indx],All_T[hyp02_view_indx],tangents_3D);
-        tangent3Ds.row(pair_idx) = tangents_3D.row(0);
+        Eigen::MatrixXd tangents_3D = Eigen::Matrix3d::Zero();
+        // std::cout<<"edgel_HYPO1 is: "<<edgel_HYPO1<<std::endl;
+        // std::cout<<"edgel_HYPO2 is: "<<edgel_HYPO2<<std::endl;
+        Eigen::Vector3d Edgel_View1(edgel_HYPO1(0),  edgel_HYPO1(1), edgel_HYPO1(2));
+        Eigen::Vector3d Edgel_View2(edgel_HYPO2(0),  edgel_HYPO2(1), edgel_HYPO2(2));
+        Eigen::Matrix3d R1_test = All_R[hyp01_view_indx];
+        Eigen::Matrix3d R21_test;
+        Eigen::Matrix3d R12_test;
+        Eigen::Vector3d T12_test;
+        Eigen::Vector3d T21_test;   
+
+        util->getRelativePoses(All_R[hyp01_view_indx], All_T[hyp01_view_indx], All_R[hyp02_view_indx], All_T[hyp02_view_indx], R21_test, T21_test, R12_test, T12_test);
+
+        Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_HYPO1, K_HYPO2, R21_test, T21_test, tangents_3D);
+        Eigen::Vector3d tangents_3D_world = All_R[hyp01_view_indx] * tangents_3D;
+        tangent3Ds.row(pair_idx) = tangents_3D_world;
+//std::cout << "Assigned tangent3Ds.row(pair_idx): " << tangent3Ds.row(pair_idx) << std::endl;
         
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, pt_H1, hyp01_view_indx);
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, pt_H2, hyp02_view_indx);
@@ -725,53 +739,6 @@ void EdgeSketch_Core::test_3D_tangent() {
 
 void EdgeSketch_Core::Stack_3D_Edges() {
     
-    ////////////////// test /////////////////////////
-    /*
-    Eigen::Matrix3d R1_test;
-    Eigen::Matrix3d R2_test;
-    Eigen::Matrix3d R21_test;
-    Eigen::Matrix3d R12_test;
-    Eigen::Matrix3d K_test;
-    Eigen::Vector3d T12_test;
-    Eigen::Vector3d T21_test;
-    Eigen::MatrixXd Edges_HYPO1_final_test(2, 1); 
-    Eigen::MatrixXd Edges_HYPO2_final_test(2, 1); 
-
-    Edges_HYPO1_final_test << 313.1281,  221.2212;
-    Edges_HYPO2_final_test << 214.3858,  328.1279;
-
-    R1_test <<  0.283307133314224,   0.599568603826573,   0.748501541427090,
-              -0.799349013318374,  -0.283603601454719,   0.529726488056670,
-               0.529885103697223,  -0.748389261378974,   0.398917648559720;
-    Eigen::Vector3d T1_test(13.6410104166048, -9.11680242242608, 1127.72680230083);
-    R2_test << 0.198022493633256,  -0.935531843585112,  -0.292518822733696,
-            0.825113183290599,   0.320192735561566,  -0.465472713328778,
-            0.529126947693388,  -0.149187069586616,   0.835325021469390;    
-    Eigen::Vector3d T2_test(7.08308678814200 ,     5.40078420948800,    1123.03603126844);
-    K_test << 2584.93250981950,    0,   249.771375872214,
-         0, 2584.79186060577, 278.312679379194,
-         0, 0,1;
-
-
-    util->getRelativePoses(R1_test, T1_test, R2_test, T2_test, R21_test, T21_test, R12_test, T12_test);
-
-    std::vector<Eigen::Vector2d> pts_test;
-    pts_test.push_back(Edges_HYPO1_final_test);
-    pts_test.push_back(Edges_HYPO2_final_test);
-
-    std::vector<Eigen::Matrix3d> Rs_test;
-    Rs_test.push_back(R21_test);
-    std::vector<Eigen::Vector3d> Ts_test;
-    Ts_test.push_back(T21_test);
-
-    Eigen::MatrixXd tangents_3D_test;
-    Compute_3D_Tangents(Edges_HYPO1_final_test,Edges_HYPO2_final_test, K_test, K_test,R1_test,R2_test,T1_test,T2_test,tangents_3D_test);
-    std::cout<<"tangent is: "<<tangents_3D_test<<std::endl;
-    Eigen::Vector3d edge_pt_3D_test = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K_test);
-    Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D_test, R1_test, T1_test);
-    std::cout<<"3d point is: "<<edge_pt_3D_world.transpose()<<std::endl;*/
-
-    ////////////////// test /////////////////////////
     Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
     Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
 
