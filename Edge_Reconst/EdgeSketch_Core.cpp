@@ -143,7 +143,7 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 
     auto result = getOre->getOreListBar(Edges_HYPO1, All_R, All_T, K_HYPO1, K_HYPO2, hyp02_view_indx, hyp01_view_indx);
     OreListBardegree = result.first;
-    Eigen::Vector3d epipole = result.second;
+    epipole = result.second;
 }
 
 void EdgeSketch_Core::Run_3D_Edge_Sketch() {
@@ -186,6 +186,9 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //Get angle Thresholds from OreListBar (in Degree) 
             double thresh_ore21_1 = OreListBardegree(edge_idx, 0);
             double thresh_ore21_2 = OreListBardegree(edge_idx, 1);
+            Eigen::Vector3d corresponding_epipole = epipole;
+
+            
 
             //> Find the corresponding edgel in HYPO2 based on the epipolar angle
             Eigen::MatrixXd HYPO2_idx_raw = PairHypo->getHYPO2_idx_Ore(OreListdegree, thresh_ore21_1, thresh_ore21_2);
@@ -194,6 +197,16 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Eigen::MatrixXd edgels_HYPO2 = PairHypo->getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, thresh_ore21_1, thresh_ore21_2);
             //> Correct Edgels in Hypo2 Based on Epipolar Constraints
             Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgels_HYPO2, Edges_HYPO1.row(edge_idx), F21, F12, HYPO2_idx_raw);
+
+            if (abs(Edges_HYPO1(edge_idx,0)-520.6008)<0.001  && abs(Edges_HYPO1(edge_idx,1)-428.9978)<0.001){
+                // std::cout<<HYPO2_idx_raw<<std::endl;
+                // std::cout<<edgels_HYPO2<<std::endl;
+                // std::cout<<edgels_HYPO2_corrected<<std::endl;
+                std::cout<<thresh_ore21_1<<std::endl;
+                std::cout<<thresh_ore21_2<<std::endl;
+                std::cout<<corresponding_epipole<<std::endl;
+            }
+            
             //> Organize the final edge data (hypothesis edge pairs)
             Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
             Edges_HYPO1_final << edgels_HYPO2_corrected.col(0), edgels_HYPO2_corrected.col(1), edgels_HYPO2_corrected.col(2), edgels_HYPO2_corrected.col(3);
@@ -306,8 +319,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     Eigen::MatrixXd inliner(idxVector);
 
                     // ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
-                    // if (abs(Edges_HYPO1_final(idx_pair,0)-232.669803511699)<0.001  && abs(Edges_HYPO1_final(idx_pair,1)-456.492553062112)<0.001 &&	
-                    // abs(Edges_HYPO2_final(idx_pair,0)-257.615692972776)<0.001  && abs(Edges_HYPO2_final(idx_pair,1)-488.98111082677)<0.001 &&
+                    // if (abs(Edges_HYPO1_final(idx_pair,0)-520.6008)<0.001  && abs(Edges_HYPO1_final(idx_pair,1)-428.9978)<0.001 &&	
+                    // abs(Edges_HYPO2_final(idx_pair,0)-519.7277)<0.001  && abs(Edges_HYPO2_final(idx_pair,1)-408.9833)<0.001 &&
                     // !v_intersection.empty()){
                     //     std::cout<<"found"<<std::endl;
                     //     std::ofstream epipole_file;
@@ -522,6 +535,12 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         paired_edges_locations_file << "Pair " << pair_idx + 1 << ":\n";
         Eigen::RowVectorXd R_vector1 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp01_view_indx].data(), All_R[hyp01_view_indx].size());
         Eigen::RowVectorXd R_vector2 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp02_view_indx].data(), All_R[hyp02_view_indx].size());
+
+        // std::cout<<"R1 is: "<<All_R[hyp01_view_indx]<<std::endl;
+        // std::cout<<"R2 is: "<<All_R[hyp02_view_indx]<<std::endl;
+        // std::cout<<"T1 is: "<<All_T[hyp01_view_indx]<<std::endl;
+        // std::cout<<"T2 is: "<<All_T[hyp02_view_indx]<<std::endl;
+
         
         paired_edges_locations_file << edge_hypo1(0) << " " << edge_hypo1(1) << " " << R_vector1 << " " << All_T[hyp01_view_indx].transpose() << "\n";
         paired_edges_locations_file << edge_hypo2(0) << " " << edge_hypo2(1) << " " << R_vector2 << " " << All_T[hyp02_view_indx].transpose() << "\n";
@@ -680,62 +699,137 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
     finalize_edge_pair_time += omp_get_wtime() - itime;
 }
 
+// void EdgeSketch_Core::test_3D_tangent() {
+//     Eigen::Matrix3d R1_test;
+//     Eigen::Matrix3d R2_test;
+//     Eigen::Matrix3d R21_test;
+//     Eigen::Matrix3d R12_test;
+//     Eigen::Matrix3d K_test;
+//     Eigen::Vector3d T12_test;
+//     Eigen::Vector3d T21_test;
+//     Eigen::MatrixXd Edges_HYPO1_final_test(2, 1);
+//     Eigen::MatrixXd Edges_HYPO2_final_test(2, 1);
+
+//     Edges_HYPO1_final_test << 313.1281,  221.2212;
+//     Edges_HYPO2_final_test << 214.3858,  328.1279;
+//     Eigen::Vector3d Edgel_View1(313.1281,  221.2212, 1.0532);
+//     Eigen::Vector3d Edgel_View2(214.3858,  328.1279, -2.0733);
+
+//     R1_test <<  0.283307133314224,   0.599568603826573,   0.748501541427090,
+//               -0.799349013318374,  -0.283603601454719,   0.529726488056670,
+//                0.529885103697223,  -0.748389261378974,   0.398917648559720;
+//     Eigen::Vector3d T1_test(13.6410104166048, -9.11680242242608, 1127.72680230083);
+//     R2_test << 0.198022493633256,  -0.935531843585112,  -0.292518822733696,
+//             0.825113183290599,   0.320192735561566,  -0.465472713328778,
+//             0.529126947693388,  -0.149187069586616,   0.835325021469390;
+//     Eigen::Vector3d T2_test(7.08308678814200 ,     5.40078420948800,    1123.03603126844);
+//     K_test << 2584.93250981950,    0,   249.771375872214,
+//          0, 2584.79186060577, 278.312679379194,
+//          0, 0,1;
+
+//     util->getRelativePoses(R1_test, T1_test, R2_test, T2_test, R21_test, T21_test, R12_test, T12_test);
+
+//     //std::cout << "R21:" << std::endl << R21_test << std::endl;
+//     //std::cout << "T21:" << std::endl << T21_test << std::endl;
+
+//     std::vector<Eigen::Vector2d> pts_test;
+//     pts_test.push_back(Edges_HYPO1_final_test);
+//     pts_test.push_back(Edges_HYPO2_final_test);
+
+//     std::vector<Eigen::Matrix3d> Rs_test;
+//     Rs_test.push_back(R21_test);
+//     std::vector<Eigen::Vector3d> Ts_test;
+//     Ts_test.push_back(T21_test);
+
+//     //> Compute 3D tangent
+//     Eigen::MatrixXd tangents_3D_test;
+//     Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_test, K_test, R21_test, T21_test, tangents_3D_test);
+//     std::cout << " - 3D tangent in the first camera coordinate: (" << tangents_3D_test(0) << ", " << tangents_3D_test(1) << ", " << tangents_3D_test(2) << ")" <<std::endl;
+//     Eigen::Vector3d tangents_3D_world = R1_test.transpose() * tangents_3D_test;
+//     std::cout << " - 3D tangent in the world coordinate:        (" << tangents_3D_world(0) << ", " << tangents_3D_world(1) << ", " << tangents_3D_world(2) << ")" <<std::endl;
+
+//     //> Compute 3D point
+//     Eigen::Vector3d edge_pt_3D_test = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K_test);
+//     std::cout << " - 3D point in the first camera coordinate: (" << edge_pt_3D_test(0) << ", " << edge_pt_3D_test(1) << ", " << edge_pt_3D_test(2) << ")" << std::endl;
+//     Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D_test, R1_test, T1_test);
+//     std::cout << " - 3D point in the world coordinate:        (" << edge_pt_3D_world(0) << ", " << edge_pt_3D_world(1) << ", " << edge_pt_3D_world(2) << ")" << std::endl;
+// }
+
 void EdgeSketch_Core::test_3D_tangent() {
-    ////////////////// test /////////////////////////
-    Eigen::Matrix3d R1_test;
-    Eigen::Matrix3d R2_test;
-    Eigen::Matrix3d R21_test;
-    Eigen::Matrix3d R12_test;
-    Eigen::Matrix3d K_test;
-    Eigen::Vector3d T12_test;
-    Eigen::Vector3d T21_test;
-    Eigen::MatrixXd Edges_HYPO1_final_test(2, 1);
-    Eigen::MatrixXd Edges_HYPO2_final_test(2, 1);
+    // Given Rotation and Translation Matrices
+    Eigen::Matrix3d R1, R2;
+    Eigen::Vector3d T1, T2;
 
-    Edges_HYPO1_final_test << 313.1281,  221.2212;
-    Edges_HYPO2_final_test << 214.3858,  328.1279;
-    Eigen::Vector3d Edgel_View1(313.1281,  221.2212, 1.0532);
-    Eigen::Vector3d Edgel_View2(214.3858,  328.1279, -2.0733);
+    R1 << 0.229714, 0.973258, -1.29728e-07,
+         -0.220415, 0.0520239, 0.974018,
+         -0.947971, 0.223746, -0.226472;
 
-    R1_test <<  0.283307133314224,   0.599568603826573,   0.748501541427090,
-              -0.799349013318374,  -0.283603601454719,   0.529726488056670,
-               0.529885103697223,  -0.748389261378974,   0.398917648559720;
-    Eigen::Vector3d T1_test(13.6410104166048, -9.11680242242608, 1127.72680230083);
-    R2_test << 0.198022493633256,  -0.935531843585112,  -0.292518822733696,
-            0.825113183290599,   0.320192735561566,  -0.465472713328778,
-            0.529126947693388,  -0.149187069586616,   0.835325021469390;
-    Eigen::Vector3d T2_test(7.08308678814200 ,     5.40078420948800,    1123.03603126844);
-    K_test << 2584.93250981950,    0,   249.771375872214,
+    T1 << -0.601486, -0.402814, -3.93395;
+
+    R2 << 0.159322, -0.987227, -3.64782e-08,
+         -0.0530916, -0.00856814, 0.998553,
+          0.985798, 0.159092, 0.0537785;
+
+    T2 << 0.413953, -0.468447, -3.95085;
+
+    // Camera Intrinsic Matrix (example, adjust if needed)
+    Eigen::Matrix3d K;
+    K << 2584.93250981950, 0, 249.771375872214,
          0, 2584.79186060577, 278.312679379194,
-         0, 0,1;
+         0, 0, 1;
 
-    util->getRelativePoses(R1_test, T1_test, R2_test, T2_test, R21_test, T21_test, R12_test, T12_test);
+    // Point coordinates from two images
+    std::vector<Eigen::Vector2d> points_img1 = {
+        {520.590800, 428.498217}, {520.581695, 427.998471}, {520.573102, 427.498616},
+        {520.564490, 426.998731}, {520.555647, 426.498837}, {520.645733, 430.996517},
+        {520.634568, 430.496660}, {520.623192, 429.996899}, {520.611786, 429.497305},
+        {520.600795, 428.997801}};
+    std::vector<Eigen::Vector2d> points_img2 = {
+        {240.855540, 429.000920}, {240.849805, 428.001160}, {240.839928, 427.001388},
+        {240.839928, 427.001388}, {240.834057, 426.501440}, {240.885916, 432.001500},
+        {240.872839, 431.001501}, {240.866802, 430.501425}, {240.861729, 430.001200},
+        {240.855540, 429.000920}};
 
-    //std::cout << "R21:" << std::endl << R21_test << std::endl;
-    //std::cout << "T21:" << std::endl << T21_test << std::endl;
+    // Relative Rotation and Translation
+    Eigen::Matrix3d R21 = R2 * R1.transpose();
+    Eigen::Vector3d T21 = T2 - R21 * T1;
 
-    std::vector<Eigen::Vector2d> pts_test;
-    pts_test.push_back(Edges_HYPO1_final_test);
-    pts_test.push_back(Edges_HYPO2_final_test);
+    // Store 3D points and tangents
+    std::vector<Eigen::Vector3d> points_3D;
+    std::vector<Eigen::Vector3d> tangents_3D;
 
-    std::vector<Eigen::Matrix3d> Rs_test;
-    Rs_test.push_back(R21_test);
-    std::vector<Eigen::Vector3d> Ts_test;
-    Ts_test.push_back(T21_test);
+    for (size_t i = 0; i < points_img1.size(); ++i) {
+        // Prepare the corresponding points
+        Eigen::Vector2d pt1 = points_img1[i];
+        Eigen::Vector2d pt2 = points_img2[i];
+        Eigen::Vector3d pt1_h(pt1(0), pt1(1), 1.0);
+        Eigen::Vector3d pt2_h(pt2(0), pt2(1), 1.0);
 
-    //> Compute 3D tangent
-    Eigen::MatrixXd tangents_3D_test;
-    Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_test, K_test, R21_test, T21_test, tangents_3D_test);
-    std::cout << " - 3D tangent in the first camera coordinate: (" << tangents_3D_test(0) << ", " << tangents_3D_test(1) << ", " << tangents_3D_test(2) << ")" <<std::endl;
-    Eigen::Vector3d tangents_3D_world = R1_test.transpose() * tangents_3D_test;
-    std::cout << " - 3D tangent in the world coordinate:        (" << tangents_3D_world(0) << ", " << tangents_3D_world(1) << ", " << tangents_3D_world(2) << ")" <<std::endl;
+        // Triangulate the 3D point
+        std::vector<Eigen::Vector2d> pts_test = {pt1, pt2};
+        std::vector<Eigen::Matrix3d> Rs_test = {R21};
+        std::vector<Eigen::Vector3d> Ts_test = {T21};
 
-    //> Compute 3D point
-    Eigen::Vector3d edge_pt_3D_test = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K_test);
-    std::cout << " - 3D point in the first camera coordinate: (" << edge_pt_3D_test(0) << ", " << edge_pt_3D_test(1) << ", " << edge_pt_3D_test(2) << ")" << std::endl;
-    Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D_test, R1_test, T1_test);
-    std::cout << " - 3D point in the world coordinate:        (" << edge_pt_3D_world(0) << ", " << edge_pt_3D_world(1) << ", " << edge_pt_3D_world(2) << ")" << std::endl;
+        Eigen::Vector3d edge_pt_3D = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K);
+        Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D, R1, T1);
+
+        points_3D.push_back(edge_pt_3D_world);
+
+        // Compute the 3D tangent
+        Eigen::MatrixXd tangent_3D;
+        Compute_3D_Tangents(pt1_h, pt2_h, K, K, R21, T21, tangent_3D);
+        Eigen::Vector3d tangent_3D_world = R1.transpose() * tangent_3D;
+
+        tangents_3D.push_back(tangent_3D_world);
+
+        // Print results
+        std::cout << "Point " << i + 1 << ": (" << edge_pt_3D_world(0) << ", " << edge_pt_3D_world(1) << ", " << edge_pt_3D_world(2) << ")" << std::endl;
+        std::cout << "Tangent " << i + 1 << ": (" << tangent_3D_world(0) << ", " << tangent_3D_world(1) << ", " << tangent_3D_world(2) << ")" << std::endl;
+    }
+
+    std::cout << "Triangulation and tangent computation completed for all points." << std::endl;
 }
+
 
 void EdgeSketch_Core::Stack_3D_Edges() {
     
@@ -938,15 +1032,6 @@ void EdgeSketch_Core::Compute_3D_Tangents(
 {
     tangents_3D.resize(1, 3);
 
-    //Eigen::Matrix3d R21 = R1.transpose() * R2;  // Relative rotation
-    //Eigen::Vector3d T21 = R1.transpose() * (T2 - T1); // Relative translation
-
-    //std::cout << "Are these correct?" << std::endl;
-    //std::cout << "R21: " << std::endl << R21 << std::endl;
-    //std::cout << "T21: " << std::endl << T21 << std::endl;
-
-    
-
     Eigen::Vector3d e1  = {1,0,0};
     Eigen::Vector3d e3  = {0,0,1};
 
@@ -954,9 +1039,6 @@ void EdgeSketch_Core::Compute_3D_Tangents(
     Eigen::Vector3d Gamma1 = K1.inverse() * Eigen::Vector3d(pt_edge_view1(0), pt_edge_view1(1), 1.0);
     Eigen::Vector3d Gamma2 = K2.inverse() * Eigen::Vector3d(pt_edge_view2(0), pt_edge_view2(1), 1.0);
 
-    //std::cout << "Gamma1: (" << Gamma1(0) << ", " << Gamma1(1) << ", " << Gamma1(2) << ")" << std::endl;
-
-    //Eigen::Vector3d tgt1_meters = getReprojEdgel->getTGT_Meters(pt_edge_view1, K1);
     Eigen::Vector3d tgt1(cos(pt_edge_view1(2)), sin(pt_edge_view1(2)), 0.0);
     Eigen::Vector3d tgt2(cos(pt_edge_view2(2)), sin(pt_edge_view2(2)), 0.0);
     Eigen::Vector3d tgt1_meters = K1.inverse() * tgt1;
@@ -964,18 +1046,11 @@ void EdgeSketch_Core::Compute_3D_Tangents(
 
     double rho1 = (double(e1.transpose() * T21) - double(e3.transpose() * T21) * double(e1.transpose() *Gamma2))/(double(e3.transpose() * R21 * Gamma1)* double(e1.transpose() * Gamma2) - double(e1.transpose() * R21 * Gamma1));
 
-    //std::cout << "rho1 = " << rho1 << std::endl;
-    //Eigen::Vector3d tgt2_meters = getReprojEdgel->getTGT_Meters(pt_edge_view2, K2);
     Eigen::Vector3d n1 = tgt1_meters.cross(Gamma1);
     Eigen::Vector3d n2 = R21.transpose() * tgt2_meters.cross(Gamma2);
 
-    //std::cout << "n1: (" << n1(0) << ", " << n1(1) << ", " << n1(2) << ")" << std::endl;
-    //std::cout << "n2: (" << n2(0) << ", " << n2(1) << ", " << n2(2) << ")" << std::endl;
-
     Eigen::Vector3d T3D = n1.cross(n2) / (n1.cross(n2) ).norm();
     tangents_3D = T3D;
-    //Eigen::Vector3d T3D_world = R1.transpose() * T3D;
-    //tangents_3D.row(0) = T3D_world.transpose();
 }
 
 
