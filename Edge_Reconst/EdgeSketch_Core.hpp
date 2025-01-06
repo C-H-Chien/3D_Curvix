@@ -181,6 +181,7 @@ private:
     Eigen::MatrixXd paired_edge;
     Eigen::MatrixXd OreListdegree;
     Eigen::MatrixXd OreListBardegree;
+    Eigen::Vector3d epipole;
 };
 
 
