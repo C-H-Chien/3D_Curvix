@@ -136,7 +136,12 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
     Edges_HYPO2     = All_Edgels[hyp02_view_indx];
 
     //> Initialize a list of paired edges between HYPO1 and HYPO2
-    paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows(), Num_Of_Total_Imgs, -2);
+    //paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows(), Num_Of_Total_Imgs, -2);
+    paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows()*Num_Of_Total_Imgs, Num_Of_Total_Imgs, -2);
+    //paired_edge = Eigen::MatrixXd::Constant(1, Num_Of_Total_Imgs, -2);
+
+
+
 
     //> Compute epipolar wedge angles between HYPO1 and HYPO2 and valid angle range in HYPO1 for fast indexing from edges of HYPO2
     OreListdegree       = getOre->getOreList(hyp01_view_indx, hyp02_view_indx, Edges_HYPO2, All_R, All_T, K_HYPO1, K_HYPO2);
@@ -188,8 +193,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             double thresh_ore21_2 = OreListBardegree(edge_idx, 1);
             Eigen::Vector3d corresponding_epipole = epipole;
 
-            
-
             //> Find the corresponding edgel in HYPO2 based on the epipolar angle
             Eigen::MatrixXd HYPO2_idx_raw = PairHypo->getHYPO2_idx_Ore(OreListdegree, thresh_ore21_1, thresh_ore21_2);
             if (HYPO2_idx_raw.rows() == 0) continue;
@@ -198,14 +201,14 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> Correct Edgels in Hypo2 Based on Epipolar Constraints
             Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgels_HYPO2, Edges_HYPO1.row(edge_idx), F21, F12, HYPO2_idx_raw);
 
-            if (abs(Edges_HYPO1(edge_idx,0)-520.6008)<0.001  && abs(Edges_HYPO1(edge_idx,1)-428.9978)<0.001){
-                // std::cout<<HYPO2_idx_raw<<std::endl;
-                // std::cout<<edgels_HYPO2<<std::endl;
-                // std::cout<<edgels_HYPO2_corrected<<std::endl;
-                std::cout<<thresh_ore21_1<<std::endl;
-                std::cout<<thresh_ore21_2<<std::endl;
-                std::cout<<corresponding_epipole<<std::endl;
-            }
+            // if (abs(Edges_HYPO1(edge_idx,0)-520.6008)<0.001  && abs(Edges_HYPO1(edge_idx,1)-428.9978)<0.001){
+            //     // std::cout<<HYPO2_idx_raw<<std::endl;
+            //     // std::cout<<edgels_HYPO2<<std::endl;
+            //     // std::cout<<edgels_HYPO2_corrected<<std::endl;
+            //     std::cout<<thresh_ore21_1<<std::endl;
+            //     std::cout<<thresh_ore21_2<<std::endl;
+            //     std::cout<<corresponding_epipole<<std::endl;
+            // }
             
             //> Organize the final edge data (hypothesis edge pairs)
             Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
@@ -236,7 +239,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             // if (skip_edge) continue;
             ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
             
-
             int supported_edge_idx = 0;
             int stack_idx = 0;
             Eigen::MatrixXd supported_indices;
@@ -376,60 +378,104 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> Count the Occurrence of Each Unique Index
             Eigen::VectorXd rep_count;
             rep_count.conservativeResize(indices_stack_unique.size(),1);
+
+            // for(int a = 0; a < indices_stack.size(); a++){
+            //     std::cout<<indices_stack[a]<<std::endl;
+            // }
             for (int unique_idx = 0; unique_idx<indices_stack_unique.size(); unique_idx++) {
-                rep_count.row(unique_idx) << double(count(indices_stack.begin(), indices_stack.end(), indices_stack_unique[unique_idx]));
+                rep_count.row(unique_idx) << int(count(indices_stack.begin(), indices_stack.end(), indices_stack_unique[unique_idx]));
+                // std::cout<<"rep_count row "<<unique_idx<<": "<<rep_count.row(unique_idx)<<std::endl;
+                // std::cout<<"indices_stack_unique row "<<unique_idx<<": "<<indices_stack_unique[unique_idx]<<std::endl;
             }
+
+           
 
             //> Find the maximal number of supports from validation views and check if this number is over the threshold
             Eigen::VectorXd::Index maxIndex;
             double max_support = rep_count.maxCoeff(&maxIndex);
-            if( max_support < Max_Num_Of_Support_Views )
+            if( max_support < Max_Num_Of_Support_Views ){
                 continue;
-            
+            }
+
             int finalpair = -2;
             int numofmax = std::count(rep_count.data(), rep_count.data()+rep_count.size(), max_support);
-            if (numofmax > 1) {
-                std::vector<double> rep_count_vec(rep_count.data(), rep_count.data() + rep_count.rows());
-                //std::cout<< "here"<<std::endl;
-                std::vector<int> max_index;
-                auto start_it = begin(rep_count_vec);
-                while (start_it != end(rep_count_vec)) {
-                    start_it = std::find(start_it, end(rep_count_vec), max_support);
-                    if (start_it != end(rep_count_vec)) {
-                        auto const pos = std::distance(begin(rep_count_vec), start_it);
-                        max_index.push_back(int(pos));
-                        ++start_it;
-                    }
-                }
+            // Find all edges within the distance threshold
+            std::vector<int> valid_indices;
+            Eigen::Vector3d coeffs;
+            coeffs = F21 * pt_edgel_HYPO1;
+            Eigen::MatrixXd Edge_Pts;
 
-                //Select the Final Paired Edge
-                Eigen::Vector3d coeffs;
-                coeffs = F21 * pt_edgel_HYPO1;
-                Eigen::MatrixXd Edge_Pts;
-                Edge_Pts.conservativeResize(max_index.size(),2);
-                for(int maxidx = 0; maxidx<max_index.size(); maxidx++){
-                    Edge_Pts.row(maxidx) << Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 0), \
-                                            Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 1);
+            for(int a = 0; a < rep_count.rows(); a++){
+                if(rep_count(a) < Max_Num_Of_Support_Views){
+                    continue;
                 }
-                Eigen::VectorXd Ap = coeffs(0)*Edge_Pts.col(0);
-                Eigen::VectorXd Bp = coeffs(1)*Edge_Pts.col(1);
-                Eigen::VectorXd numDist = Ap + Bp + Eigen::VectorXd::Ones(Ap.rows())*coeffs(2);
+                
+                Eigen::Vector2d Edge_Pt;
+                Edge_Pt << Edges_HYPO2_final.row(indices_stack_unique[a])(0), Edges_HYPO2_final.row(indices_stack_unique[a])(1);
+                
+                double Ap = coeffs(0) * Edge_Pt(0);
+                double Bp = coeffs(1) * Edge_Pt(1);
+                double numDist = Ap + Bp + coeffs(2);
                 double denomDist = coeffs(0)*coeffs(0) + coeffs(1)*coeffs(1);
                 denomDist = sqrt(denomDist);
-                Eigen::VectorXd dist = numDist.cwiseAbs()/denomDist;
-                Eigen::VectorXd::Index   minIndex;
-                double min_dist = dist.minCoeff(&minIndex);
-                //> ignore if the distance from the reprojected edge to the epipolar line is greater than some threshold
-                if (min_dist > Reproj_Dist_Thresh) continue;
+                double dist = std::abs(numDist) / denomDist;
 
-                finalpair = int(indices_stack_unique[max_index[minIndex]]);
+                if (dist > Reproj_Dist_Thresh) continue;
+                valid_indices.push_back(int(indices_stack_unique[a]));
             }
-            else {
-                finalpair = int(indices_stack_unique[int(maxIndex)]);
+            // If no edges are within the threshold, skip
+            if (valid_indices.empty()) continue;
+   
+            for (int valid_idx : valid_indices) {
+                paired_edge.row(edge_idx*Num_Of_Total_Imgs +valid_idx) << edge_idx, HYPO2_idx(valid_idx), supported_indices.row(valid_idx);
             }
+     
+            // if (numofmax > 1) {
+            //     std::vector<double> rep_count_vec(rep_count.data(), rep_count.data() + rep_count.rows());
+            //     //std::cout<< "here"<<std::endl;
+            //     std::vector<int> max_index;
+            //     auto start_it = begin(rep_count_vec);
+            //     while (start_it != end(rep_count_vec)) {
+            //         start_it = std::find(start_it, end(rep_count_vec), max_support);
+            //         if (start_it != end(rep_count_vec)) {
+            //             auto const pos = std::distance(begin(rep_count_vec), start_it);
+            //             max_index.push_back(int(pos));
+            //             ++start_it;
+            //         }
+            //     }
 
-            //> paired_edge is a row vector continaing (hypo1 edge index), (paired hypo2 edge index), (paired validation edge indices)
-            paired_edge.row(edge_idx) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
+            //     //Select the Final Paired Edge
+            //     Eigen::Vector3d coeffs;
+            //     coeffs = F21 * pt_edgel_HYPO1;
+            //     Eigen::MatrixXd Edge_Pts;
+            //     Edge_Pts.conservativeResize(max_index.size(),2);
+            //     for(int maxidx = 0; maxidx<max_index.size(); maxidx++){
+            //         std::cout<<indices_stack_unique[max_index[maxidx]]<<std::endl;
+            //         Edge_Pts.row(maxidx) << Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 0), \
+            //                                 Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 1);
+            //     }
+            //     Eigen::VectorXd Ap = coeffs(0)*Edge_Pts.col(0);
+            //     Eigen::VectorXd Bp = coeffs(1)*Edge_Pts.col(1);
+            //     Eigen::VectorXd numDist = Ap + Bp + Eigen::VectorXd::Ones(Ap.rows())*coeffs(2);
+            //     double denomDist = coeffs(0)*coeffs(0) + coeffs(1)*coeffs(1);
+            //     denomDist = sqrt(denomDist);
+            //     Eigen::VectorXd dist = numDist.cwiseAbs()/denomDist;
+            //     Eigen::VectorXd::Index   minIndex;
+            //     double min_dist = dist.minCoeff(&minIndex);
+            //     //> ignore if the distance from the reprojected edge to the epipolar line is greater than some threshold
+            //     if (min_dist > Reproj_Dist_Thresh) continue;
+
+            //     finalpair = int(indices_stack_unique[max_index[minIndex]]);
+            //     std::cout<<finalpair<<std::endl;
+            // }
+            // else {
+            //     finalpair = int(indices_stack_unique[int(maxIndex)]);
+            // }
+            //exit(0);
+
+            // //> paired_edge is a row vector continaing (hypo1 edge index), (paired hypo2 edge index), (paired validation edge indices)
+            // paired_edge.row(edge_idx) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
+
         }
         //> A critical session to stack all local supported indices
         #pragma omp critical
@@ -458,37 +504,37 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
 
 
-    ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
-    //Create a new data structure to hold the reorganized paired edges
-    Eigen::MatrixXd paired_edge_final_reorganized = Eigen::MatrixXd::Constant(
-        paired_edge_final.rows(), Num_Of_Total_Imgs, -2  // Initialize with -2 (no support)
-    );
+    // ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
+    // //Create a new data structure to hold the reorganized paired edges
+    // Eigen::MatrixXd paired_edge_final_reorganized = Eigen::MatrixXd::Constant(
+    //     paired_edge_final.rows(), Num_Of_Total_Imgs, -2  // Initialize with -2 (no support)
+    // );
 
-    // Copy data from paired_edge_final to paired_edge_final_reorganized
-    for (int i = 0; i < paired_edge_final.rows(); ++i) {
-        // Move hypothesis 1 edge index to the column corresponding to hyp01_view_indx
-        paired_edge_final_reorganized(i, hyp01_view_indx) = paired_edge_final(i, 0);
+    // // Copy data from paired_edge_final to paired_edge_final_reorganized
+    // for (int i = 0; i < paired_edge_final.rows(); ++i) {
+    //     // Move hypothesis 1 edge index to the column corresponding to hyp01_view_indx
+    //     paired_edge_final_reorganized(i, hyp01_view_indx) = paired_edge_final(i, 0);
 
-        // Move hypothesis 2 edge index to the column corresponding to hyp02_view_indx
-        paired_edge_final_reorganized(i, hyp02_view_indx) = paired_edge_final(i, 1);
+    //     // Move hypothesis 2 edge index to the column corresponding to hyp02_view_indx
+    //     paired_edge_final_reorganized(i, hyp02_view_indx) = paired_edge_final(i, 1);
 
-        // Copy the validation view indices as they are
-        int val_idx_in_paired_edge = 2;  // Start from the 3rd column in paired_edge_final
-        for (int j = 0; j < Num_Of_Total_Imgs; ++j) {
-            // Skip the columns for hypothesis 1 and hypothesis 2
-            if (j == hyp01_view_indx || j == hyp02_view_indx) continue;
+    //     // Copy the validation view indices as they are
+    //     int val_idx_in_paired_edge = 2;  // Start from the 3rd column in paired_edge_final
+    //     for (int j = 0; j < Num_Of_Total_Imgs; ++j) {
+    //         // Skip the columns for hypothesis 1 and hypothesis 2
+    //         if (j == hyp01_view_indx || j == hyp02_view_indx) continue;
 
-            // Copy the validation view edge indices to the new structure
-            paired_edge_final_reorganized(i, j) = paired_edge_final(i, val_idx_in_paired_edge);
-            val_idx_in_paired_edge++;
-        }
-    }
+    //         // Copy the validation view edge indices to the new structure
+    //         paired_edge_final_reorganized(i, j) = paired_edge_final(i, val_idx_in_paired_edge);
+    //         val_idx_in_paired_edge++;
+    //     }
+    // }
 
-    // Push paired_edge_final to paired_edge_final_all
-    if (paired_edge_final.rows() > 0) {
-        paired_edge_final_all.push_back(paired_edge_final_reorganized);
-    }
-    ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
+    // // Push paired_edge_final to paired_edge_final_all
+    // if (paired_edge_final.rows() > 0) {
+    //     paired_edge_final_all.push_back(paired_edge_final_reorganized);
+    // }
+    // ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
 
 #if DEBUG_PAIRED_EDGES
     std::ofstream debug_file_paired_edges;
