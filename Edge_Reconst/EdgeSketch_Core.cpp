@@ -132,16 +132,20 @@ void EdgeSketch_Core::Read_Edgels_Data() {
 }
 
 void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
+
+    Edges_HYPO1.resize(0, 0); 
+    Edges_HYPO2.resize(0, 0); 
+    paired_edge.resize(0, 0); 
+    OreListdegree.resize(0, 0); 
+    OreListBardegree.resize(0, 0); 
+    epipole.setZero(); 
+
     Edges_HYPO1     = All_Edgels[hyp01_view_indx];
     Edges_HYPO2     = All_Edgels[hyp02_view_indx];
 
     //> Initialize a list of paired edges between HYPO1 and HYPO2
     //paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows(), Num_Of_Total_Imgs, -2);
-    paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows()*Num_Of_Total_Imgs, Num_Of_Total_Imgs, -2);
-    //paired_edge = Eigen::MatrixXd::Constant(1, Num_Of_Total_Imgs, -2);
-
-
-
+    paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows()*(Num_Of_Total_Imgs+1), Num_Of_Total_Imgs, -2);
 
     //> Compute epipolar wedge angles between HYPO1 and HYPO2 and valid angle range in HYPO1 for fast indexing from edges of HYPO2
     OreListdegree       = getOre->getOreList(hyp01_view_indx, hyp02_view_indx, Edges_HYPO2, All_R, All_T, K_HYPO1, K_HYPO2);
@@ -151,7 +155,7 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
     epipole = result.second;
 }
 
-void EdgeSketch_Core::Run_3D_Edge_Sketch() {
+void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
 
     itime = omp_get_wtime();
     #pragma omp parallel
@@ -379,16 +383,10 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Eigen::VectorXd rep_count;
             rep_count.conservativeResize(indices_stack_unique.size(),1);
 
-            // for(int a = 0; a < indices_stack.size(); a++){
-            //     std::cout<<indices_stack[a]<<std::endl;
-            // }
             for (int unique_idx = 0; unique_idx<indices_stack_unique.size(); unique_idx++) {
                 rep_count.row(unique_idx) << int(count(indices_stack.begin(), indices_stack.end(), indices_stack_unique[unique_idx]));
-                // std::cout<<"rep_count row "<<unique_idx<<": "<<rep_count.row(unique_idx)<<std::endl;
-                // std::cout<<"indices_stack_unique row "<<unique_idx<<": "<<indices_stack_unique[unique_idx]<<std::endl;
-            }
 
-           
+            }
 
             //> Find the maximal number of supports from validation views and check if this number is over the threshold
             Eigen::VectorXd::Index maxIndex;
@@ -426,55 +424,62 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             // If no edges are within the threshold, skip
             if (valid_indices.empty()) continue;
    
+
             for (int valid_idx : valid_indices) {
                 paired_edge.row(edge_idx*Num_Of_Total_Imgs +valid_idx) << edge_idx, HYPO2_idx(valid_idx), supported_indices.row(valid_idx);
             }
      
-            // if (numofmax > 1) {
-            //     std::vector<double> rep_count_vec(rep_count.data(), rep_count.data() + rep_count.rows());
-            //     //std::cout<< "here"<<std::endl;
-            //     std::vector<int> max_index;
-            //     auto start_it = begin(rep_count_vec);
-            //     while (start_it != end(rep_count_vec)) {
-            //         start_it = std::find(start_it, end(rep_count_vec), max_support);
-            //         if (start_it != end(rep_count_vec)) {
-            //             auto const pos = std::distance(begin(rep_count_vec), start_it);
-            //             max_index.push_back(int(pos));
-            //             ++start_it;
-            //         }
-            //     }
+            if (numofmax > 1) {
+                std::vector<double> rep_count_vec(rep_count.data(), rep_count.data() + rep_count.rows());
+                //std::cout<< "here"<<std::endl;
+                std::vector<int> max_index;
+                auto start_it = begin(rep_count_vec);
+                while (start_it != end(rep_count_vec)) {
+                    start_it = std::find(start_it, end(rep_count_vec), max_support);
+                    if (start_it != end(rep_count_vec)) {
+                        auto const pos = std::distance(begin(rep_count_vec), start_it);
+                        max_index.push_back(int(pos));
+                        ++start_it;
+                    }
+                }
 
-            //     //Select the Final Paired Edge
-            //     Eigen::Vector3d coeffs;
-            //     coeffs = F21 * pt_edgel_HYPO1;
-            //     Eigen::MatrixXd Edge_Pts;
-            //     Edge_Pts.conservativeResize(max_index.size(),2);
-            //     for(int maxidx = 0; maxidx<max_index.size(); maxidx++){
-            //         std::cout<<indices_stack_unique[max_index[maxidx]]<<std::endl;
-            //         Edge_Pts.row(maxidx) << Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 0), \
-            //                                 Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 1);
-            //     }
-            //     Eigen::VectorXd Ap = coeffs(0)*Edge_Pts.col(0);
-            //     Eigen::VectorXd Bp = coeffs(1)*Edge_Pts.col(1);
-            //     Eigen::VectorXd numDist = Ap + Bp + Eigen::VectorXd::Ones(Ap.rows())*coeffs(2);
-            //     double denomDist = coeffs(0)*coeffs(0) + coeffs(1)*coeffs(1);
-            //     denomDist = sqrt(denomDist);
-            //     Eigen::VectorXd dist = numDist.cwiseAbs()/denomDist;
-            //     Eigen::VectorXd::Index   minIndex;
-            //     double min_dist = dist.minCoeff(&minIndex);
-            //     //> ignore if the distance from the reprojected edge to the epipolar line is greater than some threshold
-            //     if (min_dist > Reproj_Dist_Thresh) continue;
+                //Select the Final Paired Edge
+                Eigen::Vector3d coeffs;
+                coeffs = F21 * pt_edgel_HYPO1;
+                Eigen::MatrixXd Edge_Pts;
+                Edge_Pts.conservativeResize(max_index.size(),2);
+                for(int maxidx = 0; maxidx<max_index.size(); maxidx++){
+                    //std::cout<<indices_stack_unique[max_index[maxidx]]<<std::endl;
+                    Edge_Pts.row(maxidx) << Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 0), \
+                                            Edges_HYPO2_final(indices_stack_unique[max_index[maxidx]], 1);
+                }
+                Eigen::VectorXd Ap = coeffs(0)*Edge_Pts.col(0);
+                Eigen::VectorXd Bp = coeffs(1)*Edge_Pts.col(1);
+                Eigen::VectorXd numDist = Ap + Bp + Eigen::VectorXd::Ones(Ap.rows())*coeffs(2);
+                double denomDist = coeffs(0)*coeffs(0) + coeffs(1)*coeffs(1);
+                denomDist = sqrt(denomDist);
+                Eigen::VectorXd dist = numDist.cwiseAbs()/denomDist;
+                Eigen::VectorXd::Index   minIndex;
+                double min_dist = dist.minCoeff(&minIndex);
+                //> ignore if the distance from the reprojected edge to the epipolar line is greater than some threshold
+                if (min_dist > Reproj_Dist_Thresh) continue;
 
-            //     finalpair = int(indices_stack_unique[max_index[minIndex]]);
-            //     std::cout<<finalpair<<std::endl;
-            // }
-            // else {
-            //     finalpair = int(indices_stack_unique[int(maxIndex)]);
-            // }
-            //exit(0);
+                finalpair = int(indices_stack_unique[max_index[minIndex]]);
+                //std::cout<<finalpair<<std::endl;
+            }
+            else {
+                finalpair = int(indices_stack_unique[int(maxIndex)]);
+            }
 
-            // //> paired_edge is a row vector continaing (hypo1 edge index), (paired hypo2 edge index), (paired validation edge indices)
-            // paired_edge.row(edge_idx) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
+            if(hypothesis == 1){
+                hypothesis1_best_match[edge_idx] = HYPO2_idx(finalpair);
+            }else{
+                hypothesis2_best_match[edge_idx] = HYPO2_idx(finalpair);
+            }
+
+            //> paired_edge is a row vector continaing (hypo1 edge index), (paired hypo2 edge index), (paired validation edge indices)
+            //paired_edge.row(edge_idx) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
+            paired_edge.row(edge_idx*Num_Of_Total_Imgs +Num_Of_Total_Imgs) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
 
         }
         //> A critical session to stack all local supported indices
@@ -484,7 +489,73 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     pair_edges_time += omp_get_wtime() - itime;
 }
 
+// void EdgeSketch_Core::saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
+//                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
+//                            const std::string& filename) {
+//     std::ofstream outFile(filename);
+
+//     if (!outFile.is_open()) {
+//         std::cerr << "Error: Could not open file " << filename << " for writing.\n";
+//         return;
+//     }
+//     // Find and write mutual matches
+//     outFile << "Mutual Matches\n";
+//     outFile << "--------------------------\n";
+//     for (const auto& h1_pair : hypothesis1ToBestMatch) {
+//         int h1 = h1_pair.first;
+//         int h2 = h1_pair.second;
+
+//         // Check if the reverse match exists
+//         auto it = hypothesis2ToBestMatch.find(h2);
+//         if (it != hypothesis2ToBestMatch.end() && it->second == h1) {
+//             outFile << "H1:H2 " << h1 <<" "<< h2 << "\n";
+//         }
+//     }
+
+//     outFile.close();
+//     std::cout << "Best matches and mutual matches have been saved to " << filename << "\n";
+// }
+
+
+std::unordered_map<int, int> EdgeSketch_Core::saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
+                                                                    const std::unordered_map<int, int>& hypothesis2ToBestMatch,
+                                                                    const std::string& filename) {
+    std::ofstream outFile(filename);
+
+    if (!outFile.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for writing.\n";
+        return {}; // Return empty map if file cannot be opened
+    }
+
+    std::unordered_map<int, int> mutualMatches;
+
+    // Find and write mutual matches
+    outFile << "Mutual Matches\n";
+    outFile << "--------------------------\n";
+    for (const auto& h1_pair : hypothesis1ToBestMatch) {
+        int h1 = h1_pair.first;
+        int h2 = h1_pair.second;
+
+        // Check if the reverse match exists
+        auto it = hypothesis2ToBestMatch.find(h2);
+        if (it != hypothesis2ToBestMatch.end() && it->second == h1) {
+            outFile << "H1:H2 " << h1 << " " << h2 << "\n";
+            mutualMatches[h2] = h1; // Store mutual match with H2 as the key
+        }
+    }
+
+    outFile.close();
+    std::cout << "Best matches and mutual matches have been saved to " << filename << "\n";
+
+    return mutualMatches; // Return the map of mutual matches
+}
+
+
+
+
 void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
+
+    //std::unordered_map<int, int> mutualMatches = saveBestMatchesToFile(hypothesis1_best_match, hypothesis2_best_match, "../../outputs/best_matches.txt");
 
     itime = omp_get_wtime();
     int pair_num = 0;
@@ -502,40 +573,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
     std::string info_str = "Number of pairs is: " + std::to_string(pair_num);
     LOG_INFOR_MESG(info_str);
 
-
-
-    // ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
-    // //Create a new data structure to hold the reorganized paired edges
-    // Eigen::MatrixXd paired_edge_final_reorganized = Eigen::MatrixXd::Constant(
-    //     paired_edge_final.rows(), Num_Of_Total_Imgs, -2  // Initialize with -2 (no support)
-    // );
-
-    // // Copy data from paired_edge_final to paired_edge_final_reorganized
-    // for (int i = 0; i < paired_edge_final.rows(); ++i) {
-    //     // Move hypothesis 1 edge index to the column corresponding to hyp01_view_indx
-    //     paired_edge_final_reorganized(i, hyp01_view_indx) = paired_edge_final(i, 0);
-
-    //     // Move hypothesis 2 edge index to the column corresponding to hyp02_view_indx
-    //     paired_edge_final_reorganized(i, hyp02_view_indx) = paired_edge_final(i, 1);
-
-    //     // Copy the validation view indices as they are
-    //     int val_idx_in_paired_edge = 2;  // Start from the 3rd column in paired_edge_final
-    //     for (int j = 0; j < Num_Of_Total_Imgs; ++j) {
-    //         // Skip the columns for hypothesis 1 and hypothesis 2
-    //         if (j == hyp01_view_indx || j == hyp02_view_indx) continue;
-
-    //         // Copy the validation view edge indices to the new structure
-    //         paired_edge_final_reorganized(i, j) = paired_edge_final(i, val_idx_in_paired_edge);
-    //         val_idx_in_paired_edge++;
-    //     }
-    // }
-
-    // // Push paired_edge_final to paired_edge_final_all
-    // if (paired_edge_final.rows() > 0) {
-    //     paired_edge_final_all.push_back(paired_edge_final_reorganized);
-    // }
-    // ///////////////////////////////////////////////// incremental method ////////////////////////////////////////////////////
-
 #if DEBUG_PAIRED_EDGES
     std::ofstream debug_file_paired_edges;
     std::string Output_File_Path_Paired_Edges = "../../outputs/paired_edge_final.txt";
@@ -543,22 +580,16 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
     debug_file_paired_edges << paired_edge_final;
     debug_file_paired_edges.close();
 
-//     std::ofstream reorg_file_paired_edges;
-    // std::string Output_File_Path_Paired_Edges_reorg = "../../outputs/idx_paired_edge_final_"+ std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
-    // reorg_file_paired_edges.open(Output_File_Path_Paired_Edges_reorg);
-    // reorg_file_paired_edges << paired_edge_final_reorganized;
-    // reorg_file_paired_edges.close();
-
-//    Write paired_edges_final_hypothesis1_hypothesis2.txt with actual edge locations and corresponding R and T matrices
     std::ofstream paired_edges_locations_file;
     std::string Output_File_Path_Edge_Locations = "../../outputs/paired_edges_final_" + std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
     paired_edges_locations_file.open(Output_File_Path_Edge_Locations);
+
 
     for (int pair_idx = 0; pair_idx < paired_edge_final.rows(); ++pair_idx) {
         // Write Hypothesis 1 and Hypothesis 2 edge locations
         int hypo1_idx = paired_edge_final(pair_idx, 0);
         int hypo2_idx = paired_edge_final(pair_idx, 1);
-
+            
         Eigen::Vector2d edge_hypo1 = Edges_HYPO1.row(hypo1_idx).head<2>();
         Eigen::Vector2d edge_hypo2 = Edges_HYPO2.row(hypo2_idx).head<2>();
 
@@ -572,7 +603,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         Eigen::MatrixXd Edges_HYPO2_final(edgels_HYPO2_corrected.rows(), 4);
         Edges_HYPO2_final << edgels_HYPO2_corrected.col(4), edgels_HYPO2_corrected.col(5), edgels_HYPO2_corrected.col(6), edgels_HYPO2_corrected.col(7);
 
-
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
             std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
             continue;
@@ -581,16 +611,9 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         paired_edges_locations_file << "Pair " << pair_idx + 1 << ":\n";
         Eigen::RowVectorXd R_vector1 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp01_view_indx].data(), All_R[hyp01_view_indx].size());
         Eigen::RowVectorXd R_vector2 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp02_view_indx].data(), All_R[hyp02_view_indx].size());
-
-        // std::cout<<"R1 is: "<<All_R[hyp01_view_indx]<<std::endl;
-        // std::cout<<"R2 is: "<<All_R[hyp02_view_indx]<<std::endl;
-        // std::cout<<"T1 is: "<<All_T[hyp01_view_indx]<<std::endl;
-        // std::cout<<"T2 is: "<<All_T[hyp02_view_indx]<<std::endl;
-
-        
+    
         paired_edges_locations_file << edge_hypo1(0) << " " << edge_hypo1(1) << " " << R_vector1 << " " << All_T[hyp01_view_indx].transpose() << "\n";
         paired_edges_locations_file << edge_hypo2(0) << " " << edge_hypo2(1) << " " << R_vector2 << " " << All_T[hyp02_view_indx].transpose() << "\n";
-
 
         // Loop through validation views and write actual edge locations and R, T matrices
         int val_indx_in_paired_edge_array = 2;
@@ -625,15 +648,61 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
     abs_Ts.push_back(All_T[hyp01_view_indx]);
     abs_Ts.push_back(All_T[hyp02_view_indx]);
 
-    Gamma1s.conservativeResize(paired_edge_final.rows(),3);
+    int hypo1_identifier = 0;
+    int previous_hypo1 = -1; 
+    Gamma1s.conservativeResize(paired_edge_final.rows(),4);
     tangent3Ds.conservativeResize(paired_edge_final.rows(), 3);
 
+    // int num_mutual_matches = 0;
+    // for (int row = 0; row < paired_edge_final.rows(); ++row) {
+    //     auto pair = paired_edge_final.row(row);
+
+    //     int hypo1_idx = pair(0);
+    //     int hypo2_idx = pair(1);
+
+    //     // Check if it's a mutual match
+    //     auto it = mutualMatches.find(hypo1_idx);
+    //     if (it != mutualMatches.end() && it->second == hypo2_idx) {
+    //         num_mutual_matches++;
+    //     }
+    // }
+
+    // // Resize Gamma1s and tangent3Ds based on the number of mutual matches
+    // Gamma1s.resize(num_mutual_matches, 3);
+    // tangent3Ds.resize(num_mutual_matches, 3);
+
+
+    int count = 0;
+    int valid_pair_idx = 0;
+
+    // std::ofstream hypo2_coords_before("/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/hypo2_coords_before_correction.txt");
+    // std::ofstream hypo2_coords_after("/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/hypo2_coords_after_correction.txt");
+
     for (int pair_idx = 0; pair_idx < paired_edge_final.rows(); pair_idx++) {
+        
+        // int hypo1_idx = paired_edge_final(pair_idx, 0);
+        // int hypo2_idx = paired_edge_final(pair_idx, 1);
+        // auto it = mutualMatches.find(hypo1_idx);
+        // if (it == mutualMatches.end() || it->second != hypo2_idx) {
+        //     count +=1;
+        //     std::cout<<count<<std::endl;
+        //     continue; // Skip this pair if it's not mutual
+        // }
+        // Get the hypothesis 1 edge index
+        int current_hypo1 = int(paired_edge_final(pair_idx, 0));
+
+        // Check if this is a new hypothesis 1 edge
+        if (current_hypo1 != previous_hypo1) {
+            hypo1_identifier++;
+        }
+        previous_hypo1 = current_hypo1;
+
         Eigen::MatrixXd edgel_HYPO1   = Edges_HYPO1.row(int(paired_edge_final(pair_idx,0)));  //> edge index in hypo 1
         Eigen::MatrixXd edgel_HYPO2   = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));  //> edge index in hypo 2
         Eigen::MatrixXd HYPO2_idx_raw = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));
 
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        //Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
 
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
             std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
@@ -651,21 +720,16 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         pts.push_back(pt_H1);
         pts.push_back(pt_H2);
 
+
+
+
+        // // Record Hypo2's edge before correction
+        // hypo2_coords_before << edgel_HYPO2(0, 0) << " " <<edgel_HYPO2(0, 1)<<std::endl;
+        // // Record Hypo2's edge after correction
+        // hypo2_coords_after << pt_H2(0) << " " << pt_H2(1) << std::endl;
+
         //> The resultant edge_pt_3D is 3D edges "under the first hypothesis view coordinate"
         Eigen::Vector3d edge_pt_3D = util->linearTriangulation(2, pts, Rs, Ts, K_HYPO1);
-
-        ///////////////// print R and T ///////////////////////
-        // std::cout<<"Rs is: ";
-        // for (const auto& r : Rs) {
-        //     std::cout << r.transpose() << " "; // Use transpose() to print as a row for readability
-        // }
-        // std::cout << std::endl;
-        // std::cout << "Ts is: ";
-        // for (const auto& t : Ts) {
-        //     std::cout << t.transpose() << " "; // Use transpose() to print as a row for readability
-        // }
-        // std::cout << std::endl;
-        ///////////////// print R and T ///////////////////////
 
         if (edge_pt_3D.hasNaN()) {
             LOG_ERROR("NaN values detected in edge_pt_3D for pair_idx: ");
@@ -674,20 +738,9 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
             continue;
         }
 
-        // if (pt_H2(0) ==412.47224748142 && pt_H2(1) ==395.73765308129){
-        //     std::cout<<"2d point in hypothesis 1 is: " <<pt_H1(0)<<" "<<pt_H1(1)<<std::endl;
-        //     std::cout<<"3d point is: " <<edge_pt_3D(0)<<" "<<edge_pt_3D(1)<<" "<<edge_pt_3D(2)<<std::endl;
-        //     Eigen::Matrix3d R_new = All_R[hyp01_view_indx];
-        //     Eigen::Vector3d T_new = All_T[hyp01_view_indx];
-        //     Eigen::Vector3d world_coord = util->transformToWorldCoordinates(edge_pt_3D, R_new, T_new);
-        //     std::cout<<"3d world point is: " <<world_coord(0)<<" "<<world_coord(1)<<" "<<world_coord(2)<<std::endl;
-        // }
-
-        Gamma1s.row(pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
+        Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2), hypo1_identifier;
 
         Eigen::MatrixXd tangents_3D = Eigen::Matrix3d::Zero();
-        // std::cout<<"edgel_HYPO1 is: "<<edgel_HYPO1<<std::endl;
-        // std::cout<<"edgel_HYPO2 is: "<<edgel_HYPO2<<std::endl;
         Eigen::Vector3d Edgel_View1(edgel_HYPO1(0),  edgel_HYPO1(1), edgel_HYPO1(2));
         Eigen::Vector3d Edgel_View2(edgel_HYPO2(0),  edgel_HYPO2(1), edgel_HYPO2(2));
         Eigen::Matrix3d R1_test = All_R[hyp01_view_indx];
@@ -700,8 +753,8 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
         Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_HYPO1, K_HYPO2, R21_test, T21_test, tangents_3D);
         Eigen::Vector3d tangents_3D_world = (All_R[hyp01_view_indx]).transpose() * tangents_3D;
-        tangent3Ds.row(pair_idx) = tangents_3D_world;
-//std::cout << "Assigned tangent3Ds.row(pair_idx): " << tangent3Ds.row(pair_idx) << std::endl;
+        tangent3Ds.row(valid_pair_idx) = tangents_3D_world;
+        valid_pair_idx++;
         
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, pt_H1, hyp01_view_indx);
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, pt_H2, hyp02_view_indx);
@@ -732,8 +785,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
                 //> Qiwu: Store validation view and the supporting edge
                 validation_support_edges.emplace_back(val_idx, supporting_edge);
-                
-
                 //> Qiwu: Add the supporting edge to the edgeMapping for the 3D edge
                 edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D, supporting_edge, val_idx);
 
@@ -745,61 +796,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
     finalize_edge_pair_time += omp_get_wtime() - itime;
 }
 
-// void EdgeSketch_Core::test_3D_tangent() {
-//     Eigen::Matrix3d R1_test;
-//     Eigen::Matrix3d R2_test;
-//     Eigen::Matrix3d R21_test;
-//     Eigen::Matrix3d R12_test;
-//     Eigen::Matrix3d K_test;
-//     Eigen::Vector3d T12_test;
-//     Eigen::Vector3d T21_test;
-//     Eigen::MatrixXd Edges_HYPO1_final_test(2, 1);
-//     Eigen::MatrixXd Edges_HYPO2_final_test(2, 1);
-
-//     Edges_HYPO1_final_test << 313.1281,  221.2212;
-//     Edges_HYPO2_final_test << 214.3858,  328.1279;
-//     Eigen::Vector3d Edgel_View1(313.1281,  221.2212, 1.0532);
-//     Eigen::Vector3d Edgel_View2(214.3858,  328.1279, -2.0733);
-
-//     R1_test <<  0.283307133314224,   0.599568603826573,   0.748501541427090,
-//               -0.799349013318374,  -0.283603601454719,   0.529726488056670,
-//                0.529885103697223,  -0.748389261378974,   0.398917648559720;
-//     Eigen::Vector3d T1_test(13.6410104166048, -9.11680242242608, 1127.72680230083);
-//     R2_test << 0.198022493633256,  -0.935531843585112,  -0.292518822733696,
-//             0.825113183290599,   0.320192735561566,  -0.465472713328778,
-//             0.529126947693388,  -0.149187069586616,   0.835325021469390;
-//     Eigen::Vector3d T2_test(7.08308678814200 ,     5.40078420948800,    1123.03603126844);
-//     K_test << 2584.93250981950,    0,   249.771375872214,
-//          0, 2584.79186060577, 278.312679379194,
-//          0, 0,1;
-
-//     util->getRelativePoses(R1_test, T1_test, R2_test, T2_test, R21_test, T21_test, R12_test, T12_test);
-
-//     //std::cout << "R21:" << std::endl << R21_test << std::endl;
-//     //std::cout << "T21:" << std::endl << T21_test << std::endl;
-
-//     std::vector<Eigen::Vector2d> pts_test;
-//     pts_test.push_back(Edges_HYPO1_final_test);
-//     pts_test.push_back(Edges_HYPO2_final_test);
-
-//     std::vector<Eigen::Matrix3d> Rs_test;
-//     Rs_test.push_back(R21_test);
-//     std::vector<Eigen::Vector3d> Ts_test;
-//     Ts_test.push_back(T21_test);
-
-//     //> Compute 3D tangent
-//     Eigen::MatrixXd tangents_3D_test;
-//     Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_test, K_test, R21_test, T21_test, tangents_3D_test);
-//     std::cout << " - 3D tangent in the first camera coordinate: (" << tangents_3D_test(0) << ", " << tangents_3D_test(1) << ", " << tangents_3D_test(2) << ")" <<std::endl;
-//     Eigen::Vector3d tangents_3D_world = R1_test.transpose() * tangents_3D_test;
-//     std::cout << " - 3D tangent in the world coordinate:        (" << tangents_3D_world(0) << ", " << tangents_3D_world(1) << ", " << tangents_3D_world(2) << ")" <<std::endl;
-
-//     //> Compute 3D point
-//     Eigen::Vector3d edge_pt_3D_test = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K_test);
-//     std::cout << " - 3D point in the first camera coordinate: (" << edge_pt_3D_test(0) << ", " << edge_pt_3D_test(1) << ", " << edge_pt_3D_test(2) << ")" << std::endl;
-//     Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D_test, R1_test, T1_test);
-//     std::cout << " - 3D point in the world coordinate:        (" << edge_pt_3D_world(0) << ", " << edge_pt_3D_world(1) << ", " << edge_pt_3D_world(2) << ")" << std::endl;
-// }
 
 void EdgeSketch_Core::test_3D_tangent() {
     // Given Rotation and Translation Matrices
@@ -879,16 +875,27 @@ void EdgeSketch_Core::test_3D_tangent() {
 
 void EdgeSketch_Core::Stack_3D_Edges() {
     
+    // Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
+    // Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
+
+    // //> Transform the 3D edges from the first hypothesis view coordinate (Gamma1s) to the world coordinate (Gamma1s_world)
+    // Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 3);
+    // for (int i = 0; i < Gamma1s.rows(); ++i) {
+    //     Eigen::Vector3d point_camera = Gamma1s.row(i).transpose();
+    //     Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
+    //     Gamma1s_world.row(i) = point_world.transpose();
+    // }
     Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
     Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
 
-    //> Transform the 3D edges from the first hypothesis view coordinate (Gamma1s) to the world coordinate (Gamma1s_world)
-    Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 3);
+    Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 4);
     for (int i = 0; i < Gamma1s.rows(); ++i) {
-        Eigen::Vector3d point_camera = Gamma1s.row(i).transpose();
+        Eigen::Vector3d point_camera = Gamma1s.row(i).head<3>().transpose();
         Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
-        Gamma1s_world.row(i) = point_world.transpose();
+        Gamma1s_world.row(i).head<3>() = point_world.transpose();
+        Gamma1s_world(i, 3) = Gamma1s(i, 3);
     }
+
 
 #if WRITE_3D_EDGES
     std::ofstream myfile2;
@@ -937,10 +944,8 @@ void EdgeSketch_Core::Project_3D_Edges_and_Find_Next_Hypothesis_Views() {
         Eigen::MatrixXd projectedEdges = project3DEdgesToView(all_3D_Edges, All_R[i], All_T[i], K, All_R[hyp01_view_indx], All_T[hyp01_view_indx]);
 
         //> Claim the projected edges by the observed edges
-        // std::vector<int> claimedEdges = findClosestObservedEdges(projectedEdges, All_Edgels[i], Reproj_Dist_Thresh);
         int num_of_claimed_edges = claim_Projected_Edges(projectedEdges, All_Edgels[i], Reproj_Dist_Thresh);
         claimedEdgesList.push_back(num_of_claimed_edges);
-        // std::cout << "(" << i << "," << (double)(num_of_claimed_edges) / (double)(All_Edgels[i].rows()) << ")" << std::endl;
     }
 
     //> Use the selectBestViews function to determine the two frames with the least claimed edges
