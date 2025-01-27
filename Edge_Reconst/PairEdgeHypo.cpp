@@ -175,10 +175,6 @@ namespace PairEdgeHypothesis {
         double a_edgeH1    = tan(edgel_HYPO1(0,2));
         double b_edgeH1    = -1;
         double c_edgeH1    = -(a_edgeH1*edgel_HYPO1(0,0)-edgel_HYPO1(0,1));
-        // std::cout << "a1_line: " << a1_line <<std::endl;
-        // std::cout << "c1_line: " << c1_line <<std::endl;
-        // std::cout << "a_edgeH1: " << a_edgeH1 <<std::endl;
-        // std::cout << "c_edgeH1: " << c_edgeH1 <<std::endl;
         double idx_correct = 0;
         for(int idx_hypo2 = 0; idx_hypo2 < edgels_HYPO2.rows(); idx_hypo2++){
             double a_edgeH2 = tan(edgels_HYPO2(idx_hypo2,2));
@@ -218,6 +214,48 @@ namespace PairEdgeHypothesis {
                                                            HYPO2_idx_raw(idx_hypo2), idx_hypo2;
                 idx_correct++;
             // }
+        }
+        return edgels_HYPO2_corrected;
+    }
+
+    Eigen::MatrixXd pair_edge_hypothesis::edgelsHYPO2correct_post_validation(
+        Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, 
+        Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw)
+    {
+        Eigen::MatrixXd edgels_HYPO2_corrected;
+        Eigen::MatrixXd xy1_H1;
+        xy1_H1.conservativeResize(1,3);
+        xy1_H1(0,0) = edgel_HYPO1(0,0);
+        xy1_H1(0,1) = edgel_HYPO1(0,1);
+        xy1_H1(0,2) = 1;
+        Eigen::MatrixXd coeffspt1T = F21 * xy1_H1.transpose();
+        Eigen::MatrixXd coeffspt1  = coeffspt1T.transpose();
+        Eigen::MatrixXd Apixel_1   = coeffspt1.col(0);
+        Eigen::MatrixXd Bpixel_1   = coeffspt1.col(1);
+        Eigen::MatrixXd Cpixel_1   = coeffspt1.col(2);
+        double a1_line  = -Apixel_1(0,0)/Bpixel_1(0,0);
+        double b1_line  = -1;
+        double c1_line  = -Cpixel_1(0,0)/Bpixel_1(0,0);
+        double a_edgeH1    = tan(edgel_HYPO1(0,2));
+        double b_edgeH1    = -1;
+        double c_edgeH1    = -(a_edgeH1*edgel_HYPO1(0,0)-edgel_HYPO1(0,1));
+        double idx_correct = 0;
+        
+        for(int idx_hypo2 = 0; idx_hypo2 < edgels_HYPO2.rows(); idx_hypo2++){
+            // Parameters of the line passing through hypo2 along its angle
+            double a_edgeH2 = tan(edgels_HYPO2(idx_hypo2,2)); //tan(theta2)
+            double b_edgeH2 = -1;
+            double c_edgeH2 = -(a_edgeH2*edgels_HYPO2(idx_hypo2,0)-edgels_HYPO2(idx_hypo2,1)); //−(a⋅x2−y2)
+            // Intersection between the hypo2 line and the epipolar line from hypo1 to hypo2
+            // double x_currH2 = ((b1_line*c_edgeH2-b_edgeH2*c1_line)/(a1_line*b_edgeH2-a_edgeH2*b1_line) + edgels_HYPO2(idx_hypo2,0))/2;
+            // double y_currH2 = ((c1_line*a_edgeH2-c_edgeH2*a1_line)/(a1_line*b_edgeH2-a_edgeH2*b1_line) + edgels_HYPO2(idx_hypo2,1))/2; 
+            double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+            double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+            edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
+            edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+                                                        x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
+                                                        HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+            idx_correct++;
         }
         return edgels_HYPO2_corrected;
     }
