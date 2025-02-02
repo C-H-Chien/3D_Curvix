@@ -203,7 +203,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
             //> Retrieve Hypo2 Edgels
             Eigen::MatrixXd edgels_HYPO2 = PairHypo->getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, thresh_ore21_1, thresh_ore21_2);
             //> Correct Edgels in Hypo2 Based on Epipolar Constraints
-            Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgels_HYPO2, Edges_HYPO1.row(edge_idx), F21, F12, HYPO2_idx_raw);
+            Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgels_HYPO2, Edges_HYPO1.row(edge_idx), F21, F12, HYPO2_idx_raw);
 
             // if (abs(Edges_HYPO1(edge_idx,0)-520.6008)<0.001  && abs(Edges_HYPO1(edge_idx,1)-428.9978)<0.001){
             //     // std::cout<<HYPO2_idx_raw<<std::endl;
@@ -478,8 +478,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
             }
 
             //> paired_edge is a row vector continaing (hypo1 edge index), (paired hypo2 edge index), (paired validation edge indices)
-            //paired_edge.row(edge_idx) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
-            paired_edge.row(edge_idx*Num_Of_Total_Imgs +Num_Of_Total_Imgs) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
+            //paired_edge.row(edge_idx*Num_Of_Total_Imgs +Num_Of_Total_Imgs) << edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
 
         }
         //> A critical session to stack all local supported indices
@@ -597,12 +596,15 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         Eigen::MatrixXd edgel_HYPO2   = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));  //> edge index in hypo 2
         Eigen::MatrixXd HYPO2_idx_raw = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));
 
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
         Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
         Edges_HYPO1_final << edgels_HYPO2_corrected.col(0), edgels_HYPO2_corrected.col(1), edgels_HYPO2_corrected.col(2), edgels_HYPO2_corrected.col(3);
         Eigen::MatrixXd Edges_HYPO2_final(edgels_HYPO2_corrected.rows(), 4);
         Edges_HYPO2_final << edgels_HYPO2_corrected.col(4), edgels_HYPO2_corrected.col(5), edgels_HYPO2_corrected.col(6), edgels_HYPO2_corrected.col(7);
 
+        Eigen::Vector2d pt_H1 = Edges_HYPO1_final.row(0);
+        Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
+        
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
             std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
             continue;
@@ -627,6 +629,9 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
                 Eigen::RowVectorXd R_vector = Eigen::Map<Eigen::RowVectorXd>(All_R[val_idx].data(), All_R[val_idx].size());
                 Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
                 paired_edges_locations_file << supporting_edge(0) << " " << supporting_edge(1) << " " << R_vector<<" "<<All_T[val_idx].transpose() << "\n";
+                if (abs(edge_hypo1(0)-519.863)<0.001  && abs(edge_hypo1(1)-399.004)<0.001 && abs(pt_H2(0)-517.955)<0.001  && abs(pt_H2(1)- 384.822)<0.001){
+                    std::cout<<"valid # "<<val_idx<<": "<<supporting_edge(0) << " " << supporting_edge(1) <<std::endl;
+                }
             }
             val_indx_in_paired_edge_array++;
         }
@@ -650,7 +655,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
     int hypo1_identifier = 0;
     int previous_hypo1 = -1; 
-    Gamma1s.conservativeResize(paired_edge_final.rows(),4);
+    Gamma1s.conservativeResize(paired_edge_final.rows(),3);
     tangent3Ds.conservativeResize(paired_edge_final.rows(), 3);
 
     // int num_mutual_matches = 0;
@@ -701,8 +706,8 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         Eigen::MatrixXd edgel_HYPO2   = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));  //> edge index in hypo 2
         Eigen::MatrixXd HYPO2_idx_raw = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));
 
+        //Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
         Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
-        //Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
 
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
             std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
@@ -720,14 +725,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         pts.push_back(pt_H1);
         pts.push_back(pt_H2);
 
-
-
-
-        // // Record Hypo2's edge before correction
-        // hypo2_coords_before << edgel_HYPO2(0, 0) << " " <<edgel_HYPO2(0, 1)<<std::endl;
-        // // Record Hypo2's edge after correction
-        // hypo2_coords_after << pt_H2(0) << " " << pt_H2(1) << std::endl;
-
         //> The resultant edge_pt_3D is 3D edges "under the first hypothesis view coordinate"
         Eigen::Vector3d edge_pt_3D = util->linearTriangulation(2, pts, Rs, Ts, K_HYPO1);
 
@@ -738,7 +735,8 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
             continue;
         }
 
-        Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2), hypo1_identifier;
+        Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
+        //Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2), hypo1_identifier;
 
         Eigen::MatrixXd tangents_3D = Eigen::Matrix3d::Zero();
         Eigen::Vector3d Edgel_View1(edgel_HYPO1(0),  edgel_HYPO1(1), edgel_HYPO1(2));
@@ -875,26 +873,26 @@ void EdgeSketch_Core::test_3D_tangent() {
 
 void EdgeSketch_Core::Stack_3D_Edges() {
     
-    // Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
-    // Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
-
-    // //> Transform the 3D edges from the first hypothesis view coordinate (Gamma1s) to the world coordinate (Gamma1s_world)
-    // Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 3);
-    // for (int i = 0; i < Gamma1s.rows(); ++i) {
-    //     Eigen::Vector3d point_camera = Gamma1s.row(i).transpose();
-    //     Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
-    //     Gamma1s_world.row(i) = point_world.transpose();
-    // }
     Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
     Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
 
-    Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 4);
+    //> Transform the 3D edges from the first hypothesis view coordinate (Gamma1s) to the world coordinate (Gamma1s_world)
+    Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 3);
     for (int i = 0; i < Gamma1s.rows(); ++i) {
-        Eigen::Vector3d point_camera = Gamma1s.row(i).head<3>().transpose();
+        Eigen::Vector3d point_camera = Gamma1s.row(i).transpose();
         Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
-        Gamma1s_world.row(i).head<3>() = point_world.transpose();
-        Gamma1s_world(i, 3) = Gamma1s(i, 3);
+        Gamma1s_world.row(i) = point_world.transpose();
     }
+    // Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
+    // Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
+
+    // Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 4);
+    // for (int i = 0; i < Gamma1s.rows(); ++i) {
+    //     Eigen::Vector3d point_camera = Gamma1s.row(i).head<3>().transpose();
+    //     Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
+    //     Gamma1s_world.row(i).head<3>() = point_world.transpose();
+    //     Gamma1s_world(i, 3) = Gamma1s(i, 3);
+    // }
 
 
 #if WRITE_3D_EDGES
