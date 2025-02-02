@@ -256,6 +256,22 @@ namespace PairEdgeHypothesis {
                                                         x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
                                                         HYPO2_idx_raw(idx_hypo2), idx_hypo2;
             idx_correct++;
+
+            // if (abs(edgels_HYPO2(idx_hypo2,0)-322.485)<0.001  && abs(edgels_HYPO2(idx_hypo2,1)-364.499)<0.001){
+            //     std::cout<<edgels_HYPO2(idx_hypo2,0)<<"  " <<edgels_HYPO2(idx_hypo2,1)<<"  " << edgels_HYPO2(idx_hypo2,2)<<std::endl;
+            //     std::cout<<x_currH2 << " " <<y_currH2<< std::endl;
+            //     std::cout<< a1_line<<" " << b1_line <<" " <<c1_line<<std::endl;
+            //     double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+            //     double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+            //     double epipolar_check = a1_line * x_intersection + b1_line * y_intersection + c1_line;
+            //     double tangent_check = a_edgeH2 * x_intersection + b_edgeH2 * y_intersection + c_edgeH2;
+
+            //     std::cout << "Epipolar line check: " << epipolar_check << std::endl;
+            //     std::cout << "Tangent line check: " << tangent_check << std::endl;
+            //     std::cout << "Raw intersection: (" << x_intersection << ", " << y_intersection << ")" << std::endl;
+            //     std::cout << "Averaged intersection: (" << x_currH2 << ", " << y_currH2 << ")" << std::endl;
+
+            // }
         }
         return edgels_HYPO2_corrected;
     }
