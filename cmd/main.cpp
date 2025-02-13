@@ -66,9 +66,8 @@ int main(int argc, char **argv) {
   //> Constructor
   EdgeSketch_Core MWV_Edge_Rec( Edge_Sketch_Settings_Map );
 
-  MWV_Edge_Rec.test_3D_tangent();
+  //MWV_Edge_Rec.test_3D_tangent();
 
-  /*
 
   //> Read camera intrinsic and extrinsic matrices
   MWV_Edge_Rec.Read_Camera_Data();
@@ -95,7 +94,21 @@ int main(int argc, char **argv) {
       MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
 
       //> Hypothesis-Validation process
-      MWV_Edge_Rec.Run_3D_Edge_Sketch();
+      int hypothesis = 1;
+      MWV_Edge_Rec.Run_3D_Edge_Sketch(hypothesis);
+
+      // int temp = MWV_Edge_Rec.hyp01_view_indx;
+      // MWV_Edge_Rec.hyp01_view_indx = MWV_Edge_Rec.hyp02_view_indx;
+      // MWV_Edge_Rec.hyp02_view_indx = temp;
+      // hypothesis = 2;
+      // MWV_Edge_Rec.Set_Hypothesis_Views_Camera();
+      // std::string out_str = "Selected views for hypotheses are " + std::to_string(MWV_Edge_Rec.hyp01_view_indx) \
+      //                     + " and " + std::to_string(MWV_Edge_Rec.hyp02_view_indx);
+      // LOG_INFOR_MESG(out_str);
+      // //> Load edges with specific third-order edge threshold
+      // MWV_Edge_Rec.Read_Edgels_Data();
+      // MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
+      // MWV_Edge_Rec.Run_3D_Edge_Sketch(hypothesis);
     }
     
     //> Finalize hypothesis edge pairs for a two-view triangulation
@@ -122,7 +135,6 @@ int main(int argc, char **argv) {
   std::cout << "     - Time for Pairing up Edges:              " << MWV_Edge_Rec.pair_edges_time << " (s)" << std::endl;
   std::cout << "     - Time for Finalizing Edge Pairs:         " << MWV_Edge_Rec.finalize_edge_pair_time << " (s)" << std::endl;
   std::cout << "     - Time for Finding Next Hypothesis Views: " << MWV_Edge_Rec.find_next_hypothesis_view_time << " (s)" << std::endl;
-  */
 
   LOG_INFOR_MESG("3D Edge Sketch is Finished!");
   return 0;
