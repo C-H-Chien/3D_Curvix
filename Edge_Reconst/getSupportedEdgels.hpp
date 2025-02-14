@@ -25,7 +25,7 @@ namespace GetSupportedEdgels {
     public:
         get_SupportedEdgels( double );
         
-        double getSupportIdx(Eigen::Vector2d edgels_tgt_reproj, Eigen::MatrixXd Tangents_VALID, Eigen::MatrixXd inliner);
+        int getSupportIdx(Eigen::Vector2d edgels_tgt_reproj, Eigen::MatrixXd Tangents_VALID, Eigen::MatrixXd inliner);
         void printAllSupportedIndices(const std::vector<Eigen::MatrixXd> &all_supported_indices);
         // void printEdge3DToHypothesisAndSupports(
         //     const std::unordered_map<Eigen::Matrix<double, 3, 1>, 

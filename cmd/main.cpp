@@ -127,6 +127,7 @@ int main(int argc, char **argv) {
 
     if (MWV_Edge_Rec.enable_aborting_3D_edge_sketch)
       break;
+    break;
   }
 
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;

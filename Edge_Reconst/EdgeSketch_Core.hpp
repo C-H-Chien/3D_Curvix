@@ -133,7 +133,47 @@ private:
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
-      std::pair<int, int> &next_hypothesis_views, double &least_ratio);
+      std::pair<int, int> &next_hypothesis_views, double &least_ratio
+    );
+
+    bool get_H2_edge_indices_passing_dist2EL_thresh(
+      std::vector<int> &H2_edge_indices_passing_dist2EL_thresh, std::vector<double> indices_stack_unique,
+      Eigen::Vector3d pt_edgel_HYPO1, Eigen::VectorXd rep_count, Eigen::MatrixXd Edges_HYPO2_final ) 
+    {
+      Eigen::Vector3d coeffs = F21 * pt_edgel_HYPO1;
+
+      //> Loop over all hypothesis edge pairs, pick the pairs where the H2 edge is close to the epipolar line arising from the H1 edge
+      for(int a = 0; a < rep_count.rows(); a++) {
+          //> Ignore if the current hypothesis edge pair has validation view supports less than Max_Num_Of_Support_Views
+          if (rep_count(a) < Max_Num_Of_Support_Views) continue;
+          
+          Eigen::Vector2d Edge_Pt;
+          Edge_Pt << Edges_HYPO2_final.row(indices_stack_unique[a])(0), Edges_HYPO2_final.row(indices_stack_unique[a])(1);
+          
+          double Ap = coeffs(0) * Edge_Pt(0);
+          double Bp = coeffs(1) * Edge_Pt(1);
+          double numDist = Ap + Bp + coeffs(2);
+          double denomDist = coeffs(0)*coeffs(0) + coeffs(1)*coeffs(1);
+          denomDist = sqrt(denomDist);
+          double dist = std::abs(numDist) / denomDist;
+
+          if (dist > Reproj_Dist_Thresh) continue;
+          H2_edge_indices_passing_dist2EL_thresh.push_back(int(indices_stack_unique[a]));
+      }
+      //> If no H2 edges are within the point-to-epipolar line distance threshold, go to the next H1 edge
+      return (H2_edge_indices_passing_dist2EL_thresh.empty()) ? (true) : (false);
+    }
+
+    //> generate a list of validation view indices
+    void get_validation_view_index_list() {
+      //> reset the vector
+      valid_view_index.clear();
+      for (int VALID_INDX = 0; VALID_INDX < Num_Of_Total_Imgs; VALID_INDX++) {
+        if (VALID_INDX == hyp01_view_indx || VALID_INDX == hyp02_view_indx) continue;
+        valid_view_index.push_back(VALID_INDX);
+      }
+    }
+    
 
     //> YAML file data parser
     YAML::Node Edge_Sketch_Setting_YAML_File;
@@ -194,6 +234,9 @@ private:
     // data structure for tracking best matches
     std::unordered_map<int, int> hypothesis1_best_match;
     std::unordered_map<int, int> hypothesis2_best_match;
+
+    //> a list of validation view indices
+    std::vector<int> valid_view_index;
 };
 
 
