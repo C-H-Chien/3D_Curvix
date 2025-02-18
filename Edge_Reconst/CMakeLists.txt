@@ -20,13 +20,26 @@ set ( control_sources
 
   EdgeSketch_Core.cpp
   EdgeSketch_Core.hpp
+
+  #>MVT Utilities
+  mvt.hpp
+  mvt.cpp
+  NViewsCertifier.h
+  NViewsCertifier.cpp
+  NViewsClass.h
+  NViewsClass.cpp
+  NViewsTypes.h
+  NViewsUtils.h
+  NViewsUtils.cpp
+  generatePointCloud.h
+  generatePointCloud.cpp
 )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_library( edge_reconstruction ${control_sources} )
 target_link_libraries(edge_reconstruction 
-        -L/gpfs/data/bkimia/cchien3/yaml-cpp/bin/lib64 yaml-cpp
+        -L/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/bin/lib64 yaml-cpp
         -L/usr/lib64 pthread
 )
 
