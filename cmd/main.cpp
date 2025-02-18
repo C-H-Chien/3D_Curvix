@@ -28,6 +28,8 @@
 #include "../Edge_Reconst/file_reader.hpp"
 #include "../Edge_Reconst/edge_mapping.hpp"
 
+#include "../Edge_Reconst/mvt.hpp"
+
 using namespace MultiviewGeometryUtil;
 
 // ========================================================================================================================
@@ -94,21 +96,8 @@ int main(int argc, char **argv) {
       MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
 
       //> Hypothesis-Validation process
-      int hypothesis = 1;
-      MWV_Edge_Rec.Run_3D_Edge_Sketch(hypothesis);
+      MWV_Edge_Rec.Run_3D_Edge_Sketch();
 
-      // int temp = MWV_Edge_Rec.hyp01_view_indx;
-      // MWV_Edge_Rec.hyp01_view_indx = MWV_Edge_Rec.hyp02_view_indx;
-      // MWV_Edge_Rec.hyp02_view_indx = temp;
-      // hypothesis = 2;
-      // MWV_Edge_Rec.Set_Hypothesis_Views_Camera();
-      // std::string out_str = "Selected views for hypotheses are " + std::to_string(MWV_Edge_Rec.hyp01_view_indx) \
-      //                     + " and " + std::to_string(MWV_Edge_Rec.hyp02_view_indx);
-      // LOG_INFOR_MESG(out_str);
-      // //> Load edges with specific third-order edge threshold
-      // MWV_Edge_Rec.Read_Edgels_Data();
-      // MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
-      // MWV_Edge_Rec.Run_3D_Edge_Sketch(hypothesis);
     }
     
     //> Finalize hypothesis edge pairs for a two-view triangulation
@@ -118,16 +107,18 @@ int main(int argc, char **argv) {
     
     //> Stack all 3D edges located in the world coordinate
     MWV_Edge_Rec.Stack_3D_Edges();
+  
+    MWV_Edge_Rec.all_3D_Edges = NViewsTrian::mvt(MWV_Edge_Rec.hyp01_view_indx, MWV_Edge_Rec.hyp02_view_indx);
 
     //> Find the next hypothesis view pairs, if any
     MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
     MWV_Edge_Rec.Clear_Data();
 
+
     edge_sketch_pass_count++;
 
     if (MWV_Edge_Rec.enable_aborting_3D_edge_sketch)
       break;
-    break;
   }
 
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;
