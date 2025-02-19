@@ -110,9 +110,10 @@ public:
     
     Eigen::MatrixXd all_3D_Edges;
     std::vector< int > claimedEdgesList;
-    double least_ratio;
+    double avg_ratio;
     bool enable_aborting_3D_edge_sketch;
     int num_of_nonveridical_edge_pairs;
+    std::vector<int> history_hypothesis_views_index;
 
     //> timer
     double itime, pair_edges_time;
@@ -135,7 +136,7 @@ private:
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
-      std::pair<int, int> &next_hypothesis_views, double &least_ratio
+      std::pair<int, int> &next_hypothesis_views, std::vector<int> history_hypothesis_views_index
     );
 
     bool get_H2_edge_indices_passing_dist2EL_thresh(

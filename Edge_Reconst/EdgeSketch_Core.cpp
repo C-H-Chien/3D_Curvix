@@ -127,6 +127,10 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Camera() {
 
     //> generate a list of validation view indices which is valid_view_index (data type: std::vector<int>)
     get_validation_view_index_list();
+
+    //> A list of history hypothesis views
+    history_hypothesis_views_index.push_back(hyp01_view_indx);
+    history_hypothesis_views_index.push_back(hyp02_view_indx);
 }
 
 void EdgeSketch_Core::Read_Edgels_Data() {
@@ -1037,15 +1041,15 @@ void EdgeSketch_Core::Project_3D_Edges_and_Find_Next_Hypothesis_Views() {
     //> Use the selectBestViews function to determine the two frames with the least claimed edges
     // std::pair<int, int> bestViews = selectBestViews(claimedEdgesList);
     std::pair<int, int> next_hypothesis_views;
-    select_Next_Best_Hypothesis_Views( claimedEdgesList, All_Edgels, next_hypothesis_views, least_ratio );
+    select_Next_Best_Hypothesis_Views( claimedEdgesList, All_Edgels, next_hypothesis_views, history_hypothesis_views_index );
     
     //> Assign the best views to the hypothesis indices
     hyp01_view_indx = next_hypothesis_views.first;
     hyp02_view_indx = next_hypothesis_views.second;
 
     //> Check if the claimed edges is over a ratio of total observed edges
-    //enable_aborting_3D_edge_sketch = (least_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges) ? (true) : (false);
-    if (least_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges){
+    // enable_aborting_3D_edge_sketch = (avg_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges) ? (true) : (false);
+    if (avg_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges){
         enable_aborting_3D_edge_sketch = true;
         std::cout<<"reached Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges value"<<std::endl;
     }else{
@@ -1107,56 +1111,53 @@ void EdgeSketch_Core::select_Next_Best_Hypothesis_Views(
     const std::vector<int>& claimedEdges, 
     std::vector<Eigen::MatrixXd> All_Edgels, 
     std::pair<int, int>& next_hypothesis_views, 
-    double& least_ratio) 
+    std::vector<int> history_hypothesis_views_index ) 
 {
     std::vector<std::pair<int, double>> frameSupportCounts;
+    std::vector<double> all_ratio_of_claimed_over_unclaimed;
 
     double ratio_claimed_over_unclaimed;
     for (int i = 0; i < claimedEdges.size(); i++) {
         ratio_claimed_over_unclaimed = (double)(claimedEdges[i]) / (double)(All_Edgels[i].rows());
         frameSupportCounts.push_back({i, ratio_claimed_over_unclaimed});
-
-        // std::cout << "Frame " << i << ": Claimed = " << claimedEdges[i] 
-        //           << ", Total Edgels = " << All_Edgels[i].rows() 
-        //           << ", Ratio = " << ratio_claimed_over_unclaimed << std::endl;
+        all_ratio_of_claimed_over_unclaimed.push_back(ratio_claimed_over_unclaimed);
     }
 
     std::sort(frameSupportCounts.begin(), frameSupportCounts.end(), 
-              [](const std::pair<int, double>& a, const std::pair<int, double>& b) {
-                  return a.second < b.second;
-              });
+            [](const std::pair<int, double>& a, const std::pair<int, double>& b) {
+                return a.second < b.second;
+            });
 
     int bestView1 = frameSupportCounts[0].first;
     int bestView2 = frameSupportCounts[1].first;
 
-    // If the new best views are the same as hyp1 and hyp2, randomly select two new views
-    if ((bestView1 == hyp01_view_indx && bestView2 == hyp02_view_indx) || (bestView1 == hyp02_view_indx && bestView2 == hyp01_view_indx)) {
-        std::vector<int> availableViews;
-        for (int i = 0; i < claimedEdges.size(); i++) {
-            if (i != hyp01_view_indx && i != hyp02_view_indx) {
-                availableViews.push_back(i);
-            }
+    //> Calculate the average ratio of claimed 2D edges over unclaimed 2D edges
+    avg_ratio = std::accumulate(all_ratio_of_claimed_over_unclaimed.begin(), all_ratio_of_claimed_over_unclaimed.end(), 0.0) / (double)(all_ratio_of_claimed_over_unclaimed.size());
+
+    //> If the selected hypothesis view for the next round is repeated based on the history data, pick another one instead
+    int keep_finding_counter = 0;
+    while (true) {
+        int find_existence_HYPO1 = std::count(history_hypothesis_views_index.begin(), history_hypothesis_views_index.end(), bestView1);
+        int find_existence_HYPO2 = std::count(history_hypothesis_views_index.begin(), history_hypothesis_views_index.end(), bestView2);
+
+        if (find_existence_HYPO1 == 0 && find_existence_HYPO2 == 0)
+            break;
+
+        if (find_existence_HYPO1 > 0 && find_existence_HYPO2 > 0) {
+            bestView1 = frameSupportCounts[2 + keep_finding_counter].first;
+            bestView2 = frameSupportCounts[3 + keep_finding_counter].first;
         }
-
-        // Randomly select two unique views from the available views
-        if (availableViews.size() >= 2) {
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::uniform_int_distribution<> dis(0, availableViews.size() - 1);
-
-            int randomIndex1 = dis(gen);
-            int randomIndex2;
-            do {
-                randomIndex2 = dis(gen);
-            } while (randomIndex2 == randomIndex1);
-
-            bestView1 = availableViews[randomIndex1];
-            bestView2 = availableViews[randomIndex2];
+        if (find_existence_HYPO1 > 0) {
+            bestView1 = frameSupportCounts[1 + keep_finding_counter].first;
+            bestView2 = frameSupportCounts[2 + keep_finding_counter].first;
         }
+        if (find_existence_HYPO2 > 0) {
+            bestView2 = frameSupportCounts[2 + keep_finding_counter].first;
+        }
+        keep_finding_counter++;
     }
-
+    
     next_hypothesis_views = std::make_pair(bestView1, bestView2);
-    least_ratio = frameSupportCounts[0].second;
 }
 
 

@@ -11,8 +11,6 @@
 #include <random>
 #include "definitions.h"
 
-#define PI 3.1415927
-
 namespace NViewsTrian
 {
 
