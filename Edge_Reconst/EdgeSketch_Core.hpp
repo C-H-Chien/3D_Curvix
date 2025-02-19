@@ -49,7 +49,7 @@ public:
     void Read_Edgels_Data();
     void Set_Hypothesis_Views_Camera();
     void Set_Hypothesis_Views_Edgels();
-    void Run_3D_Edge_Sketch(int hypothesis);
+    void Run_3D_Edge_Sketch();
     void Finalize_Edge_Pairs_and_Reconstruct_3D_Edges();
     void Clear_Data();
     void Stack_3D_Edges();
@@ -107,7 +107,7 @@ public:
     std::vector< Eigen::MatrixXd > all_supported_indices;
     Eigen::MatrixXd Gamma1s;
     Eigen::MatrixXd tangent3Ds;
-
+    
     Eigen::MatrixXd all_3D_Edges;
     std::vector< int > claimedEdgesList;
     double least_ratio;
@@ -130,6 +130,8 @@ private:
     //std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
 
     Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
+
+    
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
