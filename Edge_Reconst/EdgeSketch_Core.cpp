@@ -158,7 +158,7 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
     epipole = result.second;
 }
 
-void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
+void EdgeSketch_Core::Run_3D_Edge_Sketch() {
 
     itime = omp_get_wtime();
     #pragma omp parallel
@@ -346,11 +346,10 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
 
                         ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
                         //> anchor this hypothesis edge pair
-                        if (abs(Edges_HYPO1_final(idx_pair,0)-274.394)<0.001  && abs(Edges_HYPO1_final(idx_pair,1)-405.998)<0.001 &&	
-                        abs(Edges_HYPO2_final(idx_pair,0)-284.514)<0.001  && abs(Edges_HYPO2_final(idx_pair,1)-418.369)<0.001 &&
-                        !v_intersection.empty()){
-                            //std::cout<<"hyp 1 H1_edge_idx: "<<H1_edge_idx<<std::endl;
-                            std::cout<<"found support in valid# "<<VALID_INDX<<std::endl;
+                        // if (abs(Edges_HYPO1_final(idx_pair,0)-274.394)<0.001  && abs(Edges_HYPO1_final(idx_pair,1)-405.998)<0.001 &&	
+                        // abs(Edges_HYPO2_final(idx_pair,0)-284.514)<0.001  && abs(Edges_HYPO2_final(idx_pair,1)-418.369)<0.001 &&
+                        // !v_intersection.empty()){
+                            //std::cout<<"found support in valid# "<<VALID_INDX<<std::endl;
                             // std::ofstream epipole_file;
                             // std::string Epipole_File_Path = "../../outputs/epipole_and_angle_range_val_" + std::to_string(VALID_INDX) + ".txt";
                             // epipole_file.open(Epipole_File_Path);
@@ -363,7 +362,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
                             // epipole_file << "Angle Range Hypothesis 2: [" << thresh_ore32_1 << ", " << thresh_ore32_2 << "]\n";
                             // epipole_file << "-------------------------\n";
                             // epipole_file.close();
-                        }
+                        //}
                         ////////////////////////////////////////////// Record Wedge ////////////////////////////////////////////
 
                     }
@@ -420,21 +419,21 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
                 //> what does it look like in paired_edge??????
                 paired_edge.row(H1_edge_idx*Num_Of_Total_Imgs+H2_edge_idx) << H1_edge_idx, HYPO2_idx(H2_edge_idx), supported_indices.row(H2_edge_idx);
 
-                if (std::abs(Edges_HYPO1(H1_edge_idx,0)- 274.394) < 0.001 &&
-                    std::abs(Edges_HYPO1(H1_edge_idx,1) - 405.998) < 0.001 &&
-                    std::abs(Edges_HYPO2(HYPO2_idx(H2_edge_idx),0)- 284.506) < 0.001 &&
-                    std::abs(Edges_HYPO2(HYPO2_idx(H2_edge_idx),1) - 418.5) < 0.001 ) {
-                    std::cout << "Supporting Validation View Indices for Hypothesis Edge (274.394, 405.998): ";
+                // if (std::abs(Edges_HYPO1(H1_edge_idx,0)- 274.394) < 0.001 &&
+                //     std::abs(Edges_HYPO1(H1_edge_idx,1) - 405.998) < 0.001 &&
+                //     std::abs(Edges_HYPO2(HYPO2_idx(H2_edge_idx),0)- 284.506) < 0.001 &&
+                //     std::abs(Edges_HYPO2(HYPO2_idx(H2_edge_idx),1) - 418.5) < 0.001 ) {
+                //     std::cout << "Supporting Validation View Indices for Hypothesis Edge (274.394, 405.998): ";
                     
-                    // Iterate over the columns of supported_indices for this H2_edge_idx
-                    for (int col = 0; col < supported_indices.cols(); col++) {
-                        int support_index = supported_indices(H2_edge_idx, col);
-                        if (support_index != -2) {  // Ignore invalid values
-                            std::cout << valid_view_index[col] << " ";
-                        }
-                    }
-                    std::cout << std::endl;
-                }
+                //     // Iterate over the columns of supported_indices for this H2_edge_idx
+                //     for (int col = 0; col < supported_indices.cols(); col++) {
+                //         int support_index = supported_indices(H2_edge_idx, col);
+                //         if (support_index != -2) {  // Ignore invalid values
+                //             std::cout << valid_view_index[col] << " ";
+                //         }
+                //     }
+                //     std::cout << std::endl;
+                // }
             }
      
             //> If there are more than 1 hypothesis edge pair that has maximal validation view supports
@@ -480,11 +479,11 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch(int hypothesis) {
                 finalpair = int(indices_stack_unique[int(maxIndex)]);
             }
 
-            if(hypothesis == 1){
-                hypothesis1_best_match[H1_edge_idx] = HYPO2_idx(finalpair);
-            }else{
-                hypothesis2_best_match[H1_edge_idx] = HYPO2_idx(finalpair);
-            }
+            // if(hypothesis == 1){
+            //     hypothesis1_best_match[H1_edge_idx] = HYPO2_idx(finalpair);
+            // }else{
+            //     hypothesis2_best_match[H1_edge_idx] = HYPO2_idx(finalpair);
+            // }
 
             //> paired_edge is a row vector continaing (hypo1 edge index), (paired hypo2 edge index), (paired validation edge indices)
             //paired_edge.row(H1_edge_idx*Num_Of_Total_Imgs +Num_Of_Total_Imgs) << H1_edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
@@ -564,35 +563,50 @@ std::unordered_map<int, int> EdgeSketch_Core::saveBestMatchesToFile(const std::u
 void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
     //std::unordered_map<int, int> mutualMatches = saveBestMatchesToFile(hypothesis1_best_match, hypothesis2_best_match, "../../outputs/best_matches.txt");
-
     itime = omp_get_wtime();
-    int pair_num = 0;
+
     std::vector<int> valid_pair_index;
+    std::vector<int> valid_pair_indices;
+    
     for (int pair_idx = 0; pair_idx < paired_edge.rows(); pair_idx++) {
-      if(paired_edge(pair_idx,0) != -2 && paired_edge(pair_idx,0) != -3) {
-        valid_pair_index.push_back(pair_idx);
-        pair_num++;
-      }
-    }
-    paired_edge_final = Eigen::MatrixXd::Constant(pair_num, Num_Of_Total_Imgs, -2);
-    for (int i = 0; i < pair_num; i++){
-      paired_edge_final.row(i) << paired_edge.row(valid_pair_index[i]);
-      int H1_edge_idx = paired_edge_final(i,0);
-
-    //   if (std::abs(Edges_HYPO1(H1_edge_idx,0) - 274.394) < 0.001 &&
-    //         std::abs(Edges_HYPO1(H1_edge_idx, 1) - 405.998) < 0.001) {
-    //         std::cout << "Validation Indices for Hypothesis 1 Edge (274.394, 405.998): ";
-    //         for (int col = 2; col < paired_edge_final.cols(); col++) {
-    //             int val_index = paired_edge_final(i, col);
-    //             if (val_index != -2) { // Ignore invalid values
-    //                 std::cout << col << " ";
-    //             }
-    //         }
-    //         std::cout << std::endl;
-    //     }
+        int H1_index = paired_edge(pair_idx, 0);
+        if (H1_index != -2 && H1_index != -3) {
+            valid_pair_indices.push_back(pair_idx);
+        }
     }
 
-    std::string info_str = "Number of pairs is: " + std::to_string(pair_num);
+    int pair_num = valid_pair_indices.size();
+    paired_edge_final = Eigen::MatrixXd::Constant(pair_num, paired_edge.cols(), -2);
+
+    for (int i = 0; i < pair_num; i++) {
+        int row_idx = valid_pair_indices[i];
+
+        paired_edge_final(i, 0) = paired_edge(row_idx, 0); // Hypothesis 1 edge index
+        paired_edge_final(i, 1) = paired_edge(row_idx, 1); // Hypothesis 2 edge index
+
+        for (int col = 2; col < paired_edge.cols(); col++) {
+            paired_edge_final(i, col) = paired_edge(row_idx, col); // Validation view indices
+        }
+
+        // Debugging: Print validation indices for a specific hypothesis edge
+        int H1_edge_idx = paired_edge_final(i, 0);
+        int H2_edge_idx = paired_edge_final(i, 1);
+        // if (std::abs(Edges_HYPO1(H1_edge_idx, 0) - 274.394) < 0.001 &&
+        //     std::abs(Edges_HYPO1(H1_edge_idx, 1) - 405.998) < 0.001 &&
+        //     std::abs(Edges_HYPO2(H2_edge_idx,0)- 284.506) < 0.001 &&
+        //     std::abs(Edges_HYPO2(H2_edge_idx,1) - 418.5) < 0.001) {
+        //     std::cout << "Validation Indices for Hypothesis 1 Edge (274.394, 405.998): ";
+        //     for (int col = 2; col < paired_edge_final.cols(); col++) {
+        //         int val_index = paired_edge_final(i, col);
+        //         if (val_index != -2) { // Ignore invalid values
+        //             std::cout << valid_view_index[col-2] << " ";
+        //         }
+        //     }
+        //     std::cout << std::endl;
+        // }
+    }
+
+    std::string info_str = "Number of valid edge pairs: " + std::to_string(pair_num);
     LOG_INFOR_MESG(info_str);
 
 #if DEBUG_PAIRED_EDGES
@@ -641,17 +655,11 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
         paired_edges_locations_file << pt_H2(0) << " " << pt_H2(1) << " " << R_vector2 << " " << All_T[hyp02_view_indx].transpose() << "\n";
 
         // Loop through validation views and write actual edge locations and R, T matrices
-        int val_indx_in_paired_edge_array = 2;
-        for (int val_idx = 0; val_idx < Num_Of_Total_Imgs; ++val_idx) {
-            if (val_idx == hyp01_view_indx || val_idx == hyp02_view_indx) {
-                continue;  // Skip hypothesis views
-            }
 
-            int support_idx = paired_edge_final(pair_idx, val_indx_in_paired_edge_array);
+        for (int col = 2; col < paired_edge_final.cols(); col++) {
+            int val_idx = valid_view_index[col - 2]; 
+            int support_idx = paired_edge_final(pair_idx, col);
             if (support_idx != -2) {
-                if (abs(pt_H1(0) - 274.394) <0.001 && abs(pt_H1(1) - 405.998) <0.001 && abs(pt_H2(0) - 284.514) <0.001 && abs(pt_H2(1) - 418.369) <0.001) {
-                    std::cout<<"Finalize_Edge_Pairs_and_Reconstruct_3D_Edges validation index: "<<val_idx<<std::endl;
-                }
                 /////////////////////////////////// epipolar correcting validation view edges ///////////////////////////////////
                 Eigen::RowVectorXd R_vector = Eigen::Map<Eigen::RowVectorXd>(All_R[val_idx].data(), All_R[val_idx].size());
                 Eigen::MatrixXd edgel_VALID = All_Edgels[val_idx].row(support_idx);
@@ -685,22 +693,21 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
                 if (corrected_validation_edge.rows() > 0) {
                     Eigen::Vector2d pt_VAL = Edges_VAL_final.row(0);
                     paired_edges_locations_file << pt_VAL(0) << " " << pt_VAL(1) << " " << R_vector << " " << All_T[val_idx].transpose() << "\n";
-                    // if (abs(pt_H1(0) - 274.394) <0.001 && abs(pt_H1(1) - 405.998) <0.001 &&
-                    //     abs(pt_H2(0) - 284.514) <0.001 && abs(pt_H2(1) - 418.369) <0.001) {
+                    // if (abs(pt_H1(0) - 498.48) <0.001 && abs(pt_H1(1) - 419.52) <0.001
+                    //     && abs(pt_H2(0) - 462.525) <0.001 && abs(pt_H2(1) - 372.139) <0.001) {
                     //     std::cout << "validation view: " << val_idx << " point: "<<pt_VAL(0)<<","<<pt_VAL(1)<<" original point: "<<edgel_VALID(0)<<","<<edgel_VALID(1) << std::endl;
                     // }
                 }
                 /////////////////////////////////// epipolar correcting validation view edges ///////////////////////////////////
 
-                //Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
+                Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
                 
-                // if (abs(edge_hypo1(0)-519.863)<0.001  && abs(edge_hypo1(1)-399.004)<0.001 && abs(pt_H2(0)-517.955)<0.001  && abs(pt_H2(1)- 384.822)<0.001){
+                // if (abs(edge_hypo1(0)-498.487)<0.001  && abs(edge_hypo1(1)-419.52)<0.001 && abs(pt_H2(0)-462.525)<0.001  && abs(pt_H2(1)- 372.139)<0.001){
                 //     std::cout<<"valid # "<<val_idx<<": "<<supporting_edge(0) << " " << supporting_edge(1) <<" " << supporting_edge(2) <<std::endl;
-                //     std::cout<<"hyp1 orientation: "<< edgel_HYPO1(0,2) << std::endl;
-                //     std::cout<<"hyp2 orientation: "<< edgel_HYPO2(0,2) <<std::endl;
+                //     // std::cout<<"hyp1 orientation: "<< edgel_HYPO1(0,2) << std::endl;
+                //     // std::cout<<"hyp2 orientation: "<< edgel_HYPO2(0,2) <<std::endl;
                 // }
             }
-            val_indx_in_paired_edge_array++;
         }
         paired_edges_locations_file << "\n"; // Newline between pairs
     }
@@ -804,10 +811,10 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges() {
 
         Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
         //Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2), hypo1_identifier;
-        // const double EPSILON = 1e-3;  // Increase tolerance from 1e-6 to 1e-4
-        // if (std::abs(edge_pt_3D(0) - 0.48281) < EPSILON &&
-        //     std::abs(edge_pt_3D(1) + 0.0250759) < EPSILON &&
-        //     std::abs(edge_pt_3D(2) + 4.288) < EPSILON) {
+        // const double EPSILON = 1e-4;  // Increase tolerance from 1e-6 to 1e-4
+        // if (std::abs(edge_pt_3D(0) + 0.366299) < EPSILON &&
+        //     std::abs(edge_pt_3D(1) + 0.0740885) < EPSILON &&
+        //     std::abs(edge_pt_3D(2) + 4.11193) < EPSILON) {
         //     std::cout << "Matched tangents_3D: " << Gamma1s.row(valid_pair_idx) << std::endl;
         //     std::cout<<"hyp1 is: " <<pt_H1 <<" hyp2 is: "<<pt_H2<<std::endl;
         // }
@@ -957,9 +964,9 @@ void EdgeSketch_Core::Stack_3D_Edges() {
         Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
         Gamma1s_world.row(i) = point_world.transpose();
         // const double EPSILON = 1e-4;  // Increase tolerance from 1e-6 to 1e-4
-        // if (std::abs(point_world(0) - 0.501451) < EPSILON &&
-        //     std::abs(point_world(1) - 0.995733) < EPSILON &&
-        //     std::abs(point_world(2) - 0.448107) < EPSILON) {
+        // if (std::abs(point_world(0) - 0.150291) < EPSILON &&
+        //     std::abs(point_world(1) - 0.206176) < EPSILON &&
+        //     std::abs(point_world(2) - 0.360493) < EPSILON) {
         //     std::cout << "Matched tangents_3D_world: " << point_world.transpose() << std::endl;
         //     std::cout << "Corresponding tangents_3D: " << point_camera.transpose() << std::endl;
         // }
@@ -1037,9 +1044,17 @@ void EdgeSketch_Core::Project_3D_Edges_and_Find_Next_Hypothesis_Views() {
     hyp02_view_indx = next_hypothesis_views.second;
 
     //> Check if the claimed edges is over a ratio of total observed edges
-    enable_aborting_3D_edge_sketch = (least_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges) ? (true) : (false);
+    //enable_aborting_3D_edge_sketch = (least_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges) ? (true) : (false);
+    if (least_ratio > Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges){
+        enable_aborting_3D_edge_sketch = true;
+        std::cout<<"reached Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges value"<<std::endl;
+    }else{
+        enable_aborting_3D_edge_sketch = false;
+    }
     find_next_hypothesis_view_time += omp_get_wtime() - itime;
 }
+
+
 
 int EdgeSketch_Core::claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold) {
     
@@ -1100,6 +1115,10 @@ void EdgeSketch_Core::select_Next_Best_Hypothesis_Views(
     for (int i = 0; i < claimedEdges.size(); i++) {
         ratio_claimed_over_unclaimed = (double)(claimedEdges[i]) / (double)(All_Edgels[i].rows());
         frameSupportCounts.push_back({i, ratio_claimed_over_unclaimed});
+
+        // std::cout << "Frame " << i << ": Claimed = " << claimedEdges[i] 
+        //           << ", Total Edgels = " << All_Edgels[i].rows() 
+        //           << ", Ratio = " << ratio_claimed_over_unclaimed << std::endl;
     }
 
     std::sort(frameSupportCounts.begin(), frameSupportCounts.end(), 
