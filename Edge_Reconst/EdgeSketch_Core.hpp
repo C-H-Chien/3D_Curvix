@@ -31,6 +31,7 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
+#include "../Edge_Reconst/mvt.hpp"
 
 //> mutual best support
 #include <unordered_map>
