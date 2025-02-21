@@ -108,12 +108,11 @@ int main(int argc, char **argv) {
     //> Stack all 3D edges located in the world coordinate
     MWV_Edge_Rec.Stack_3D_Edges();
   
-    MWV_Edge_Rec.all_3D_Edges = NViewsTrian::mvt(MWV_Edge_Rec.hyp01_view_indx, MWV_Edge_Rec.hyp02_view_indx);
+    //MWV_Edge_Rec.all_3D_Edges = NViewsTrian::mvt(MWV_Edge_Rec.hyp01_view_indx, MWV_Edge_Rec.hyp02_view_indx);
 
     //> Find the next hypothesis view pairs, if any
     MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
     MWV_Edge_Rec.Clear_Data();
-
 
     edge_sketch_pass_count++;
 
