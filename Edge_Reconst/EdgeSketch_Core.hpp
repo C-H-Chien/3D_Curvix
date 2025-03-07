@@ -31,6 +31,7 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
+#include "../Edge_Reconst/mvt.hpp"
 
 //> mutual best support
 #include <unordered_map>
@@ -50,7 +51,7 @@ public:
     void Set_Hypothesis_Views_Camera();
     void Set_Hypothesis_Views_Edgels();
     void Run_3D_Edge_Sketch();
-    void Finalize_Edge_Pairs_and_Reconstruct_3D_Edges();
+    void Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_ptr<EdgeMapping> edgeMapping);
     void Clear_Data();
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
