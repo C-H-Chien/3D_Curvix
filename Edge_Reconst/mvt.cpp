@@ -34,6 +34,8 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>  
 
+#include "edge_mapping.hpp"
+
 //> Macros
 #define VERBOSE (false)
 
@@ -410,26 +412,11 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
                 filtered_track.Abs_Rots.push_back(feature_track_.Abs_Rots[idx]);
                 filtered_track.Abs_Transls.push_back(feature_track_.Abs_Transls[idx]);
             }
+            
         }
 
-        // std::cout<<"filtered length is: "<<filtered_track.Length<<std::endl;
-
-        // std::cout << "------------------------------------" << std::endl;
-        // std::cout << "Before Multiview_Triangulation:" << std::endl;
-        // std::cout << "filtered_track.Length: " << filtered_track.Length << std::endl;
-        // std::cout << "filtered_track.Locations size: " << filtered_track.Locations.size() << std::endl;
-        // std::cout << "filtered_track.Abs_Rots size: " << filtered_track.Abs_Rots.size() << std::endl;
-        // std::cout << "filtered_track.Abs_Transls size: " << filtered_track.Abs_Transls.size() << std::endl;
 
         Multiview_Triangulation(filtered_track, K);
-
-        // std::cout << "After Multiview_Triangulation:" << std::endl;
-        // std::cout << "filtered_track.Length: " << filtered_track.Length << std::endl;
-        // std::cout << "filtered_track.Locations size: " << filtered_track.Locations.size() << std::endl;
-        // std::cout << "filtered_track.Abs_Rots size: " << filtered_track.Abs_Rots.size() << std::endl;
-        // std::cout << "filtered_track.Abs_Transls size: " << filtered_track.Abs_Transls.size() << std::endl;
-        // std::cout << "------------------------------------" << std::endl;
-
 
         // Step 3: Recheck reprojection errors (Include all points)
         std::vector<double> finalReprojectionErrors(feature_track_.Length, 0.0);
@@ -440,11 +427,15 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
             Eigen::Vector2d reprojected(projected(0) / projected(2), projected(1) / projected(2));
             finalReprojectionErrors[idx] = std::sqrt((reprojected - feature_track_.Locations[idx].head<2>()).squaredNorm());
             //std::cout<<"reprojection error is : "<<finalReprojectionErrors[idx]<<std::endl;
+            if (std::abs(point3D(0) - 0.237764) < 1e-6 && std::abs(point3D(1) - 0.833728) < 1e-6 && std::abs(point3D(2) - 0.345843) < 1e-6) {
+                std::cout << "Filtered Track Locations for point3D (0.237764, 0.833728, 0.345843):\n";
+                std::cout<<filtered_track.Locations[idx]<<std::endl;
+            }
         }
 
         Feature_Track rechecked_track;
         for (size_t idx = 0; idx < feature_track_.Length; ++idx) {
-            if (finalReprojectionErrors[idx] <= 2.0) {
+            if (finalReprojectionErrors[idx] <= 1) {
                 rechecked_track.Locations.push_back(feature_track_.Locations[idx]);
                 rechecked_track.Abs_Rots.push_back(feature_track_.Abs_Rots[idx]);
                 rechecked_track.Abs_Transls.push_back(feature_track_.Abs_Transls[idx]);
@@ -481,10 +472,92 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
 
     GammaMatrix.conservativeResize(3, gammaIndex);  // Resize to keep only valid columns
 
-    // for(int i = 0; i < 3; i++){
-    //   std::cout<<"row "<<i<<" size: "<<GammaMatrix.row(i).size()<<", col "<<i<<" size: "<<GammaMatrix.col(1).size()<<std::endl;
-    // }
     return GammaMatrix.transpose();  // Return only the filled columns
 }
+
+void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>& all_groups, 
+                 const std::string& outputFilePath) {
+
+    //> Intrinsic matrix
+    double fx = 1111.11136542426;
+    double fy = 1111.11136542426;
+    double cx = 399.500000000000;
+    double cy = 399.500000000000;
+    Eigen::Matrix3d K;
+    K << fx, 0, cx, 0, fy, cy, 0, 0, 1;
+
+    std::ofstream outFile(outputFilePath);
+    if (!outFile.is_open()) {
+        std::cerr << "Failed to open output file: " << outputFilePath << std::endl;
+        exit(0);
+    }
+
+    std::cout << "[INFO] Saving triangulated 3D edges to: " << outputFilePath << std::endl;
+
+    size_t batch_size = 5;  // Process smaller batches to reduce memory usage
+    int triangulated_count = 0;
+
+    // **Use a local copy of all_groups to avoid modifying the original const reference**
+    std::vector<std::vector<EdgeMapping::SupportingEdgeData>> local_groups = all_groups;
+
+    for (size_t start_idx = 0; start_idx < local_groups.size(); start_idx += batch_size) {
+        size_t end_idx = std::min(start_idx + batch_size, local_groups.size());
+
+        std::cout << "[INFO] Processing groups " << start_idx << " to " << end_idx << "..." << std::endl;
+
+        for (size_t i = start_idx; i < end_idx; ++i) {
+            const auto& group = local_groups[i];
+
+            if (group.size() < 6) {
+                std::cerr << "[WARNING] Skipping group " << i << " (not enough edges for triangulation)." << std::endl;
+                continue;
+            }
+
+            // **Minimize memory usage for each batch**
+            Feature_Track feature_track_;
+            feature_track_.Length = group.size();
+            
+            for (const auto& edge_data : group) {
+                feature_track_.Locations.emplace_back(edge_data.edge(0), edge_data.edge(1), 1); // Convert 2D edge to homogeneous
+                feature_track_.Abs_Rots.emplace_back(edge_data.rotation);
+                feature_track_.Abs_Transls.emplace_back(edge_data.translation);
+            }
+
+            Multiview_Triangulation(feature_track_, K);
+
+            outFile << std::fixed << feature_track_.Gamma(0) << "\t" 
+                    << feature_track_.Gamma(1) << "\t" 
+                    << feature_track_.Gamma(2) << "\n";
+
+            // **Manually free memory**
+            feature_track_.Locations.clear();
+            feature_track_.Abs_Rots.clear();
+            feature_track_.Abs_Transls.clear();
+            feature_track_.Reprojection_Errors.clear();
+            feature_track_.Optimal_Locations.clear();
+
+            feature_track_.Locations.shrink_to_fit();
+            feature_track_.Abs_Rots.shrink_to_fit();
+            feature_track_.Abs_Transls.shrink_to_fit();
+            feature_track_.Reprojection_Errors.shrink_to_fit();
+            feature_track_.Optimal_Locations.shrink_to_fit();
+
+            triangulated_count++;
+
+            // **Flush output frequently to avoid data loss**
+            outFile.flush();
+        }
+
+        // **Manually clear processed groups from memory to reduce RAM usage**
+        for (size_t i = start_idx; i < end_idx; ++i) {
+            local_groups[i].clear();
+            local_groups[i].shrink_to_fit();
+        }
+    }
+
+    outFile.close();
+    std::cout << "[INFO] Saved " << triangulated_count << " triangulated 3D edges to " << outputFilePath << std::endl;
+}
+
 
 }
