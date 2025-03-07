@@ -74,6 +74,9 @@ int main(int argc, char **argv) {
   //> Read camera intrinsic and extrinsic matrices
   MWV_Edge_Rec.Read_Camera_Data();
 
+
+  std::shared_ptr<EdgeMapping> edgeMapping = std::make_shared<EdgeMapping>();
+
   //> Iteratively picking hypothesis view pairs to reconstruct 3D edges
   int edge_sketch_pass_count = 0;
   while ( edge_sketch_pass_count < MWV_Edge_Rec.Max_3D_Edge_Sketch_Passes ) {
@@ -100,15 +103,15 @@ int main(int argc, char **argv) {
 
     }
     
-    //> Finalize hypothesis edge pairs for a two-view triangulation
-    MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges();
+    //std::cout << "Size of edge_3D_to_supporting_edges: " << edgeMapping.edge_3D_to_supporting_edges.size() << std::endl;
 
-    // std::cout << "Number of nonveridical edge pairs = " << MWV_Edge_Rec.num_of_nonveridical_edge_pairs << std::endl;
+    //> Finalize hypothesis edge pairs for a two-view triangulation
+    MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(edgeMapping);
+    //std::cout << "EdgeMapping in main: " << edgeMapping.get() << std::endl;
+
     
     //> Stack all 3D edges located in the world coordinate
     MWV_Edge_Rec.Stack_3D_Edges();
-  
-    //MWV_Edge_Rec.all_3D_Edges = NViewsTrian::mvt(MWV_Edge_Rec.hyp01_view_indx, MWV_Edge_Rec.hyp02_view_indx);
 
     //> Find the next hypothesis view pairs, if any
     MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
@@ -119,6 +122,16 @@ int main(int argc, char **argv) {
     if (MWV_Edge_Rec.enable_aborting_3D_edge_sketch)
       break;
   }
+
+  //////////////////// Merge edges ////////////////////
+  //std::cout << "main size of edge_3D_to_supporting_edges: " << edgeMapping->edge_3D_to_supporting_edges.size() << std::endl;
+  //edgeMapping->printFirst10Edges();
+  std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups();
+  std::string outputFilePath = "/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/grouped_mvt.txt";
+  NViewsTrian::grouped_mvt(all_groups, outputFilePath);
+  std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
+
+  //////////////////// Merge edges ////////////////////
 
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;
   std::string out_time_str = "Total computation time: " + std::to_string(total_time) + " (s)";
