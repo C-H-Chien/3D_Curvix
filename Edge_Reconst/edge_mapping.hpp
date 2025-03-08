@@ -29,7 +29,7 @@ struct HashEigenVector2d {
 
 class EdgeMapping {
 public:
-    struct SupportingEdgeData {  // ✅ Make sure SupportingEdgeData is defined inside the class
+    struct SupportingEdgeData {  
         Eigen::Vector2d edge;
         int image_number;
         Eigen::Matrix3d rotation;
