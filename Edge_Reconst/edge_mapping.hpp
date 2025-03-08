@@ -1,8 +1,8 @@
-#ifndef EDGE_MAPPING_H
-#define EDGE_MAPPING_H
+#ifndef EDGE_MAPPING_HPP
+#define EDGE_MAPPING_HPP
 
+#include <Eigen/Core>
 #include <unordered_map>
-#include <map>
 #include <vector>
 #include <Eigen/Dense>
 #include <algorithm>
@@ -27,16 +27,37 @@ struct HashEigenVector2d {
     }
 };
 
-// EdgeMapping class for storing 3D-to-2D edge mappings
 class EdgeMapping {
 public:
-    std::unordered_map<Eigen::Vector3d, std::vector<std::pair<Eigen::Vector2d, int>>, HashEigenVector3d> edge_3D_to_supporting_edges;
-    std::map<int, std::unordered_map<Eigen::Vector2d, std::vector<Eigen::Vector3d>, HashEigenVector2d>> frame_to_edge_to_3D_map;
+    struct SupportingEdgeData {  // ✅ Make sure SupportingEdgeData is defined inside the class
+        Eigen::Vector2d edge;
+        int image_number;
+        Eigen::Matrix3d rotation;
+        Eigen::Vector3d translation;
 
-    void add3DToSupportingEdgesMapping(const Eigen::Vector3d &edge_3D, const Eigen::Vector2d &supporting_edge, int image_number);
-    void add3DToFrameMapping(const Eigen::Vector3d& edge_3D, const Eigen::Vector2d& supporting_edge, int frame);
+        bool operator<(const SupportingEdgeData& other) const {
+            if (image_number != other.image_number) return image_number < other.image_number;
+            if (edge.x() != other.edge.x()) return edge.x() < other.edge.x();
+            return edge.y() < other.edge.y();
+        }
+    };
 
+    void add3DToSupportingEdgesMapping(const Eigen::Vector3d &edge_3D, 
+                                       const Eigen::Vector2d &supporting_edge, 
+                                       int image_number,
+                                       const Eigen::Matrix3d &rotation,
+                                       const Eigen::Vector3d &translation);
 
+    void add3DToFrameMapping(const Eigen::Vector3d& edge_3D, 
+                             const Eigen::Vector2d& supporting_edge, 
+                             int frame);
+
+    void printFirst10Edges();
+
+    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups();
+
+    std::unordered_map<Eigen::Vector3d, std::vector<SupportingEdgeData>, HashEigenVector3d> edge_3D_to_supporting_edges;
+    std::unordered_map<int, std::unordered_map<Eigen::Vector2d, std::vector<Eigen::Vector3d>, HashEigenVector2d>> frame_to_edge_to_3D_map;
 };
 
-#endif  // EDGE_MAPPING_H
+#endif  // EDGE_MAPPING_HPP
