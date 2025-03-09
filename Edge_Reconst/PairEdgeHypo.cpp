@@ -222,7 +222,9 @@ namespace PairEdgeHypothesis {
         Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, 
         Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw)
     {
-        Eigen::MatrixXd edgels_HYPO2_corrected;
+        int max_possible_size = edgels_HYPO2.rows();  
+        Eigen::MatrixXd edgels_HYPO2_corrected(0, 10);  
+
         Eigen::MatrixXd xy1_H1;
         xy1_H1.conservativeResize(1,3);
         xy1_H1(0,0) = edgel_HYPO1(0,0);
@@ -236,9 +238,6 @@ namespace PairEdgeHypothesis {
         double a1_line  = -Apixel_1(0,0)/Bpixel_1(0,0);
         double b1_line  = -1;
         double c1_line  = -Cpixel_1(0,0)/Bpixel_1(0,0);
-        double a_edgeH1    = tan(edgel_HYPO1(0,2));
-        double b_edgeH1    = -1;
-        double c_edgeH1    = -(a_edgeH1*edgel_HYPO1(0,0)-edgel_HYPO1(0,1));
         double idx_correct = 0;
         
         for(int idx_hypo2 = 0; idx_hypo2 < edgels_HYPO2.rows(); idx_hypo2++){
@@ -246,33 +245,54 @@ namespace PairEdgeHypothesis {
             double a_edgeH2 = tan(edgels_HYPO2(idx_hypo2,2)); //tan(theta2)
             double b_edgeH2 = -1;
             double c_edgeH2 = -(a_edgeH2*edgels_HYPO2(idx_hypo2,0)-edgels_HYPO2(idx_hypo2,1)); //−(a⋅x2−y2)
-            // Intersection between the hypo2 line and the epipolar line from hypo1 to hypo2
-            // double x_currH2 = ((b1_line*c_edgeH2-b_edgeH2*c1_line)/(a1_line*b_edgeH2-a_edgeH2*b1_line) + edgels_HYPO2(idx_hypo2,0))/2;
-            // double y_currH2 = ((c1_line*a_edgeH2-c_edgeH2*a1_line)/(a1_line*b_edgeH2-a_edgeH2*b1_line) + edgels_HYPO2(idx_hypo2,1))/2; 
             double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
             double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-            edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
-            edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+            double dist_diff    = sqrt((x_intersection - edgels_HYPO2(idx_hypo2,0))*(x_intersection - edgels_HYPO2(idx_hypo2,0))+(y_intersection -  edgels_HYPO2(idx_hypo2,1))*(y_intersection - edgels_HYPO2(idx_hypo2,1)));
+            
+            if (x_intersection == 0 && y_intersection == 0) {
+                std::cout << "WARNING: Found (0,0) intersection! idx_hypo2: " << idx_hypo2 << std::endl;
+            }
+
+            // check if edge's tangent line is almost parallal to epipolar line
+            double angle_edgeH2 = edgels_HYPO2(idx_hypo2,2);  // Slope of tangent line at hyp2
+            double m_epipolar = -a1_line / b1_line;            // Slope of epipolar line
+            double angle_diff_rad = abs(angle_edgeH2 - atan(m_epipolar));
+            double angle_diff_deg = angle_diff_rad * (180.0 / M_PI);
+            if (angle_diff_deg > 180){
+                angle_diff_deg -= 180;
+            }
+
+            //if(angle_diff_deg > 4){
+           // if (dist_diff < 4){
+            if (dist_diff < 6 && abs(angle_diff_deg - 0) > 4 && abs(angle_diff_deg - 180) > 4){
+                if (idx_correct == 0) {
+                    edgels_HYPO2_corrected = Eigen::MatrixXd(1, 10);
+                } else {
+                    edgels_HYPO2_corrected.conservativeResize(idx_correct+1, 10);
+                }
+                
+                if (idx_correct >= max_possible_size) {
+                    std::cout << "ERROR: Buffer size exceeded! Increase max_possible_size." << std::endl;
+                    break;
+                }
+                edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
+                edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
                                                         x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
                                                         HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-            idx_correct++;
+                idx_correct++;
+            }
 
-            // if (abs(edgels_HYPO2(idx_hypo2,0)-322.485)<0.001  && abs(edgels_HYPO2(idx_hypo2,1)-364.499)<0.001){
-            //     std::cout<<edgels_HYPO2(idx_hypo2,0)<<"  " <<edgels_HYPO2(idx_hypo2,1)<<"  " << edgels_HYPO2(idx_hypo2,2)<<std::endl;
-            //     std::cout<<x_currH2 << " " <<y_currH2<< std::endl;
-            //     std::cout<< a1_line<<" " << b1_line <<" " <<c1_line<<std::endl;
-            //     double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-            //     double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-            //     double epipolar_check = a1_line * x_intersection + b1_line * y_intersection + c1_line;
-            //     double tangent_check = a_edgeH2 * x_intersection + b_edgeH2 * y_intersection + c_edgeH2;
-
-            //     std::cout << "Epipolar line check: " << epipolar_check << std::endl;
-            //     std::cout << "Tangent line check: " << tangent_check << std::endl;
-            //     std::cout << "Raw intersection: (" << x_intersection << ", " << y_intersection << ")" << std::endl;
-            //     std::cout << "Averaged intersection: (" << x_currH2 << ", " << y_currH2 << ")" << std::endl;
-
+            // if (abs(edgel_HYPO1(0,0)-342.542)<0.001  && abs(edgel_HYPO1(0,1)-511.939)<0.001 && abs(x_intersection-311.272)<0.001 && abs(y_intersection-491.301)<0.001){
+            //     std::cout<< "epipolar line is: "<< a1_line<<" " << b1_line <<" " <<c1_line <<std::endl;
+            //     std::cout<< "tangent line is: "<< a_edgeH2<<" " << b_edgeH2 <<" " <<c_edgeH2 <<" " <<std::endl;
+            //     std::cout<< "original point location is: " <<edgels_HYPO2(idx_hypo2,0)<< ", "<< edgels_HYPO2(idx_hypo2,1) <<std::endl;
+            //     std::cout<< "angle diff: " << angle_diff_deg << " degrees" <<std::endl;
+            //     std::cout<< "dist diff: " << dist_diff << " pixels" <<std::endl;
+            //     std::cout<< "angle_edgeH2: "<<angle_edgeH2*(180.0 / M_PI)<<std::endl;
+            //     std::cout<< "atan(m_epipolar): "<<atan(m_epipolar)*(180.0 / M_PI)<<std::endl;
             // }
         }
+
         return edgels_HYPO2_corrected;
     }
 
