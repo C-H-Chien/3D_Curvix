@@ -298,6 +298,7 @@ void writeTangentFile(const std::string& outputTangentFilePath, const std::vecto
     for (const auto& tangent : tangents) {
         tangentFile << tangent(0) << "\t" << tangent(1) << "\t" << tangent(2) << "\n";
     }
+    tangentFile.flush();
     tangentFile.close();
 }
 
@@ -314,16 +315,19 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
     std::string points3DFile = basePath + "3D_edges_ABC-NEF_00000006_hypo1_" + 
                             std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
                             "_t1to1_delta03_theta15.000000_N4.txt";
-    std::string tangentFilePath = points3DFile; 
-    std::string outputTangentFilePath = outputFilePath; // Matches the outputFilePath name
+    std::string tangentFilePath = basePath + "3D_tangents_ABC-NEF_00000006_hypo1_" + 
+                            std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
+                            "_t1to1_delta03_theta15.000000_N4.txt";
+    std::string outputTangentFilePath = "/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/updated_tangents.txt"; 
     std::vector<Eigen::Vector3d> points3D;
 
     ////////////////////// Read 3D points from the file //////////////////////
     std::ifstream points3DStream(points3DFile);
     if (!points3DStream.is_open()) {
-        std::cerr << "Failed to open file: " << points3DFile << std::endl;
+        std::cerr << "[Error]: Failed to open file: " << points3DFile << std::endl;
         exit(0);
     }
+
 
     double x, y, z;
     while (points3DStream >> x >> y >> z) {
@@ -334,16 +338,13 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
     // Read tangent file
     std::vector<Eigen::Vector3d> tangents = readTangentFile(tangentFilePath);
     if (tangents.size() != points3D.size()) {
-        std::cerr << "Mismatch between 3D points and tangent data size." << std::endl;
+        std::cout << "[Error]: Mismatch between 3D points and tangent data size." << std::endl;
         exit(0);
     }
 
-    std::ofstream outFile(outputFilePath);
-    if (!outFile.is_open()) {
-        std::cerr << "Failed to open output file: " << outputFilePath << std::endl;
-        exit(0);
-    }
-
+    std::ofstream outFile;
+    outFile.open (outputFilePath);
+    
     // Placeholder for updated tangent data
     std::vector<Eigen::Vector3d> updatedTangents;
 
@@ -445,6 +446,7 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
 
         // Update the track length
         rechecked_track.Length = rechecked_track.Locations.size();
+        std::cout<<rechecked_track.Length<<std::endl;
         if (rechecked_track.Length < 6){
             //std::cout<<"length<6"<<std::endl;
             continue;
@@ -454,10 +456,8 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
         Multiview_Triangulation(rechecked_track, K);
 
         // Save the final result
-        outFile << std::fixed << rechecked_track.Gamma(0) << "\t" << rechecked_track.Gamma(1) << "\t" << rechecked_track.Gamma(2) << "\n";
-        // if (gammaIndex<10){
-        //     std::cout<<rechecked_track.Gamma(0) << "\t" << rechecked_track.Gamma(1) << "\t" << rechecked_track.Gamma(2)<<std::endl;
-        // }
+        outFile << rechecked_track.Gamma(0) << "\t" << rechecked_track.Gamma(1) << "\t" << rechecked_track.Gamma(2) << "\n";
+        //std::cout<<rechecked_track.Gamma(0) << "\t" << rechecked_track.Gamma(1) << "\t" << rechecked_track.Gamma(2) << std::endl;
         updatedTangents.push_back(tangents[i]);
 
         // Store Gamma values in matrix
@@ -466,6 +466,8 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
         GammaMatrix(2, gammaIndex) = rechecked_track.Gamma(2);
         gammaIndex++;
     }
+
+    //outFile.flush();
     outFile.close();
     writeTangentFile(outputTangentFilePath, updatedTangents);
    // std::cout << "gammaIndex before resize: " << gammaIndex << std::endl;
