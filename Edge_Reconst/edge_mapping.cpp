@@ -39,37 +39,73 @@ void EdgeMapping::printFirst10Edges() {
     }
 }
 
+// void EdgeMapping::write_edge_linking_to_file() {
+//     int count = 0;
+//     std::string filePath = "../../outputs/edge_linkings.txt";
+//     std::string outputFilePath = basePath + "triangulated_3D_edges_ABC-NEF_00000006_hypo1_" + 
+//                                 std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
+//                                 "_t1to1_delta03_theta15.000000_N4.txt";
+//     for (const auto& pair : edge_3D_to_supporting_edges) {
+//         if (count >= 10) break;
 
+//         std::cout << "3D Edge: (" << pair.first(0) << ", " << pair.first(1) << ", " << pair.first(2) << ")\n";
+//         std::cout << "Supporting 2D Edges:\n";
+
+//         for (const auto& support : pair.second) {
+//             std::cout << "   View " << support.image_number << ": (" << support.edge(0) << ", " << support.edge(1) << ")\n";
+//             std::cout << "   Rotation:\n" << support.rotation << "\n";
+//             std::cout << "   Translation: (" << support.translation.transpose() << ")\n";
+//         }
+//         std::cout << "-----------------------------\n";
+
+//         count++;
+//     }
+// }
 
 std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMergable2DEdgeGroups() { 
     std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups; 
-    std::unordered_map<Eigen::Vector3d, bool, HashEigenVector3d> visited;
+    // std::unordered_map<Eigen::Vector3d, bool, HashEigenVector3d> visited;
+
+    bool visited_CH[edge_3D_to_supporting_edges.size()] = {false};
+
     int merged_count = 0;
     int unmerged_count = 0;
 
     std::cout << "edge_3D_to_supporting_edges size: " << edge_3D_to_supporting_edges.size() << std::endl;
 
     // Mark all 3D edges as unvisited initially
-    for (const auto& entry : edge_3D_to_supporting_edges) {
-        visited[entry.first] = false;
-    }
+    // for (const auto& entry : edge_3D_to_supporting_edges) {
+    //     visited[entry.first] = false;
+    // }
 
     // Outer loop: iterate over each unvisited 3D edge
+    int counter_query_3D_edge = 0;
     for (auto it1 = edge_3D_to_supporting_edges.begin(); it1 != edge_3D_to_supporting_edges.end(); ++it1) {
         const Eigen::Vector3d& edge_3D_1 = it1->first;
         auto& support_2D_1 = it1->second;
 
-        if (visited[edge_3D_1]) continue;  // Skip if already visited
+        // if (visited[edge_3D_1]) continue;  // Skip if already visited
+        if (visited_CH[counter_query_3D_edge]) {
+            counter_query_3D_edge++;
+            continue;
+        }
 
         // Start a new group and add all its supporting 2D edges
         std::vector<EdgeMapping::SupportingEdgeData> group(support_2D_1.begin(), support_2D_1.end()); 
-        visited[edge_3D_1] = true;
+        // visited[edge_3D_1] = true;
+        visited_CH[counter_query_3D_edge] = true;
         
+        int counter_database_3D_edge = 0;
         for (auto it2 = edge_3D_to_supporting_edges.begin(); it2 != edge_3D_to_supporting_edges.end(); ++it2) {
+            
             const Eigen::Vector3d& edge_3D_2 = it2->first;
             auto& support_2D_2 = it2->second;
 
-            if (edge_3D_1 == edge_3D_2 || visited[edge_3D_2]) continue; // Skip if same or already merged
+            // if (edge_3D_1 == edge_3D_2 || visited[edge_3D_2]) continue; // Skip if same or already merged
+            if (edge_3D_1 == edge_3D_2 || visited_CH[counter_database_3D_edge]) {
+                counter_database_3D_edge++;
+                continue; // Skip if same or already merged
+            }
 
             // Count the number of matching 2D edges from the same image
             int common_count = 0;
@@ -79,16 +115,19 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
                         edge1.edge.isApprox(edge2.edge, 1e-4)) { // Looser precision
                         common_count++;
                     }
-                    if (common_count >= 2) break;  // Stop early if already found enough matches
+                    if (common_count >= 2) break;  // Stop early if already found enough matches (?)
                 }
                 if (common_count >= 2) break;
             }
 
-            // If at least 2 matching 2D edges exist, merge into the same group
+            // If at least 2 matching 2D edges exist, merge into the same group (why 2 matching 2D edges and not 1?)
             if (common_count >= 2) {
                 group.insert(group.end(), support_2D_2.begin(), support_2D_2.end());
-                visited[edge_3D_2] = true;
+                // visited[edge_3D_2] = true;
+                visited_CH[counter_database_3D_edge] = true;
             }
+
+            counter_database_3D_edge++;
         }
 
         // Track merged vs. unmerged groups
@@ -99,12 +138,22 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
         }
 
         all_groups.push_back(group);
+
+        counter_query_3D_edge++;
     }
+
+    assert(counter_query_3D_edge == edge_3D_to_supporting_edges.size());
+    // std::cout << "counter_query_3D_edge = " << counter_query_3D_edge << std::endl;
 
     // Check if all 3D edges were visited
     int not_visited_count = 0;
-    for (const auto& entry : visited) {
-        if (!entry.second) {
+    // for (const auto& entry : visited) {
+    //     if (!entry.second) {
+    //         not_visited_count++;
+    //     }
+    // }
+    for (unsigned i = 0; i < edge_3D_to_supporting_edges.size(); i++) {
+        if (!visited_CH[i]) {
             not_visited_count++;
         }
     }

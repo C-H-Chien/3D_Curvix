@@ -123,11 +123,15 @@ int main(int argc, char **argv) {
       break;
   }
 
+  std::cout << "Start to merge edges from 3D-2D edge links and 2D-2D edge links ..." << std::endl;
   //////////////////// Merge edges ////////////////////
   //std::cout << "main size of edge_3D_to_supporting_edges: " << edgeMapping->edge_3D_to_supporting_edges.size() << std::endl;
-  //edgeMapping->printFirst10Edges();
+  // edgeMapping->printFirst10Edges();
+  std::cout << "====================================================================" << std::endl;
+
   std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups();
-  std::string outputFilePath = "/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/grouped_mvt.txt";
+  // std::string outputFilePath = "/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/grouped_mvt.txt";
+  std::string outputFilePath = "../../outputs/grouped_mvt.txt";
   NViewsTrian::grouped_mvt(all_groups, outputFilePath);
   std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
 
