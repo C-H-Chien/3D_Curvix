@@ -446,7 +446,7 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
 
         // Update the track length
         rechecked_track.Length = rechecked_track.Locations.size();
-        std::cout<<rechecked_track.Length<<std::endl;
+        //std::cout<<rechecked_track.Length<<std::endl;
         if (rechecked_track.Length < 6){
             //std::cout<<"length<6"<<std::endl;
             continue;
