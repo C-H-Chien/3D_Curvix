@@ -493,68 +493,58 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
         std::cerr << "Failed to open output file: " << outputFilePath << std::endl;
         exit(0);
     }
+    std::cout << "[INFO] Saving grouped triangulated 3D edges to: " << outputFilePath << std::endl;
 
-    std::cout << "[INFO] Saving triangulated 3D edges to: " << outputFilePath << std::endl;
-
-    size_t batch_size = 5;  // Process smaller batches to reduce memory usage
     int triangulated_count = 0;
 
-    // **Use a local copy of all_groups to avoid modifying the original const reference**
     std::vector<std::vector<EdgeMapping::SupportingEdgeData>> local_groups = all_groups;
 
-    for (size_t start_idx = 0; start_idx < local_groups.size(); start_idx += batch_size) {
-        size_t end_idx = std::min(start_idx + batch_size, local_groups.size());
+    for (size_t start_idx = 0; start_idx < all_groups.size(); start_idx += 1) {
 
-        std::cout << "[INFO] Processing groups " << start_idx << " to " << end_idx << "..." << std::endl;
+        //std::cout << "[INFO] Processing group " << start_idx << std::endl;
+        const auto& group = all_groups[start_idx];
 
-        for (size_t i = start_idx; i < end_idx; ++i) {
-            const auto& group = local_groups[i];
-
-            if (group.size() < 6) {
-                std::cerr << "[WARNING] Skipping group " << i << " (not enough edges for triangulation)." << std::endl;
-                continue;
-            }
-
-            // **Minimize memory usage for each batch**
-            Feature_Track feature_track_;
-            feature_track_.Length = group.size();
-            
-            for (const auto& edge_data : group) {
-                feature_track_.Locations.emplace_back(edge_data.edge(0), edge_data.edge(1), 1); // Convert 2D edge to homogeneous
-                feature_track_.Abs_Rots.emplace_back(edge_data.rotation);
-                feature_track_.Abs_Transls.emplace_back(edge_data.translation);
-            }
-
-            Multiview_Triangulation(feature_track_, K);
-
-            outFile << std::fixed << feature_track_.Gamma(0) << "\t" 
-                    << feature_track_.Gamma(1) << "\t" 
-                    << feature_track_.Gamma(2) << "\n";
-
-            // **Manually free memory**
-            feature_track_.Locations.clear();
-            feature_track_.Abs_Rots.clear();
-            feature_track_.Abs_Transls.clear();
-            feature_track_.Reprojection_Errors.clear();
-            feature_track_.Optimal_Locations.clear();
-
-            feature_track_.Locations.shrink_to_fit();
-            feature_track_.Abs_Rots.shrink_to_fit();
-            feature_track_.Abs_Transls.shrink_to_fit();
-            feature_track_.Reprojection_Errors.shrink_to_fit();
-            feature_track_.Optimal_Locations.shrink_to_fit();
-
-            triangulated_count++;
-
-            // **Flush output frequently to avoid data loss**
-            outFile.flush();
+        if (group.size() < 6) {
+            std::cout << "[WARNING]: Skipping group " << start_idx << " (not enough edges for triangulation)." << std::endl;
+            continue;
         }
 
-        // **Manually clear processed groups from memory to reduce RAM usage**
-        for (size_t i = start_idx; i < end_idx; ++i) {
-            local_groups[i].clear();
-            local_groups[i].shrink_to_fit();
+        Feature_Track feature_track_;
+        feature_track_.Length = std::min(group.size(), static_cast<size_t>(50));
+
+        //std::cout<<"feature_track_.Length is: "<<feature_track_.Length<<std::endl;
+        
+        int edge_count = 0;
+        for (const auto& edge_data : group) {
+            //if(edge_count< 50){
+            feature_track_.Locations.emplace_back(edge_data.edge(0), edge_data.edge(1), 1); // Convert 2D edge to homogeneous
+            feature_track_.Abs_Rots.emplace_back(edge_data.rotation);
+            feature_track_.Abs_Transls.emplace_back(edge_data.translation);
+            //}
+            edge_count++;
         }
+
+        Multiview_Triangulation(feature_track_, K);
+
+        outFile << std::fixed << feature_track_.Gamma(0) << "\t" << feature_track_.Gamma(1) << "\t" << feature_track_.Gamma(2) << "\n";
+
+        /////////// free memory ///////////
+        feature_track_.Locations.clear();
+        feature_track_.Abs_Rots.clear();
+        feature_track_.Abs_Transls.clear();
+        feature_track_.Reprojection_Errors.clear();
+        feature_track_.Optimal_Locations.clear();
+
+        feature_track_.Locations.shrink_to_fit();
+        feature_track_.Abs_Rots.shrink_to_fit();
+        feature_track_.Abs_Transls.shrink_to_fit();
+        feature_track_.Reprojection_Errors.shrink_to_fit();
+        feature_track_.Optimal_Locations.shrink_to_fit();
+        /////////// free memory ///////////
+
+        triangulated_count++;
+
+        outFile.flush();
     }
 
     outFile.close();
