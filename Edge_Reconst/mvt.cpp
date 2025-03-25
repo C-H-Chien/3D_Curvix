@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <chrono>
 #include <malloc.h>
-
+#include <random>
 
 ////////////// 3D RECONSTRUCTION /////////////////
 #include <iterator> 
@@ -33,7 +33,6 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>  
-
 #include "edge_mapping.hpp"
 
 //> Macros
@@ -427,11 +426,6 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
             Eigen::Vector3d projected = K * (feature_track_.Abs_Rots[idx] * point3D + feature_track_.Abs_Transls[idx]);
             Eigen::Vector2d reprojected(projected(0) / projected(2), projected(1) / projected(2));
             finalReprojectionErrors[idx] = std::sqrt((reprojected - feature_track_.Locations[idx].head<2>()).squaredNorm());
-            //std::cout<<"reprojection error is : "<<finalReprojectionErrors[idx]<<std::endl;
-            if (std::abs(point3D(0) - 0.237764) < 1e-6 && std::abs(point3D(1) - 0.833728) < 1e-6 && std::abs(point3D(2) - 0.345843) < 1e-6) {
-                std::cout << "Filtered Track Locations for point3D (0.237764, 0.833728, 0.345843):\n";
-                std::cout<<filtered_track.Locations[idx]<<std::endl;
-            }
         }
 
         Feature_Track rechecked_track;
@@ -478,7 +472,7 @@ Eigen::MatrixXd mvt(int hyp1, int hyp2) {
 }
 
 void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>& all_groups, 
-                 const std::string& outputFilePath) {
+                 const std::string& outputFilePath, const std::string& tangentOutputFilePath) {
 
     //> Intrinsic matrix
     double fx = 1111.11136542426;
@@ -495,13 +489,19 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
     }
     std::cout << "[INFO] Saving grouped triangulated 3D edges to: " << outputFilePath << std::endl;
 
+    std::ofstream tangentOutFile(tangentOutputFilePath);
+    if (!tangentOutFile.is_open()) {
+        std::cerr << "Failed to open tangent output file: " << tangentOutputFilePath << std::endl;
+        exit(0);
+    }
+    std::cout << "[INFO] Saving 3D tangents to: " << tangentOutputFilePath << std::endl;
+
     int triangulated_count = 0;
 
     std::vector<std::vector<EdgeMapping::SupportingEdgeData>> local_groups = all_groups;
 
     for (size_t start_idx = 0; start_idx < all_groups.size(); start_idx += 1) {
 
-        //std::cout << "[INFO] Processing group " << start_idx << std::endl;
         const auto& group = all_groups[start_idx];
 
         if (group.size() < 6) {
@@ -512,44 +512,72 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
         Feature_Track feature_track_;
         feature_track_.Length = std::min(group.size(), static_cast<size_t>(50));
 
-        //std::cout<<"feature_track_.Length is: "<<feature_track_.Length<<std::endl;
-        
-        int edge_count = 0;
         for (const auto& edge_data : group) {
-            //if(edge_count< 50){
-            feature_track_.Locations.emplace_back(edge_data.edge(0), edge_data.edge(1), 1); // Convert 2D edge to homogeneous
+            feature_track_.Locations.emplace_back(edge_data.edge_uncorrected(0), edge_data.edge_uncorrected(1), 1); // Convert 2D edge to homogeneous
             feature_track_.Abs_Rots.emplace_back(edge_data.rotation);
             feature_track_.Abs_Transls.emplace_back(edge_data.translation);
-            //}
-            edge_count++;
         }
 
         Multiview_Triangulation(feature_track_, K);
 
+        /////////// Randomly select 2 2D edges for calculating 3D tangent ///////////
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> distrib(0, feature_track_.Locations.size() - 1);
+        int idx1 = distrib(gen);
+        int idx2 = distrib(gen);
+
+        while (idx2 == idx1) {
+            idx2 = distrib(gen);
+        }
+
+        Eigen::Vector3d p1 = feature_track_.Locations[idx1];
+        Eigen::Vector3d p2 = feature_track_.Locations[idx2];
+        Eigen::Matrix3d R1 = feature_track_.Abs_Rots[idx1];
+        Eigen::Matrix3d R2 = feature_track_.Abs_Rots[idx2];
+        Eigen::Vector3d T1 = feature_track_.Abs_Transls[idx1];
+        Eigen::Vector3d T2 = feature_track_.Abs_Transls[idx2];
+        Eigen::Matrix3d R21 = R2 * R1.transpose();
+        Eigen::Vector3d T21 = T2 - R21 * T1;
+        Eigen::MatrixXd tangent_3D;
+        double orientation1 = group[idx1].edge_uncorrected(2);
+        double orientation2 = group[idx2].edge_uncorrected(2);
+
+        tangent_3D.resize(1, 3);
+        Eigen::Vector3d e1  = {1,0,0};
+        Eigen::Vector3d e3  = {0,0,1};
+        // Normalize edge points
+        Eigen::Vector3d Gamma1 = K.inverse() * Eigen::Vector3d(p1(0), p1(1), 1.0);
+        Eigen::Vector3d Gamma2 = K.inverse() * Eigen::Vector3d(p2(0), p2(1), 1.0);
+        Eigen::Vector3d tgt1(cos(orientation1), sin(orientation1), 0.0);
+        Eigen::Vector3d tgt2(cos(orientation2), sin(orientation2), 0.0);
+        Eigen::Vector3d tgt1_meters = K.inverse() * tgt1;
+        Eigen::Vector3d tgt2_meters = K.inverse() * tgt2;
+        double rho1 = (double(e1.transpose() * T21) - double(e3.transpose() * T21) * double(e1.transpose() *Gamma2))/(double(e3.transpose() * R21 * Gamma1)* double(e1.transpose() * Gamma2) - double(e1.transpose() * R21 * Gamma1));
+        Eigen::Vector3d n1 = tgt1_meters.cross(Gamma1);
+        Eigen::Vector3d n2 = R21.transpose() * tgt2_meters.cross(Gamma2);
+        Eigen::Vector3d T3D = n1.cross(n2) / (n1.cross(n2) ).norm();
+        tangent_3D = T3D;
+        Eigen::Vector3d tangent_3D_world = R1.transpose() * tangent_3D;
+
+        /////////// Write 3D tangent to file ///////////
+        tangentOutFile << std::fixed << tangent_3D_world(0) << "\t" << tangent_3D_world(1) << "\t" << tangent_3D_world(2) << "\n";
+        tangentOutFile.flush();
+        /////////// End tangent computation and writing ///////////
+
         outFile << std::fixed << feature_track_.Gamma(0) << "\t" << feature_track_.Gamma(1) << "\t" << feature_track_.Gamma(2) << "\n";
 
-        /////////// free memory ///////////
-        feature_track_.Locations.clear();
-        feature_track_.Abs_Rots.clear();
-        feature_track_.Abs_Transls.clear();
-        feature_track_.Reprojection_Errors.clear();
-        feature_track_.Optimal_Locations.clear();
-
-        feature_track_.Locations.shrink_to_fit();
-        feature_track_.Abs_Rots.shrink_to_fit();
-        feature_track_.Abs_Transls.shrink_to_fit();
-        feature_track_.Reprojection_Errors.shrink_to_fit();
-        feature_track_.Optimal_Locations.shrink_to_fit();
-        /////////// free memory ///////////
-
         triangulated_count++;
-
         outFile.flush();
     }
 
     outFile.close();
+    tangentOutFile.close();
     std::cout << "[INFO] Saved " << triangulated_count << " triangulated 3D edges to " << outputFilePath << std::endl;
+    std::cout << "[INFO] Saved 3D tangents to " << tangentOutputFilePath << std::endl;
 }
+
+
 
 
 }
