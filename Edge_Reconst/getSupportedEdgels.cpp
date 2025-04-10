@@ -29,9 +29,9 @@ namespace GetSupportedEdgels {
     
     get_SupportedEdgels::get_SupportedEdgels( double Orien_Thresh ): Orientation_Thresh(Orien_Thresh) { }
     
-    double get_SupportedEdgels::getSupportIdx(Eigen::Vector2d edgels_tgt_reproj, Eigen::MatrixXd Tangents_VALID, Eigen::MatrixXd inliner) {
+    int get_SupportedEdgels::getSupportIdx(Eigen::Vector2d edgels_tgt_reproj, Eigen::MatrixXd Tangents_VALID, Eigen::MatrixXd inliner) {
         double prev_prod = 0;
-        double supported_link_indx = -2;
+        int supported_link_indx = -2;
         double ore_threshold       = cos(double(Orientation_Thresh)/180*PI);
         for (int idx_inline = 0; idx_inline < inliner.rows(); idx_inline++){
             Eigen::Vector2d target_edges = {Tangents_VALID(inliner(idx_inline),0), Tangents_VALID(inliner(idx_inline),1)};
@@ -40,7 +40,7 @@ namespace GetSupportedEdgels {
             if(abs_dot_prod >= ore_threshold && abs_dot_prod > prev_prod){
                 //cout << "prev_prod: "<< prev_prod << endl;
                 prev_prod = abs_dot_prod;
-                supported_link_indx = inliner(idx_inline); 
+                supported_link_indx = int(inliner(idx_inline)); 
             }
         }
         return supported_link_indx;

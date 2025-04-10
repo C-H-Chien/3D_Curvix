@@ -28,6 +28,8 @@
 #include "../Edge_Reconst/file_reader.hpp"
 #include "../Edge_Reconst/edge_mapping.hpp"
 
+#include "../Edge_Reconst/mvt.hpp"
+
 using namespace MultiviewGeometryUtil;
 
 // ========================================================================================================================
@@ -66,8 +68,14 @@ int main(int argc, char **argv) {
   //> Constructor
   EdgeSketch_Core MWV_Edge_Rec( Edge_Sketch_Settings_Map );
 
+  //MWV_Edge_Rec.test_3D_tangent();
+
+
   //> Read camera intrinsic and extrinsic matrices
   MWV_Edge_Rec.Read_Camera_Data();
+
+
+  std::shared_ptr<EdgeMapping> edgeMapping = std::make_shared<EdgeMapping>();
 
   //> Iteratively picking hypothesis view pairs to reconstruct 3D edges
   int edge_sketch_pass_count = 0;
@@ -92,12 +100,15 @@ int main(int argc, char **argv) {
 
       //> Hypothesis-Validation process
       MWV_Edge_Rec.Run_3D_Edge_Sketch();
+
     }
     
-    //> Finalize hypothesis edge pairs for a two-view triangulation
-    MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges();
+    //std::cout << "Size of edge_3D_to_supporting_edges: " << edgeMapping.edge_3D_to_supporting_edges.size() << std::endl;
 
-    // std::cout << "Number of nonveridical edge pairs = " << MWV_Edge_Rec.num_of_nonveridical_edge_pairs << std::endl;
+    //> Finalize hypothesis edge pairs for a two-view triangulation
+    MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(edgeMapping);
+    //std::cout << "EdgeMapping in main: " << edgeMapping.get() << std::endl;
+
     
     //> Stack all 3D edges located in the world coordinate
     MWV_Edge_Rec.Stack_3D_Edges();
@@ -110,7 +121,25 @@ int main(int argc, char **argv) {
 
     if (MWV_Edge_Rec.enable_aborting_3D_edge_sketch)
       break;
+  
+    // if (MWV_Edge_Rec.hyp01_view_indx == 7 || MWV_Edge_Rec.hyp01_view_indx==9){
+    //   continue;
+    // }
   }
+
+  std::cout << "Start to merge edges from 3D-2D edge links and 2D-2D edge links ..." << std::endl;
+  //////////////////// Merge edges ////////////////////
+  //std::cout << "main size of edge_3D_to_supporting_edges: " << edgeMapping->edge_3D_to_supporting_edges.size() << std::endl;
+  // edgeMapping->printFirst10Edges();
+  std::cout << "====================================================================" << std::endl;
+
+  std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.Num_Of_Total_Imgs);
+  std::string outputFilePath = "../../outputs/grouped_mvt.txt";
+  std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
+  NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);
+  std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
+
+  //////////////////// Merge edges ////////////////////
 
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;
   std::string out_time_str = "Total computation time: " + std::to_string(total_time) + " (s)";

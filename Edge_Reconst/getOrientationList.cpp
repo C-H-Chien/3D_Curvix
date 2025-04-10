@@ -31,7 +31,7 @@ namespace GetOrientationList {
     get_OrientationList::get_OrientationList( double edge_location_perturbation, int img_rows, int img_cols )
     : delta(edge_location_perturbation), dataset_img_rows(img_rows), dataset_img_cols(img_cols) { }
     
-    Eigen::MatrixXd get_OrientationList::getOreListBar(Eigen::MatrixXd Edges_HYPO1, std::vector<Eigen::Matrix3d> All_R, std::vector<Eigen::Vector3d> All_T, Eigen::Matrix3d K1, Eigen::Matrix3d K2, int VALID_INDX, int REFIDX) {
+    std::pair<Eigen::MatrixXd, Eigen::Vector3d> get_OrientationList::getOreListBar(Eigen::MatrixXd Edges_HYPO1, std::vector<Eigen::Matrix3d> All_R, std::vector<Eigen::Vector3d> All_T, Eigen::Matrix3d K1, Eigen::Matrix3d K2, int VALID_INDX, int REFIDX) {
         MultiviewGeometryUtil::multiview_geometry_util util;
         Eigen::MatrixXd OreListBar_raw;
         OreListBar_raw.conservativeResize(Edges_HYPO1.rows(),2);
@@ -400,8 +400,12 @@ namespace GetOrientationList {
         OreListBardegree.col(1) = (OreListBar_raw.col(1).array() < 0).select(OreListBar_rawp2, OreListBar_raw.col(1));
         */
 
-        return OreListBar_raw;
+        //return OreListBar_raw;
+        return {OreListBar_raw, epipole_pix_view2};
     }
+
+
+
 
     Eigen::MatrixXd get_OrientationList::getOreListBarVali(Eigen::MatrixXd Edges_HYPO1, std::vector<Eigen::Matrix3d> All_R, std::vector<Eigen::Vector3d> All_T, Eigen::Matrix3d K1, Eigen::Matrix3d K2, int VALID_INDX, int REFIDX) {
         MultiviewGeometryUtil::multiview_geometry_util util;

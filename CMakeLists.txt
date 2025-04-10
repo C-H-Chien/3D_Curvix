@@ -120,7 +120,7 @@ set(PROJ_INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/include/)
 # -- include necessary libraries in the commands / executables file --
 include_directories(${PROJ_INCLUDE_DIRS})
 
-include_directories( "/gpfs/data/bkimia/cchien3/yaml-cpp/bin/include" )
+include_directories( "/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/include" )
 
 # adds a test for Endianness and a global variable that should be useful for file format programming -MM
 include(TestBigEndian)

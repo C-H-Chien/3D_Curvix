@@ -31,6 +31,12 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
+#include "../Edge_Reconst/mvt.hpp"
+
+//> mutual best support
+#include <unordered_map>
+#include <utility>
+
     
 class EdgeSketch_Core {
 
@@ -45,10 +51,22 @@ public:
     void Set_Hypothesis_Views_Camera();
     void Set_Hypothesis_Views_Edgels();
     void Run_3D_Edge_Sketch();
-    void Finalize_Edge_Pairs_and_Reconstruct_3D_Edges();
+    void Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_ptr<EdgeMapping> edgeMapping);
     void Clear_Data();
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    void Compute_3D_Tangents(const Eigen::MatrixXd& pt_edge_view1,
+    const Eigen::MatrixXd& pt_edge_view2,
+    const Eigen::Matrix3d& K1,
+    const Eigen::Matrix3d& K2,
+    const Eigen::Matrix3d& R21,
+    const Eigen::Vector3d& T21,
+    Eigen::MatrixXd& tangents_3D);
+
+    void test_3D_tangent();
+    std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
+                           const std::unordered_map<int, int>& hypothesis2ToBestMatch,
+                           const std::string& filename);
 
     //> Destructor
     ~EdgeSketch_Core();
@@ -87,13 +105,37 @@ public:
     int Edge_Detection_Final_Thresh;
     int Max_3D_Edge_Sketch_Passes;
 
+    //> Edges and camera intrinsix/extrinsic matrices of all images
+    std::vector<Eigen::Matrix3d> All_R;
+    std::vector<Eigen::Vector3d> All_T;
+    std::vector<Eigen::Matrix3d> All_K;
+    std::vector<Eigen::MatrixXd> All_Edgels; 
+    Eigen::Matrix3d K;
+
+    //> Input Dataset Settings
+    std::string Dataset_Path;
+    std::string Dataset_Name;
+    std::string Scene_Name;
+    int Num_Of_Total_Imgs;
+    int Img_Rows;
+    int Img_Cols;
+    bool Use_Multiple_K;
+    double fx;
+    double fy;
+    double cx;
+    double cy;
+    std::string Delta_FileName_Str;
+
     std::vector< Eigen::MatrixXd > all_supported_indices;
     Eigen::MatrixXd Gamma1s;
+    Eigen::MatrixXd tangent3Ds;
+    
     Eigen::MatrixXd all_3D_Edges;
     std::vector< int > claimedEdgesList;
-    double least_ratio;
+    double avg_ratio;
     bool enable_aborting_3D_edge_sketch;
     int num_of_nonveridical_edge_pairs;
+    std::vector<int> history_hypothesis_views_index;
 
     //> timer
     double itime, pair_edges_time;
@@ -111,10 +153,52 @@ private:
     //std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
 
     Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
+
+    
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
-      std::pair<int, int> &next_hypothesis_views, double &least_ratio );
+      std::pair<int, int> &next_hypothesis_views, std::vector<int> history_hypothesis_views_index
+    );
+
+    bool get_H2_edge_indices_passing_dist2EL_thresh(
+      std::vector<int> &H2_edge_indices_passing_dist2EL_thresh, std::vector<double> indices_stack_unique,
+      Eigen::Vector3d pt_edgel_HYPO1, Eigen::VectorXd rep_count, Eigen::MatrixXd Edges_HYPO2_final ) 
+    {
+      Eigen::Vector3d coeffs = F21 * pt_edgel_HYPO1;
+
+      //> Loop over all hypothesis edge pairs, pick the pairs where the H2 edge is close to the epipolar line arising from the H1 edge
+      for(int a = 0; a < rep_count.rows(); a++) {
+          //> Ignore if the current hypothesis edge pair has validation view supports less than Max_Num_Of_Support_Views
+          if (rep_count(a) < Max_Num_Of_Support_Views) continue;
+          
+          Eigen::Vector2d Edge_Pt;
+          Edge_Pt << Edges_HYPO2_final.row(indices_stack_unique[a])(0), Edges_HYPO2_final.row(indices_stack_unique[a])(1);
+          
+          double Ap = coeffs(0) * Edge_Pt(0);
+          double Bp = coeffs(1) * Edge_Pt(1);
+          double numDist = Ap + Bp + coeffs(2);
+          double denomDist = coeffs(0)*coeffs(0) + coeffs(1)*coeffs(1);
+          denomDist = sqrt(denomDist);
+          double dist = std::abs(numDist) / denomDist;
+
+          if (dist > Reproj_Dist_Thresh) continue;
+          H2_edge_indices_passing_dist2EL_thresh.push_back(int(indices_stack_unique[a]));
+      }
+      //> If no H2 edges are within the point-to-epipolar line distance threshold, go to the next H1 edge
+      return (H2_edge_indices_passing_dist2EL_thresh.empty()) ? (true) : (false);
+    }
+
+    //> generate a list of validation view indices
+    void get_validation_view_index_list() {
+      //> reset the vector
+      valid_view_index.clear();
+      for (int VALID_INDX = 0; VALID_INDX < Num_Of_Total_Imgs; VALID_INDX++) {
+        if (VALID_INDX == hyp01_view_indx || VALID_INDX == hyp02_view_indx) continue;
+        valid_view_index.push_back(VALID_INDX);
+      }
+    }
+    
 
     //> YAML file data parser
     YAML::Node Edge_Sketch_Setting_YAML_File;
@@ -129,26 +213,6 @@ private:
     double Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges;
     int circleR; //> Unknown setting
 
-    //> Input Dataset Settings
-    std::string Dataset_Path;
-    std::string Dataset_Name;
-    std::string Scene_Name;
-    int Num_Of_Total_Imgs;
-    int Img_Rows;
-    int Img_Cols;
-    bool Use_Multiple_K;
-    double fx;
-    double fy;
-    double cx;
-    double cy;
-    std::string Delta_FileName_Str;
-
-    //> Edges and camera intrinsix/extrinsic matrices of all images
-    std::vector<Eigen::Matrix3d> All_R;
-    std::vector<Eigen::Vector3d> All_T;
-    std::vector<Eigen::Matrix3d> All_K;
-    std::vector<Eigen::MatrixXd> All_Edgels; 
-    Eigen::Matrix3d K;
 
     //> Edges and camera intrinsix/extrinsic matrices of the two hypothesis views
     Eigen::Matrix3d K_HYPO1;
@@ -170,6 +234,14 @@ private:
     Eigen::MatrixXd paired_edge;
     Eigen::MatrixXd OreListdegree;
     Eigen::MatrixXd OreListBardegree;
+    Eigen::Vector3d epipole;
+
+    // data structure for tracking best matches
+    std::unordered_map<int, int> hypothesis1_best_match;
+    std::unordered_map<int, int> hypothesis2_best_match;
+
+    //> a list of validation view indices
+    std::vector<int> valid_view_index;
 };
 
 
