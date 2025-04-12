@@ -13,20 +13,6 @@
 #define SHOW_DATA_LOADING_INFO     (false)
 #define SHOW_OMP_NUM_OF_THREADS    (true)
 
-//> Macro Definitions for Fast Nview Triangulation Solver
-#define FIX_RANDOMNESS                  (true)
-#define RUN_CERES_SOLVER_ON             (false)
-#define CERTIFY_THRESH                  (-1e-09)   //> -1e-09 accroding to the paper. Negative because of numerical error.
-#define DIFF_CONSECUTIVE_SOLS_THRESH    (3e-10)    //> 3e-10 according to the paper
-#define PRINT_VECTOR3D(name, vec)       printf("%s = [%f, %f, %f]\n", std::string(name).c_str(), vec(0), vec(1), vec(2));
-#define PRINT_VECTORXD(name, vec)       printf("%s = [", std::string(name).c_str()); for(int i = 0; i < vec.size(); i++) {printf("%f ", vec(i));} printf("]\n");
-
-#define PRINT_ESSENTIAL(id1, id2, mat)  printf("E%d%d = [\n", id1, id2); \
-                                        for(int i = 0; i < 3; i++) { \
-                                            for(int j = 0; j < 3; j++) printf("%10.7f ", mat(i,j)); \
-                                            printf(";\n"); \
-                                        } printf("]\n");
-
 //> Constant values (no change)
 #define PI                            (3.1415926)
 

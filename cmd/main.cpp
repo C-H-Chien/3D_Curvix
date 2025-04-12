@@ -133,17 +133,10 @@ int main(int argc, char **argv) {
   // edgeMapping->printFirst10Edges();
   std::cout << "====================================================================" << std::endl;
 
-<<<<<<< HEAD
   std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.Num_Of_Total_Imgs);
   std::string outputFilePath = "../../outputs/grouped_mvt.txt";
   std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
   NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);
-=======
-  std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups();
-  // std::string outputFilePath = "/gpfs/data/bkimia/zqiwu/3D/3D_Edge_Sketch_and_Grouping/outputs/grouped_mvt.txt";
-  std::string outputFilePath = "../../outputs/grouped_mvt.txt";
-  NViewsTrian::grouped_mvt(all_groups, outputFilePath);
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
   std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
 
   //////////////////// Merge edges ////////////////////

@@ -20,9 +20,9 @@ colors = lines(length(edge_files));
 %> Scalar for tangent vectors
 mag = 0.0025; 
 
+target_edge_1 = [0.460003, 0.0259107, 0.352056];
+target_edge_2 = [0.456393, 0.0307521, 0.346758];
 
-target_edge_1 = [0.503094, -0.00483, 0.530816];
-target_edge_2 = [0.503093 -0.00482904 0.530817];
 
 %> Create a figure for plotting
 figure;
@@ -62,11 +62,12 @@ for i = 1:length(edge_files)
 
     %> Plot the edges using a different color for each file
     plot3(edges_3d(:,1), edges_3d(:,2), edges_3d(:,3), ...
-          'Color', colors(i, :), 'Marker', '.', 'LineStyle', 'none', ...
+          'Color', colors(1, :), 'Marker', '.', 'LineStyle', 'none', ...
           'LineWidth', 0.1, 'MarkerSize', 3, 'DisplayName', show_legend);
 
-    % %> Check and highlight specific points
-    % for j = 1:size(edges_3d, 1)
+
+    %> Check and highlight specific points
+    for j = 1:size(edges_3d, 1)
     % % 
     %     P = edges_3d(j, :)'; % Current edge point
     %     T_v = tangents_3d(j, :)'; % Corresponding tangent vector
@@ -76,16 +77,16 @@ for i = 1:length(edge_files)
     %          [P(2) + mag*T_v(2), P(2) - mag*T_v(2)], ...
     %          [P(3) + mag*T_v(3), P(3) - mag*T_v(3)], ...
     %          'Color', 'k', 'LineWidth', 0.5, 'HandleVisibility', 'off'); % Exclude from legend
-    %     point = edges_3d(j, :);
-    %     if (abs(point(1) - target_edge_1(1)) < 0.000001 && abs(point(2) - target_edge_1(2)) < 0.000001 && abs(point(3) - target_edge_1(3)) < 0.000001)
-    %         disp('found 1');
-    %         plot3(point(1), point(2), point(3), 'Color', 'r','Marker','.','MarkerSize', 3, 'LineWidth', 0.1, 'MarkerFaceColor', 'r');
-    %     end
-    %     if(abs(point(1) - target_edge_2(1)) < 0.000001 && abs(point(2) - target_edge_2(2)) < 0.000001 && abs(point(3) - target_edge_2(3)) < 0.000001)
-    %         disp('found 2');
-    %         plot3(point(1), point(2), point(3), 'Color', 'r','Marker','.','MarkerSize', 3, 'LineWidth', 0.1, 'MarkerFaceColor', 'r');
-    %     end
-    % end
+        point = edges_3d(j, :);
+        if (abs(point(1) - target_edge_1(1)) < 0.000001 && abs(point(2) - target_edge_1(2)) < 0.000001 && abs(point(3) - target_edge_1(3)) < 0.000001)
+            disp('found 1');
+            plot3(point(1), point(2), point(3), 'Color', 'r','Marker','o','MarkerSize', 5, 'LineWidth', 0.1, 'MarkerFaceColor', 'r');
+        end
+        if(abs(point(1) - target_edge_2(1)) < 0.000001 && abs(point(2) - target_edge_2(2)) < 0.000001 && abs(point(3) - target_edge_2(3)) < 0.000001)
+            disp('found 2');
+            plot3(point(1), point(2), point(3), 'Color', 'r','Marker','o','MarkerSize', 5, 'LineWidth', 0.1, 'MarkerFaceColor', 'r');
+        end
+    end
     view(3);
 end
 

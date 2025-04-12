@@ -48,27 +48,16 @@ edge_pair_final = importdata(fullfile(data_folder_path, "paired_edge_final.txt")
 % figure(1);
 % plot3(edges_3D(:,1), edges_3D(:,2), edges_3D(:,3), 'Color', 'r', 'Marker', '.', 'LineStyle', 'none')
 
-<<<<<<< HEAD
 H1_index = 47;
 H2_index = 42;
-=======
-H1_index = 0;
-H2_index = 40;
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 image_indices = 0:1:49;
 image_indices = image_indices';
 image_indices([H1_index+1, H2_index+1], :) = [];
 %image_indices(H2_index+1, :) = [];
 image_indices = [H1_index; H2_index; image_indices];
 
-<<<<<<< HEAD
 target_edge = [0.710596, 0.116216, 0.351873];
 target_index = find(abs(edges_3D(:,1)-target_edge(1))<0.00001 & abs(edges_3D(:,2)-target_edge(2))<0.00001 & abs(edges_3D(:,3)-target_edge(3))<0.00001);
-=======
-% target_edge = [0.8290, 0.6586, 0.2873];
-target_edge = [0.4407, 0.2829, 0.6423];
-target_index = find(abs(edges_3D(:,1)-target_edge(1))<0.001 & abs(edges_3D(:,2)-target_edge(2))<0.001 & abs(edges_3D(:,3)-target_edge(3))<0.001);
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 if (length(target_index) > 1)
     error("More than one target index!\n");
 end
@@ -149,11 +138,7 @@ for i = 1:length(captured_edge_pairs_img_indx)
         Rel_T = Transl - Rot * R1_hyp2' * T1_hyp2;
         E21 = skew_T(Rel_T) * Rel_R;
         F21 = K_inv' * E21 * K_inv;
-<<<<<<< HEAD
         %point1_3 = [point2(1); point2(2); 1];
-=======
-        point1_3 = [point2(1); point2(2); 1];
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
         l = F21 * point2;
         imageWidth = size(img, 2);
         x = [1, imageWidth]; 
@@ -161,7 +146,6 @@ for i = 1:length(captured_edge_pairs_img_indx)
         plot(x, y, 'b', 'LineWidth', 2);
     end
 
-<<<<<<< HEAD
      if(i == 1)
         %plot epipolar line 2
         Rel_R = Rot * R1_hyp2';
@@ -189,8 +173,6 @@ for i = 1:length(captured_edge_pairs_img_indx)
         plot(x, y, 'r', 'LineWidth', 2);hold on;
     end
 
-=======
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
     edge_counter = edge_counter + 1;
 
     % if i > 1

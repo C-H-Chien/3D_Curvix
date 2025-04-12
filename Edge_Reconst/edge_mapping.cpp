@@ -197,13 +197,8 @@ EdgeMapping::computeGraphEdgeDistanceAndAngleStats(
         double dot = clamp(t1.dot(t2), -1.0, 1.0);
         double angle = std::acos(dot);
 
-<<<<<<< HEAD
         //if ((dist<mu1 + sigma1*lambda1 && angle<mu2+sigma2*lambda2)|| weight > 1){
         if (dist<0.0002 || weight > 1){
-=======
-        if ((dist<mu1 + sigma1*lambda1 && angle<mu2+sigma2*lambda2)|| weight > 1){
-        //if (dist<0.002 || weight > 1){
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
             pruned_graph[pair]++;
         }else{
             removed_count++;
@@ -216,15 +211,141 @@ EdgeMapping::computeGraphEdgeDistanceAndAngleStats(
 }
 ///////////////////////// compute weighted graph stats /////////////////////////
 
+///////////////////////// build a map of 3d edges with its neighbors /////////////////////////
+EdgeMapping::EdgeNodeList EdgeMapping::buildEdgeNodeGraph(
+    const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
+                             HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph) {
+    std::unordered_map<Eigen::Vector3d, EdgeNode*, HashEigenVector3d, FuzzyVector3dEqual> node_map;
+    EdgeNodeList nodes;
+
+    // Create node objects
+    for (const auto& [edge, _] : edge_3D_to_supporting_edges) {
+        //auto node = std::make_unique<EdgeNode>();
+        std::unique_ptr<EdgeNode> node(new EdgeNode());
+        node->value = edge;
+        node_map[edge] = node.get();
+        nodes.push_back(std::move(node));
+    }
+
+    // Fill neighbor links
+    for (const auto& [pair, _] : pruned_graph) {
+        auto a_it = node_map.find(pair.first);
+        auto b_it = node_map.find(pair.second);
+        if (a_it == node_map.end() || b_it == node_map.end()) continue;
+
+        EdgeNode* a = a_it->second;
+        EdgeNode* b = b_it->second;
+
+        Eigen::Vector3d t_a = Eigen::Vector3d::Zero();
+        for (const auto& s : edge_3D_to_supporting_edges[pair.first]) t_a += s.tangents_3D_world;
+        t_a.normalize();
+
+        Eigen::Vector3d t_b = Eigen::Vector3d::Zero();
+        for (const auto& s : edge_3D_to_supporting_edges[pair.second]) t_b += s.tangents_3D_world;
+        t_b.normalize();
+
+        a->neighbors.emplace_back(b, std::make_pair(t_a, t_b));
+        b->neighbors.emplace_back(a, std::make_pair(t_b, t_a));
+    }
+
+    return nodes;
+}
+///////////////////////// build a map of 3d edges with its neighbors /////////////////////////
+
+
+
+///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
+void EdgeMapping::smooth3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations) {
+    // --- Write BEFORE smoothing ---
+    std::ofstream before_out("../../outputs/3D_edges_before_smoothing.txt");
+    if (!before_out.is_open()) {
+        std::cerr << "[ERROR] Could not open before smoothing file.\n";
+        return;
+    }
+    for (const auto& node : edge_nodes) {
+        before_out << node->value.transpose() << "\n";
+    }
+    before_out.close();
+
+    // --- Smoothing iterations ---
+    for (int iter = 0; iter < iterations; ++iter) {
+        std::vector<Eigen::Vector3d> new_values(edge_nodes.size());
+
+        for (size_t i = 0; i < edge_nodes.size(); ++i) {
+            const auto& node = edge_nodes[i];
+            if (node->neighbors.empty()) {
+                new_values[i] = node->value;
+                continue;
+            }
+
+            Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+            for (const auto& [neighbor_ptr, _] : node->neighbors) {
+                sum += neighbor_ptr->value;
+            }
+            //new_values[i] = sum / node->neighbors.size();
+            Eigen::Vector3d average = sum / node->neighbors.size();
+            new_values[i] = 0.5 * node->value + 0.5 * average;
+
+        }
+
+        for (size_t i = 0; i < edge_nodes.size(); ++i) {
+            edge_nodes[i]->value = new_values[i];
+        }
+    }
+
+    // --- Write AFTER smoothing ---
+    std::ofstream after_out("../../outputs/3D_edges_after_smoothing.txt");
+    if (!after_out.is_open()) {
+        std::cerr << "[ERROR] Could not open after smoothing file.\n";
+        return;
+    }
+    for (const auto& node : edge_nodes) {
+        after_out << node->value.transpose() << "\n";
+    }
+    after_out.close();
+
+    // --- Update internal mapping with smoothed values ---
+    decltype(edge_3D_to_supporting_edges) new_map;
+    for (const auto& node : edge_nodes) {
+        auto it = edge_3D_to_supporting_edges.find(node->value);
+        if (it != edge_3D_to_supporting_edges.end()) {
+            new_map[node->value] = it->second;
+        }
+    }
+
+    edge_3D_to_supporting_edges = std::move(new_map);
+
+    std::cout << "[SMOOTHING COMPLETE] Smoothed edges written to file after " << iterations << " iterations.\n";
+}
+///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
+
+
+
 
 std::vector<std::vector<EdgeMapping::SupportingEdgeData>> 
 EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
                                       const std::vector<Eigen::Vector3d>& all_T,
                                       int Num_Of_Total_Imgs) 
 { 
+    // convert 3D-> 2D relationship to 2D->3D relationship
     auto uncorrected_map = map_Uncorrected2DEdge_To_SupportingData();
+    // {3D edge 1, 3D edge 2} -> weight (how many 2d edges they have in common)
     auto graph = build3DEdgeWeightedGraph(uncorrected_map);
-    graph = computeGraphEdgeDistanceAndAngleStats(graph,0, 0);
+    //pruning
+    auto pruned_graph = computeGraphEdgeDistanceAndAngleStats(graph,0, 0);
+    // crate 3d -> its neighbor data structure
+    auto neighbor_map = buildEdgeNodeGraph(pruned_graph);
+    smooth3DEdgesUsingEdgeNodes(neighbor_map, 10);
+
+    // for (const auto& [edge_ptr, neighbor_list] : neighbor_map) {
+    //     std::cout << "[EDGE] " << edge_ptr->transpose() << "\n";
+    //     for (const auto& [neighbor_ptr, tangents] : neighbor_list) {
+    //         std::cout << "  -> Neighbor: " << neighbor_ptr->transpose()
+    //                 << " | Self Tangent: " << tangents.first.transpose()
+    //                 << " | Neighbor Tangent: " << tangents.second.transpose() << "\n";
+    //     }
+    // }
+
 
     std::vector<std::vector<SupportingEdgeData>> merged_groups;
 
@@ -258,11 +379,10 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
     }
 
     int group_id = 0;
-    for (const auto& [pair, weight] : graph) {
+    for (const auto& [pair, weight] : pruned_graph) {
         const Eigen::Vector3d& p1 = pair.first;
         const Eigen::Vector3d& p2 = pair.second;
 
-<<<<<<< HEAD
         // Retrieve tangents
         Eigen::Vector3d tangent1 = Eigen::Vector3d::Zero();
         Eigen::Vector3d tangent2 = Eigen::Vector3d::Zero();
@@ -278,39 +398,12 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
             valid_tangents = true;
         }
 
-
-        // Eigen::Vector3d target1(0.4459, 0.0341785, 0.352049);
-        // Eigen::Vector3d target2(0.447857, 0.0352899, 0.348052);
-        // bool match_direct = (p1.isApprox(target1, 1e-6) && p2.isApprox(target2, 1e-6));
-        // bool match_reverse = (p1.isApprox(target2, 1e-6) && p2.isApprox(target1, 1e-6));
-
-        // if (match_direct || match_reverse) {
-        //     std::cout << "[DEBUG]findMergable2DEdgeGroups Found target pair with weight: " << weight << std::endl;
-        // }
-
-
-=======
-        Eigen::Vector3d target1(0.4459, 0.0341785, 0.352049);
-        Eigen::Vector3d target2(0.447857, 0.0352899, 0.348052);
-        bool match_direct = (p1.isApprox(target1, 1e-6) && p2.isApprox(target2, 1e-6));
-        bool match_reverse = (p1.isApprox(target2, 1e-6) && p2.isApprox(target1, 1e-6));
-
-        if (match_direct || match_reverse) {
-            std::cout << "[DEBUG]findMergable2DEdgeGroups Found target pair with weight: " << weight << std::endl;
-        }
-
-
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
         // Project both endpoints
         Eigen::Vector3d pc1 = R_view * p1 + T_view;
         Eigen::Vector3d pc2 = R_view * p2 + T_view;
 
         if (pc1(2) == 0 || pc2(2) == 0) {
-<<<<<<< HEAD
             std::cout << "[WARNING] Z=0 for group " << group_id << " edge: skipping\n";
-=======
-            std::cerr << "[WARNING] Z=0 for group " << group_id << " edge: skipping\n";
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
             continue;
         }
 
@@ -321,9 +414,6 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
         double v1 = pi1(1) / pi1(2);
         double u2 = pi2(0) / pi2(2);
         double v2 = pi2(1) / pi2(2);
-
-<<<<<<< HEAD
-        // proj_outfile << u1 << " " << v1 << " " << u2 << " " << v2 << " ";
 
         // project 3d tangentes onto 2d images
         Eigen::Vector3d tangent_camera_1 =  R_view * tangent1;
@@ -348,7 +438,7 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
         // Add tangent angle classification
         if (valid_tangents) {
             Eigen::Vector3d edge_dir_3d = (p2 - p1).normalized();
-            
+
             double angle1_a = std::acos(edge_dir_3d.dot(tangent1));
             double angle1_b = std::acos((-edge_dir_3d).dot(tangent1));
             double angle1_deg = std::min(angle1_a, angle1_b) * 180.0 / M_PI;
@@ -370,10 +460,6 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
 
         proj_outfile << "\n";
         edge_3d_outfile << p1.transpose() << " \t " << p2.transpose() << "\n";
-=======
-        edge_3d_outfile << p1.transpose() << " \t " << p2.transpose() << "\n";
-        proj_outfile << u1 << " " << v1 << " " << u2 << " " << v2 << " " << group_id << "\n";
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
         group_id++;
     }
 

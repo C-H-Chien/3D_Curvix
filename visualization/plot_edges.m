@@ -36,13 +36,27 @@ for i = 1:length(views)
     observed_path = fullfile(observed_edge_folder, observed_file);
     if isfile(observed_path)
         observed_edges = dlmread(observed_path);
-        in_bbox = observed_edges(:,1) >= x_min & observed_edges(:,1) <= x_max & ...
-          observed_edges(:,2) >= y_min & observed_edges(:,2) <= y_max;
+        in_bbox = observed_edges(:,1) >= x_min-5 & observed_edges(:,1) <= x_max+5 & ...
+          observed_edges(:,2) >= y_min-5 & observed_edges(:,2) <= y_max+5;
 
         if any(in_bbox)
-            plot(observed_edges(in_bbox,1), observed_edges(in_bbox,2), 'go', ...
-                 'MarkerSize', 8, 'DisplayName', 'Observed Edges');
+            points = observed_edges(in_bbox, 1:2);
+            tangents = observed_edges(in_bbox, 3);  % Orientation (assumed in radians)
+        
+            % Plot observed points
+            plot(points(:,1), points(:,2), 'go', 'MarkerSize', 8, 'DisplayName', 'Observed Edges');
+        
+            % Plot green orientation lines
+            for i = 1:size(points, 1)
+                x = points(i, 1);
+                y = points(i, 2);
+                theta = tangents(i);  % radians
+        
+                % Draw orientation line in green
+                plot([x + mag*cos(theta), x - mag*cos(theta)], [y + mag*sin(theta), y - mag*sin(theta)],'g-', 'LineWidth', 1.2);
+            end
         end
+
         fprintf('Observed points in bounding box for view %d: %d\n', view_id, sum(in_bbox));
 
         % if observed_edges(:,1) >= x_min & observed_edges(:,1) <= x_max & observed_edges(:,2) >= y_min & observed_edges(:,2) <= y_max

@@ -2,24 +2,15 @@ clear;
 close all;
 
 % Validation View Indices
-<<<<<<< HEAD
 validation_view_indices = [49];
 
 % Epipoles for Hypothesis 1
 epipoles_hypo1 = [ 
     181.227 -2251.84
-=======
-validation_view_indices = [46];
-
-% Epipoles for Hypothesis 1
-epipoles_hypo1 = [
-    376.921, 108.483
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 ];
 
 % Angle Ranges for Hypothesis 1
 angle_ranges_hypo1 = [
-<<<<<<< HEAD
     82.7941, 82.8215
 ];
 
@@ -29,17 +20,6 @@ epipoles_hypo2 = [
 
 angle_ranges_hypo2= [
     134.226, 134.232
-=======
-    76.8183, 77.2089
-];
-
-epipoles_hypo2 = [
-    519.083, 11.5352
-];
-
-angle_ranges_hypo2= [
-    100.806, 103.657
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 ];
 
 Dataset_Path = "/gpfs/data/bkimia/Datasets/ABC-NEF/";
@@ -53,11 +33,7 @@ image_height = 800;
 
 figure;
 for i = 1:length(validation_view_indices)
-<<<<<<< HEAD
     % subplot(2, ceil(length(validation_view_indices) / 2), i);
-=======
-    subplot(2, ceil(length(validation_view_indices) / 2), i);
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
     image_file = fullfile(Image_Path, sprintf("%d_colors.png", validation_view_indices(i)));
     img = imread(image_file);
     imshow(img);
@@ -78,10 +54,7 @@ for i = 1:length(validation_view_indices)
     % Add a label to indicate the Validation View Index
     text(20, 20, ['Validation View Index: ', num2str(validation_view_indices(i))], ...
         'FontSize', 8, 'Color', 'green', 'FontWeight', 'bold');
-<<<<<<< HEAD
     plot(519.6032,  430.9860,'o', 'Color', 'c', 'MarkerSize', 7, 'LineWidth', 1);
-=======
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 end
 
 

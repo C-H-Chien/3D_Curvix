@@ -7,6 +7,8 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <numeric>
+#include <memory>
+
 
 // Hash function for Eigen::Vector3d to use in unordered_map
 struct HashEigenVector3d {
@@ -96,6 +98,15 @@ public:
     };
     //////////////////////////// mapping 2D edge to 3D ////////////////////////////
 
+    struct EdgeNode {
+        Eigen::Vector3d value;
+        std::vector<std::pair<EdgeNode*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>> neighbors;
+    };
+
+
+    using PointerNeighborMap = std::unordered_map<const Eigen::Vector3d*, std::vector<std::pair<const Eigen::Vector3d*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>>;
+
+
     
     // Custom hash function
     struct HashUncorrected2DEdgeKey {
@@ -143,17 +154,22 @@ public:
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
     build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map);
+    
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
                    HashEigenVector3dPair, FuzzyVector3dPairEqual>
+
     computeGraphEdgeDistanceAndAngleStats(
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
                        HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
     double lambda1, double lambda2);
 
+    using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
+
+    EdgeNodeList buildEdgeNodeGraph(const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
+                                HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
+
+    void smooth3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations);
+
 };
 
-<<<<<<< HEAD
 #endif  // EDGE_MAPPING_HPP
-=======
-#endif  // EDGE_MAPPING_HPP
->>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
