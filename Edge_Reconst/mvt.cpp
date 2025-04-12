@@ -504,6 +504,7 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
 
         const auto& group = all_groups[start_idx];
 
+<<<<<<< HEAD
         // if (group.size() < 6) {
         //     std::cout << "[WARNING]: Skipping group " << start_idx << " (not enough edges for triangulation)." << std::endl;
         //     continue;
@@ -546,6 +547,21 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
             continue;
         }
 
+=======
+        if (group.size() < 6) {
+            std::cout << "[WARNING]: Skipping group " << start_idx << " (not enough edges for triangulation)." << std::endl;
+            continue;
+        }
+
+        Feature_Track feature_track_;
+        feature_track_.Length = std::min(group.size(), static_cast<size_t>(50));
+
+        for (const auto& edge_data : group) {
+            feature_track_.Locations.emplace_back(edge_data.edge_uncorrected(0), edge_data.edge_uncorrected(1), 1); // Convert 2D edge to homogeneous
+            feature_track_.Abs_Rots.emplace_back(edge_data.rotation);
+            feature_track_.Abs_Transls.emplace_back(edge_data.translation);
+        }
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 
         Multiview_Triangulation(feature_track_, K);
 
@@ -595,6 +611,7 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
         /////////// End tangent computation and writing ///////////
 
         outFile << std::fixed << feature_track_.Gamma(0) << "\t" << feature_track_.Gamma(1) << "\t" << feature_track_.Gamma(2) << "\n";
+<<<<<<< HEAD
         
         ////////// Check if the Gamma matches the target values //////////
         // Eigen::Vector3d targetGamma(0.70455, 0.122517, 0.357381);
@@ -611,6 +628,8 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
         // }
         ////////// Check if the Gamma matches the target values //////////
 
+=======
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 
         triangulated_count++;
         outFile.flush();
@@ -625,4 +644,8 @@ void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>
 
 
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f

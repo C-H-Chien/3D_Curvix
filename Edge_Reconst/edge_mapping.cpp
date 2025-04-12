@@ -197,8 +197,13 @@ EdgeMapping::computeGraphEdgeDistanceAndAngleStats(
         double dot = clamp(t1.dot(t2), -1.0, 1.0);
         double angle = std::acos(dot);
 
+<<<<<<< HEAD
         //if ((dist<mu1 + sigma1*lambda1 && angle<mu2+sigma2*lambda2)|| weight > 1){
         if (dist<0.0002 || weight > 1){
+=======
+        if ((dist<mu1 + sigma1*lambda1 && angle<mu2+sigma2*lambda2)|| weight > 1){
+        //if (dist<0.002 || weight > 1){
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
             pruned_graph[pair]++;
         }else{
             removed_count++;
@@ -257,6 +262,7 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
         const Eigen::Vector3d& p1 = pair.first;
         const Eigen::Vector3d& p2 = pair.second;
 
+<<<<<<< HEAD
         // Retrieve tangents
         Eigen::Vector3d tangent1 = Eigen::Vector3d::Zero();
         Eigen::Vector3d tangent2 = Eigen::Vector3d::Zero();
@@ -283,12 +289,28 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
         // }
 
 
+=======
+        Eigen::Vector3d target1(0.4459, 0.0341785, 0.352049);
+        Eigen::Vector3d target2(0.447857, 0.0352899, 0.348052);
+        bool match_direct = (p1.isApprox(target1, 1e-6) && p2.isApprox(target2, 1e-6));
+        bool match_reverse = (p1.isApprox(target2, 1e-6) && p2.isApprox(target1, 1e-6));
+
+        if (match_direct || match_reverse) {
+            std::cout << "[DEBUG]findMergable2DEdgeGroups Found target pair with weight: " << weight << std::endl;
+        }
+
+
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
         // Project both endpoints
         Eigen::Vector3d pc1 = R_view * p1 + T_view;
         Eigen::Vector3d pc2 = R_view * p2 + T_view;
 
         if (pc1(2) == 0 || pc2(2) == 0) {
+<<<<<<< HEAD
             std::cout << "[WARNING] Z=0 for group " << group_id << " edge: skipping\n";
+=======
+            std::cerr << "[WARNING] Z=0 for group " << group_id << " edge: skipping\n";
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
             continue;
         }
 
@@ -300,6 +322,7 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
         double u2 = pi2(0) / pi2(2);
         double v2 = pi2(1) / pi2(2);
 
+<<<<<<< HEAD
         // proj_outfile << u1 << " " << v1 << " " << u2 << " " << v2 << " ";
 
         // project 3d tangentes onto 2d images
@@ -347,6 +370,10 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
 
         proj_outfile << "\n";
         edge_3d_outfile << p1.transpose() << " \t " << p2.transpose() << "\n";
+=======
+        edge_3d_outfile << p1.transpose() << " \t " << p2.transpose() << "\n";
+        proj_outfile << u1 << " " << v1 << " " << u2 << " " << v2 << " " << group_id << "\n";
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
         group_id++;
     }
 

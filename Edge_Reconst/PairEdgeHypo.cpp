@@ -218,6 +218,7 @@ namespace PairEdgeHypothesis {
         return edgels_HYPO2_corrected;
     }
 
+<<<<<<< HEAD
     // Eigen::MatrixXd pair_edge_hypothesis::edgelsHYPO2correct_post_validation(
     //     Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, 
     //     Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw)
@@ -325,6 +326,8 @@ namespace PairEdgeHypothesis {
     //     return edgels_HYPO2_corrected;
     // }
 
+=======
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
     Eigen::MatrixXd pair_edge_hypothesis::edgelsHYPO2correct_post_validation(
         Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, 
         Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw)
@@ -408,7 +411,12 @@ namespace PairEdgeHypothesis {
 
             // if (dist_diff_edg2 < 6 && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4 &&
             //     dist_diff_edg1 < 6 && abs(angle_diff_deg_edg1 - 0) > 4 && abs(angle_diff_deg_edg1 - 180) > 4){
+<<<<<<< HEAD
             if (dist_diff_edg2 < 3 && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4){
+=======
+            if (dist_diff_edg2 < 3 && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4 &&
+                 dist_diff_edg1 < 3 && abs(angle_diff_deg_edg1 - 0) > 4 && abs(angle_diff_deg_edg1 - 180) > 4){
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
                 if (idx_correct == 0) {
                     edgels_HYPO2_corrected = Eigen::MatrixXd(1, 10);
                 } else {
@@ -420,12 +428,21 @@ namespace PairEdgeHypothesis {
                     break;
                 }
                 edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
+<<<<<<< HEAD
                 edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
                                                         x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
                                                         HYPO2_idx_raw(idx_hypo2), idx_hypo2;
                 // edgels_HYPO2_corrected.row(idx_correct) << x_intersection_1, y_intersection_1, edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
                 //                                     x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
                 //                                     HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+=======
+                // edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+                //                                         x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
+                //                                         HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+                edgels_HYPO2_corrected.row(idx_correct) << x_intersection_1, y_intersection_1, edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+                                                    x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
+                                                    HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
                 idx_correct++;
             }
 
@@ -443,7 +460,10 @@ namespace PairEdgeHypothesis {
         return edgels_HYPO2_corrected;
     }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 
 }
 

@@ -21,12 +21,14 @@ colors = lines(length(edge_files));
 
 % Create a figure for plotting
 figure;
+ax = axes();
 hold on;
 
 %> Scalar for tangent vectors
 mag = 0.0025; 
 
 %> Loop through each file and plot its edges in 3D
+hLegs = [];
 for i = 1:length(edge_files)
     %> Read the current 3D edge file
     current_file_path = fullfile(data_folder_path, edge_files(i).name);
@@ -55,6 +57,7 @@ for i = 1:length(edge_files)
     show_legend = strcat("3D edges from hypothesis views ", hypothesis_view1_index, " and ", hypothesis_view2_index);
 
     %> Plot the edges using a different color for each file
+<<<<<<< HEAD
     % plot3(edges_3d(:,1), edges_3d(:,2), edges_3d(:,3), ...
     %       'Color', colors(i, :), 'Marker', '.', 'LineStyle', 'none', ...
     %       'LineWidth', 0.1, 'MarkerSize', 3, 'DisplayName', show_legend);
@@ -74,6 +77,16 @@ for i = 1:length(edge_files)
     view(3); % Set 3D perspective
 
 
+=======
+    h = plot3(edges_3d(:,1), edges_3d(:,2), edges_3d(:,3), ...
+             'Color', colors(i, :), 'Marker', '.', 'MarkerSize', 3.5, 'LineStyle', 'none', ...
+             'DisplayName', show_legend);
+
+    %> Make marker size larger in the legend. This would make visualization clearer especially when multiple passes of hypothesis views are used for 3D edge sketch.
+    hLeg = copyobj(h, ax);
+    set(hLeg, 'XData', NaN, 'YData', NaN, 'ZData', NaN, 'MarkerSize', 20);
+    hLegs = [hLegs, hLeg];
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 end
 
 %> Set the plot settings
@@ -83,4 +96,15 @@ set(gcf, 'color', 'w');
 ax = gca;
 ax.Clipping = "off";
 
+<<<<<<< HEAD
 hold off;
+=======
+%> Avoid 3D edge points vanish when zomming in
+ax = gca;
+ax.Clipping = "off";
+
+%> Add a legend for each file
+legend(hLegs);
+%legend({edge_files.name}, 'Interpreter', 'none');
+hold off;
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f

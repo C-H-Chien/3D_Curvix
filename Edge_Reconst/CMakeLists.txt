@@ -33,9 +33,12 @@ set ( control_sources
   NViewsUtils.cpp
   generatePointCloud.h
   generatePointCloud.cpp
+<<<<<<< HEAD
 
   EdgeClusterer.hpp
   EdgeClusterer.cpp
+=======
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
 )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})

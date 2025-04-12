@@ -152,4 +152,8 @@ public:
 
 };
 
+<<<<<<< HEAD
 #endif  // EDGE_MAPPING_HPP
+=======
+#endif  // EDGE_MAPPING_HPP
+>>>>>>> e6c6edf843f3f019e8d3420d15a62864487d5a8f
