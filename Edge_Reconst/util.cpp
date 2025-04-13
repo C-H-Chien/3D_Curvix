@@ -65,6 +65,44 @@ namespace MultiviewGeometryUtil {
         return R_2 * (C1 - C2); 
     }
 
+    //> Projecting a 3D tangent vector located in the world coordinate to the image
+    Eigen::Vector3d multiview_geometry_util::project_3DTangent_to_Image(Eigen::Matrix3d Rot, Eigen::Matrix3d K, Eigen::Vector3d Tangent_3D_world, Eigen::Vector3d Point_Location_in_Pixels) {
+        
+        Eigen::Vector3d point_in_meters = K.inverse() * Point_Location_in_Pixels;
+
+        // e3     = [0;0;1];
+        // T1 = R1*pick_scene_tangent(:,:,n)';
+        // t1 = T1 - (e3' * T1)*gamma1;
+        // t1 = t1 ./ norm(t1);
+
+        Eigen::Vector3d Tangent_3D_cam = Rot * Tangent_3D_world;
+        Eigen::Vector3d tangent_2D   = Tangent_3D_cam - Tangent_3D_cam(2) * point_in_meters;
+        tangent_2D.normalize();
+        return tangent_2D;
+    }
+
+    Eigen::Vector3d multiview_geometry_util::getNormalizedProjectedPoint(Eigen::Vector3d proj_point) {
+        proj_point(0) /= proj_point(2);
+        proj_point(1) /= proj_point(2);
+        proj_point(2) = 1.0;
+        return proj_point;
+    }
+
+    Eigen::Matrix3d multiview_geometry_util::getRodriguesRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2) {
+
+        //> make sure that the input vectors are unit-vectors
+        v1 /= v1.norm();
+        v2 /= v2.norm();
+
+        Eigen::Vector3d v1_cross_v2 = v1.cross(v2);
+        double s = v1_cross_v2.norm();
+        double c = v1.dot(v2);
+        double coeff = 1.0 / (1.0 + c);
+        Eigen::Matrix3d v_x = getSkewSymmetric(v1_cross_v2);
+        Eigen::Matrix3d R = Eigen::Matrix3d::Identity() + v_x + coeff * v_x * v_x;
+        return R;
+    }
+
     Eigen::Vector3d multiview_geometry_util::linearTriangulation(
         const int N,
         const std::vector<Eigen::Vector2d> pts, 

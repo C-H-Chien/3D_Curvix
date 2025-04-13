@@ -211,6 +211,89 @@ EdgeMapping::computeGraphEdgeDistanceAndAngleStats(
 }
 ///////////////////////// compute weighted graph stats /////////////////////////
 
+///////////////////////// Start of pruning weighted graph by projecting to all views /////////////////////
+std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                   HashEigenVector3dPair, FuzzyVector3dPairEqual>
+EdgeMapping::pruneEdgeGraphbyProjections(
+    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+    double lambda1, double lambda2, 
+    const std::vector<Eigen::Matrix3d> All_R,
+    const std::vector<Eigen::Vector3d> All_T,
+    const Eigen::Matrix3d K,
+    const int Num_Of_Total_Imgs )
+{
+    std::unordered_map<
+    std::pair<Eigen::Vector3d, Eigen::Vector3d>,
+    int,
+    HashEigenVector3dPair,
+    FuzzyVector3dPairEqual
+    > pruned_graph;
+
+    int remove_link_counter = 0;
+
+    util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+
+    for (const auto& [pair, weight] : graph) {
+
+        //> Find the locations and tangents of the 3D edge pair
+        const Eigen::Vector3d& Edge3D_1_Location = pair.first;
+        const Eigen::Vector3d& Edge3D_2_Location = pair.second;
+
+        auto it1 = edge_3D_to_supporting_edges.find(Edge3D_1_Location);
+        auto it2 = edge_3D_to_supporting_edges.find(Edge3D_2_Location);
+
+        //> Skip if the 3D edge does not exist in the structure edge_3D_to_supporting_edges (is it possible?)
+        if (it1 == edge_3D_to_supporting_edges.end() || it2 == edge_3D_to_supporting_edges.end()) continue;
+
+        Eigen::Vector3d unit_Tangent3D_1 = it1->second.front().tangents_3D_world.normalized();
+        Eigen::Vector3d unit_Tangent3D_2 = it2->second.front().tangents_3D_world.normalized();
+
+        bool prune_flag = false;
+
+        double Orientation_Diff_Thresh = 30; //> in degrees
+        double ore_diff_threshold = cos(double(Orientation_Diff_Thresh)/180*PI);
+
+        //> Project to all views 
+        for (unsigned vi = 0; vi < Num_Of_Total_Imgs; vi++) {
+
+            //> Project 3D edge point to the 2D image
+            Eigen::Vector3d proj_edge_1_location = K * (All_R[vi] * Edge3D_1_Location + All_T[vi]);
+            Eigen::Vector3d proj_edge_2_location = K * (All_R[vi] * Edge3D_2_Location + All_T[vi]);
+            proj_edge_1_location = util->getNormalizedProjectedPoint( proj_edge_1_location );
+            proj_edge_2_location = util->getNormalizedProjectedPoint( proj_edge_2_location );
+
+            //> Project 3D tangent to the 2D image
+            Eigen::Vector3d proj_tangent_1 = util->project_3DTangent_to_Image(All_R[vi], K, unit_Tangent3D_1, proj_edge_1_location);
+            Eigen::Vector3d proj_tangent_2 = util->project_3DTangent_to_Image(All_R[vi], K, unit_Tangent3D_2, proj_edge_2_location);
+
+            //> Rule out if the distance between the projected 3D edge points are over a threshold
+            //> TODO: make the threhold as a Macro
+            prune_flag = ((proj_edge_1_location - proj_edge_2_location).norm() > 2) ? (true) : (false);
+
+            //> Rule out if the orientation difference is over a threshold
+            //> TODO: make the threhold as a Macro
+            double abs_dot_prod = fabs(proj_tangent_1(0)*proj_tangent_2(0) + proj_tangent_1(1)*proj_tangent_2(1));
+            prune_flag = (abs_dot_prod > ore_diff_threshold) ? (true) : (false);
+
+            if (prune_flag) break;
+        }
+
+        if (prune_flag) {
+            remove_link_counter++;
+        }
+        else {
+            pruned_graph[pair]++;
+        }
+    }
+    std::cout << "[CH] Number of removed links in the graph: " << remove_link_counter << std::endl;
+
+    return pruned_graph;
+}
+
+
+///////////////////////// End of pruning weighted graph by projecting to all views /////////////////////
+
 ///////////////////////// build a map of 3d edges with its neighbors /////////////////////////
 EdgeMapping::EdgeNodeList EdgeMapping::buildEdgeNodeGraph(
     const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
@@ -320,22 +403,23 @@ void EdgeMapping::smooth3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iter
 ///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
 
 
-
-
 std::vector<std::vector<EdgeMapping::SupportingEdgeData>> 
-EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
-                                      const std::vector<Eigen::Vector3d>& all_T,
-                                      int Num_Of_Total_Imgs) 
+EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
+                                      const std::vector<Eigen::Vector3d> all_T,
+                                      const Eigen::Matrix3d K,
+                                      const int Num_Of_Total_Imgs) 
 { 
     // convert 3D-> 2D relationship to 2D->3D relationship
     auto uncorrected_map = map_Uncorrected2DEdge_To_SupportingData();
     // {3D edge 1, 3D edge 2} -> weight (how many 2d edges they have in common)
     auto graph = build3DEdgeWeightedGraph(uncorrected_map);
     //pruning
-    auto pruned_graph = computeGraphEdgeDistanceAndAngleStats(graph,0, 0);
+    auto pruned_graph = computeGraphEdgeDistanceAndAngleStats(graph, 0, 0);
+    // auto pruned_graph = pruneEdgeGraphbyProjections(graph, 0, 0, all_R, all_T, K, Num_Of_Total_Imgs);
+
     // crate 3d -> its neighbor data structure
-    auto neighbor_map = buildEdgeNodeGraph(pruned_graph);
-    smooth3DEdgesUsingEdgeNodes(neighbor_map, 10);
+    // auto neighbor_map = buildEdgeNodeGraph(pruned_graph);
+    // smooth3DEdgesUsingEdgeNodes(neighbor_map, 10);
 
     // for (const auto& [edge_ptr, neighbor_list] : neighbor_map) {
     //     std::cout << "[EDGE] " << edge_ptr->transpose() << "\n";
@@ -349,22 +433,10 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
 
     std::vector<std::vector<SupportingEdgeData>> merged_groups;
 
-    // Intrinsic matrix
-    double fx = 1111.11136542426;
-    double fy = 1111.11136542426;
-    double cx = 399.5;
-    double cy = 399.5;
-    Eigen::Matrix3d K;
-    K << fx, 0, cx,
-         0, fy, cy,
-         0, 0, 1;
-
     // Projection view's extrinsics
-    Eigen::Matrix3d R_view;
-    R_view <<  -0.865629,   -0.500686, -4.12948e-08,
-              -0.221951,    0.383728,     0.896376,
-              0.448803,     -0.77593,    0.443294;
-    Eigen::Vector3d T_view(0.683157, -0.529078, -3.90556);
+    Eigen::Matrix3d R_view = all_R[7];
+    Eigen::Vector3d T_view = all_T[7];
+    util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 
     std::ofstream proj_outfile("../../outputs/3D_edge_groups_projected.txt");
     if (!proj_outfile.is_open()) {
@@ -409,60 +481,49 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,
 
         Eigen::Vector3d pi1 = K * pc1;
         Eigen::Vector3d pi2 = K * pc2;
+        
+        Eigen::Vector3d proj_edge_1_location = util->getNormalizedProjectedPoint( pi1 );
+        Eigen::Vector3d proj_edge_2_location = util->getNormalizedProjectedPoint( pi2 );
 
-        double u1 = pi1(0) / pi1(2);
-        double v1 = pi1(1) / pi1(2);
-        double u2 = pi2(0) / pi2(2);
-        double v2 = pi2(1) / pi2(2);
+        //> Project 3D tangent to the 2D image
+        Eigen::Vector3d proj_tangent_1 = util->project_3DTangent_to_Image(R_view, K, tangent1, proj_edge_1_location);
+        Eigen::Vector3d proj_tangent_2 = util->project_3DTangent_to_Image(R_view, K, tangent2, proj_edge_2_location);
 
-        // project 3d tangentes onto 2d images
-        Eigen::Vector3d tangent_camera_1 =  R_view * tangent1;
-        Eigen::Vector3d e3(0.0, 0.0, 1.0);
-        Eigen::Vector2d gamma1_meters(-(u1 - cx) / fx, -(v1 - cy) / fy);
-        Eigen::Vector2d gamma2_meters(-(u2 - cx) / fx, -(v2 - cy) / fy);
-        double e3_dot_T1 = e3.dot(tangent_camera_1); 
-        Eigen::Vector2d T1_xy(tangent_camera_1(0), tangent_camera_1(1));
-        Eigen::Vector2d t_img1 = (T1_xy - e3_dot_T1 * gamma1_meters).normalized();
 
-        // Project tangent2
-        Eigen::Vector3d tangent_camera_2 =  R_view * tangent2;
-        double e3_dot_T2 = e3.dot(tangent_camera_2); 
-        Eigen::Vector2d T2_xy(tangent_camera_2(0), tangent_camera_2(1));
-        Eigen::Vector2d t_img2 = (T2_xy - e3_dot_T2 * gamma2_meters).normalized();
-
-        proj_outfile << u1 << " " << v1 << " " << u2 << " " << v2 << " "
-             << t_img1(0) << " " << t_img1(1) << " "
-             << t_img2(0) << " " << t_img2(1) << " ";
+        proj_outfile << proj_edge_1_location(0) << "\t" << proj_edge_1_location(1) << "\t" \
+                     << proj_edge_2_location(0) << "\t" << proj_edge_2_location(1) << "\t" \
+                     << proj_tangent_1(0) << "\t" << proj_tangent_1(1) << "\t"
+                     << proj_tangent_2(0) << "\t" << proj_tangent_2(1) << "\t" << valid_tangents << "\n";
 
 
         // Add tangent angle classification
-        if (valid_tangents) {
-            Eigen::Vector3d edge_dir_3d = (p2 - p1).normalized();
+        // if (valid_tangents) {
+        //     Eigen::Vector3d edge_dir_3d = (p2 - p1).normalized();
 
-            double angle1_a = std::acos(edge_dir_3d.dot(tangent1));
-            double angle1_b = std::acos((-edge_dir_3d).dot(tangent1));
-            double angle1_deg = std::min(angle1_a, angle1_b) * 180.0 / M_PI;
-            double angle2_a = std::acos(edge_dir_3d.dot(tangent1));
-            double angle2_b = std::acos((-edge_dir_3d).dot(tangent1));
-            double angle2_deg = std::min(angle1_a, angle1_b) * 180.0 / M_PI;
+        //     double angle1_a = std::acos(edge_dir_3d.dot(tangent1));
+        //     double angle1_b = std::acos((-edge_dir_3d).dot(tangent1));
+        //     double angle1_deg = std::min(angle1_a, angle1_b) * 180.0 / M_PI;
+        //     double angle2_a = std::acos(edge_dir_3d.dot(tangent1));
+        //     double angle2_b = std::acos((-edge_dir_3d).dot(tangent1));
+        //     double angle2_deg = std::min(angle1_a, angle1_b) * 180.0 / M_PI;
 
-            if (angle1_deg < 30.0 && angle2_deg < 30.0) {
-                proj_outfile << " 1 "; // Sequential
-            } else if (angle1_deg > 75.0 && angle2_deg > 75.0) {
-                proj_outfile << " 0 "; // Parallel
-            }else{
-                proj_outfile << " 2 "; // None
-            }
-        }
+        //     if (angle1_deg < 30.0 && angle2_deg < 30.0) {
+        //         proj_outfile << " 1 "; // Sequential
+        //     } else if (angle1_deg > 75.0 && angle2_deg > 75.0) {
+        //         proj_outfile << " 0 "; // Parallel
+        //     }else{
+        //         proj_outfile << " 2 "; // None
+        //     }
+        // }
 
 
-        proj_outfile << weight; 
+        // proj_outfile << weight; 
 
-        proj_outfile << "\n";
-        edge_3d_outfile << p1.transpose() << " \t " << p2.transpose() << "\n";
+        // proj_outfile << "\n";
+        // edge_3d_outfile << p1.transpose() << " \t " << p2.transpose() << "\n";
         group_id++;
     }
-
+    proj_outfile.close();
     std::cout << "[INFO] Wrote projected 3D edge groups to 2D view." << std::endl;
 
 

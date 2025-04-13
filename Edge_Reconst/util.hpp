@@ -37,6 +37,10 @@ namespace MultiviewGeometryUtil {
         
         Eigen::Matrix3d getRelativePose_R21(Eigen::Matrix3d R1, Eigen::Matrix3d R2);
         Eigen::Vector3d getRelativePose_T21(Eigen::Matrix3d R1, Eigen::Matrix3d R2, Eigen::Vector3d T1, Eigen::Vector3d T2);
+
+        Eigen::Vector3d project_3DTangent_to_Image(Eigen::Matrix3d Rot, Eigen::Matrix3d K, Eigen::Vector3d Tangent_3D_world, Eigen::Vector3d Point_Location_in_Pixels);
+        Eigen::Vector3d getNormalizedProjectedPoint(Eigen::Vector3d proj_point);
+        Eigen::Matrix3d getRodriguesRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2);
         
         Eigen::Vector3d linearTriangulation(int N, const std::vector<Eigen::Vector2d> pts,  \
                                                    const std::vector<Eigen::Matrix3d> & Rs, \
