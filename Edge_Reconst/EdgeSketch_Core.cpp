@@ -906,7 +906,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
         std::vector<Eigen::Vector2d> pts;
         pts.push_back(pt_H1);
-        //std::cout<<"hyp1 is: " <<pt_H1 <<std::endl;
         pts.push_back(pt_H2);
 
         //> The resultant edge_pt_3D is 3D edges "under the first hypothesis view coordinate"
@@ -922,31 +921,13 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D, All_R[hyp01_view_indx], All_T[hyp01_view_indx]);
 
         Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
-        //Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2), hypo1_identifier;
-        // const double EPSILON = 1e-4;  // Increase tolerance from 1e-6 to 1e-4
-        // if (std::abs(edge_pt_3D(0) - 0.413797) < EPSILON &&
-        //     std::abs(edge_pt_3D(1) - 0.193047) < EPSILON &&
-        //     std::abs(edge_pt_3D(2) + 4.20615) < EPSILON) {
-        //     std::cout << "Matched tangents_3D: " << Gamma1s.row(valid_pair_idx) << std::endl;
-        //     std::cout<<"HYPO 1 corrected: " <<pt_H1.transpose() <<", original: "<<edgel_HYPO1<<std::endl;
-        //     std::cout<<"HYPO 2 corrected: "<<pt_H2.transpose()<<", original hyp2 is: "<<edgel_HYPO2<<std::endl;
-        //     exit(0);
-        //  }
 
-        Eigen::MatrixXd tangents_3D = Eigen::Matrix3d::Zero();
+        //> Triangulate edge orientations and make them in the world coordinate
         Eigen::Vector3d Edgel_View1(edgel_HYPO1(0),  edgel_HYPO1(1), edgel_HYPO1(2));
         Eigen::Vector3d Edgel_View2(edgel_HYPO2(0),  edgel_HYPO2(1), edgel_HYPO2(2));
-        Eigen::Matrix3d R1_test = All_R[hyp01_view_indx];
-        Eigen::Matrix3d R21_test;
-        Eigen::Matrix3d R12_test;
-        Eigen::Vector3d T12_test;
-        Eigen::Vector3d T21_test;   
-
-        util->getRelativePoses(All_R[hyp01_view_indx], All_T[hyp01_view_indx], All_R[hyp02_view_indx], All_T[hyp02_view_indx], R21_test, T21_test, R12_test, T12_test);
-
-        Compute_3D_Tangents(Edgel_View1, Edgel_View2, K_HYPO1, K_HYPO2, R21_test, T21_test, tangents_3D);
-        Eigen::Vector3d tangents_3D_world = (All_R[hyp01_view_indx]).transpose() * tangents_3D;
+        Eigen::Vector3d tangents_3D_world = util->get3DTangentFromTwo2Dtangents(Edgel_View1, Edgel_View2, K_HYPO1, K_HYPO2, All_R[hyp01_view_indx], All_T[hyp01_view_indx], All_R[hyp02_view_indx], All_T[hyp02_view_indx]);
         tangent3Ds.row(valid_pair_idx) = tangents_3D_world;
+
         valid_pair_idx++;
         
         Eigen::Vector3d edge_uncorrected_hyp1 = edgel_HYPO1.block<1,3>(0,0).transpose();
@@ -1025,83 +1006,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
     std::cout << "edge sketch size of edge_3D_to_supporting_edges: " << edgeMapping->edge_3D_to_supporting_edges.size() << std::endl;
 }
 
-
-void EdgeSketch_Core::test_3D_tangent() {
-    // Given Rotation and Translation Matrices
-    Eigen::Matrix3d R1, R2;
-    Eigen::Vector3d T1, T2;
-
-    R1 << 0.229714, 0.973258, -1.29728e-07,
-         -0.220415, 0.0520239, 0.974018,
-         -0.947971, 0.223746, -0.226472;
-
-    T1 << -0.601486, -0.402814, -3.93395;
-
-    R2 << 0.159322, -0.987227, -3.64782e-08,
-         -0.0530916, -0.00856814, 0.998553,
-          0.985798, 0.159092, 0.0537785;
-
-    T2 << 0.413953, -0.468447, -3.95085;
-
-    // Camera Intrinsic Matrix (example, adjust if needed)
-    Eigen::Matrix3d K;
-    K << 2584.93250981950, 0, 249.771375872214,
-         0, 2584.79186060577, 278.312679379194,
-         0, 0, 1;
-
-    // Point coordinates from two images
-    std::vector<Eigen::Vector2d> points_img1 = {
-        {520.590800, 428.498217}, {520.581695, 427.998471}, {520.573102, 427.498616},
-        {520.564490, 426.998731}, {520.555647, 426.498837}, {520.645733, 430.996517},
-        {520.634568, 430.496660}, {520.623192, 429.996899}, {520.611786, 429.497305},
-        {520.600795, 428.997801}};
-    std::vector<Eigen::Vector2d> points_img2 = {
-        {240.855540, 429.000920}, {240.849805, 428.001160}, {240.839928, 427.001388},
-        {240.839928, 427.001388}, {240.834057, 426.501440}, {240.885916, 432.001500},
-        {240.872839, 431.001501}, {240.866802, 430.501425}, {240.861729, 430.001200},
-        {240.855540, 429.000920}};
-
-    // Relative Rotation and Translation
-    Eigen::Matrix3d R21 = R2 * R1.transpose();
-    Eigen::Vector3d T21 = T2 - R21 * T1;
-
-    // Store 3D points and tangents
-    std::vector<Eigen::Vector3d> points_3D;
-    std::vector<Eigen::Vector3d> tangents_3D;
-
-    for (size_t i = 0; i < points_img1.size(); ++i) {
-        // Prepare the corresponding points
-        Eigen::Vector2d pt1 = points_img1[i];
-        Eigen::Vector2d pt2 = points_img2[i];
-        Eigen::Vector3d pt1_h(pt1(0), pt1(1), 1.0);
-        Eigen::Vector3d pt2_h(pt2(0), pt2(1), 1.0);
-
-        // Triangulate the 3D point
-        std::vector<Eigen::Vector2d> pts_test = {pt1, pt2};
-        std::vector<Eigen::Matrix3d> Rs_test = {R21};
-        std::vector<Eigen::Vector3d> Ts_test = {T21};
-
-        Eigen::Vector3d edge_pt_3D = util->linearTriangulation(2, pts_test, Rs_test, Ts_test, K);
-        Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D, R1, T1);
-
-        points_3D.push_back(edge_pt_3D_world);
-
-        // Compute the 3D tangent
-        Eigen::MatrixXd tangent_3D;
-        Compute_3D_Tangents(pt1_h, pt2_h, K, K, R21, T21, tangent_3D);
-        Eigen::Vector3d tangent_3D_world = R1.transpose() * tangent_3D;
-
-        tangents_3D.push_back(tangent_3D_world);
-
-        // Print results
-        std::cout << "Point " << i + 1 << ": (" << edge_pt_3D_world(0) << ", " << edge_pt_3D_world(1) << ", " << edge_pt_3D_world(2) << ")" << std::endl;
-        std::cout << "Tangent " << i + 1 << ": (" << tangent_3D_world(0) << ", " << tangent_3D_world(1) << ", " << tangent_3D_world(2) << ")" << std::endl;
-    }
-
-    std::cout << "Triangulation and tangent computation completed for all points." << std::endl;
-}
-
-
 void EdgeSketch_Core::Stack_3D_Edges() {
     
     Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
@@ -1113,26 +1017,7 @@ void EdgeSketch_Core::Stack_3D_Edges() {
         Eigen::Vector3d point_camera = Gamma1s.row(i).transpose();
         Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
         Gamma1s_world.row(i) = point_world.transpose();
-        // const double EPSILON = 1e-5;  // Increase tolerance from 1e-6 to 1e-4
-        // if (std::abs(point_world(0) - 0.456393) < EPSILON &&
-        //     std::abs(point_world(1) - 0.0307521) < EPSILON &&
-        //     std::abs(point_world(2) - 0.346758) < EPSILON) {
-        //     std::cout << "Matched 3D point_word: " << point_world.transpose() << std::endl;
-        //     std::cout << "Corresponding 3D point_camera: " << point_camera.transpose() << std::endl;
-        //     exit(0);
-        // }
     }
-    // Eigen::Matrix3d R_ref = All_R[hyp01_view_indx];
-    // Eigen::Vector3d T_ref = All_T[hyp01_view_indx];
-
-    // Eigen::MatrixXd Gamma1s_world(Gamma1s.rows(), 4);
-    // for (int i = 0; i < Gamma1s.rows(); ++i) {
-    //     Eigen::Vector3d point_camera = Gamma1s.row(i).head<3>().transpose();
-    //     Eigen::Vector3d point_world = util->transformToWorldCoordinates(point_camera, R_ref, T_ref);
-    //     Gamma1s_world.row(i).head<3>() = point_world.transpose();
-    //     Gamma1s_world(i, 3) = Gamma1s(i, 3);
-    // }
-
 
 #if WRITE_3D_EDGES
     std::ofstream myfile2;
@@ -1140,7 +1025,7 @@ void EdgeSketch_Core::Stack_3D_Edges() {
                                     + "_hypo2_" + std::to_string(hyp02_view_indx) + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" \
                                     + std::to_string(Edge_Detection_Final_Thresh) + "_delta" + Delta_FileName_Str + "_theta" + std::to_string(Orien_Thresh) \
                                     + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
-    std::cout << Output_File_Path2 << std::endl;
+    std::cout << "Writing 3D edge locations to: " << Output_File_Path2 << std::endl;
     myfile2.open (Output_File_Path2);
     myfile2 << Gamma1s_world;
     myfile2.close();
@@ -1150,7 +1035,7 @@ void EdgeSketch_Core::Stack_3D_Edges() {
                                        + "_hypo2_" + std::to_string(hyp02_view_indx) + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" \
                                        + std::to_string(Edge_Detection_Final_Thresh) + "_delta" + Delta_FileName_Str + "_theta" + std::to_string(Orien_Thresh) \
                                        + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
-    std::cout << "Writing 3D tangents to: " << tangents_output_path << std::endl;
+    std::cout << "Writing 3D edge tangents to: " << tangents_output_path << std::endl;
     tangents_file.open(tangents_output_path);
     tangents_file << tangent3Ds;
     tangents_file.close();
@@ -1174,8 +1059,6 @@ void EdgeSketch_Core::Stack_3D_Edges() {
 
 }
 
-
-
 void EdgeSketch_Core::Project_3D_Edges_and_Find_Next_Hypothesis_Views() {
 
     //> First read all edges with the final-run threshold (TODO: is this step necessary?)
@@ -1187,28 +1070,6 @@ void EdgeSketch_Core::Project_3D_Edges_and_Find_Next_Hypothesis_Views() {
 
         //> Project the 3D edges to each view indexed by i
         Eigen::MatrixXd projectedEdges = project3DEdgesToView(all_3D_Edges, All_R[i], All_T[i], K, All_R[hyp01_view_indx], All_T[hyp01_view_indx]);
-        // if (i == 7){
-        //     std::cout<<"R is: "<<All_R[i]<<std::endl;
-        //     std::cout<<"T is: "<<All_T[i]<<std::endl;
-        // }
-
-        // //> Save to file if this is one of the target views
-        // if (i == 47 || i == 42 || i == 7 || i == 9) {
-        //     std::string filename = "../../outputs/projected_edges_view_" +
-        //                            std::to_string(i) +
-        //                            "_hyp" + std::to_string(hyp01_view_indx) +
-        //                            "_" + std::to_string(hyp02_view_indx) + ".txt";
-        //     std::ofstream outFile(filename);
-        //     if (outFile.is_open()) {
-        //         for (int j = 0; j < projectedEdges.rows(); ++j) {
-        //             outFile << projectedEdges(j, 0) << " " << projectedEdges(j, 1) << "\n";
-        //         }
-        //         outFile.close();
-        //         std::cout << "Projected edges saved for view " << i << "\n";
-        //     } else {
-        //         std::cerr << "Could not open file to write projected edges for view " << i << "\n";
-        //     }
-        // }
 
         //> Claim the projected edges by the observed edges
         int num_of_claimed_edges = claim_Projected_Edges(projectedEdges, All_Edgels[i], Reproj_Dist_Thresh);
@@ -1347,39 +1208,6 @@ void EdgeSketch_Core::Clear_Data() {
 }
 
 EdgeSketch_Core::~EdgeSketch_Core() { }
-
-
-void EdgeSketch_Core::Compute_3D_Tangents(
-    const Eigen::MatrixXd& pt_edge_view1,
-    const Eigen::MatrixXd& pt_edge_view2,
-    const Eigen::Matrix3d& K1,
-    const Eigen::Matrix3d& K2,
-    const Eigen::Matrix3d& R21,
-    const Eigen::Vector3d& T21,
-    Eigen::MatrixXd& tangents_3D)
-{
-    tangents_3D.resize(1, 3);
-
-    Eigen::Vector3d e1  = {1,0,0};
-    Eigen::Vector3d e3  = {0,0,1};
-
-    // Normalize edge points
-    Eigen::Vector3d Gamma1 = K1.inverse() * Eigen::Vector3d(pt_edge_view1(0), pt_edge_view1(1), 1.0);
-    Eigen::Vector3d Gamma2 = K2.inverse() * Eigen::Vector3d(pt_edge_view2(0), pt_edge_view2(1), 1.0);
-
-    Eigen::Vector3d tgt1(cos(pt_edge_view1(2)), sin(pt_edge_view1(2)), 0.0);
-    Eigen::Vector3d tgt2(cos(pt_edge_view2(2)), sin(pt_edge_view2(2)), 0.0);
-    Eigen::Vector3d tgt1_meters = K1.inverse() * tgt1;
-    Eigen::Vector3d tgt2_meters = K2.inverse() * tgt2;
-
-    double rho1 = (double(e1.transpose() * T21) - double(e3.transpose() * T21) * double(e1.transpose() *Gamma2))/(double(e3.transpose() * R21 * Gamma1)* double(e1.transpose() * Gamma2) - double(e1.transpose() * R21 * Gamma1));
-
-    Eigen::Vector3d n1 = tgt1_meters.cross(Gamma1);
-    Eigen::Vector3d n2 = R21.transpose() * tgt2_meters.cross(Gamma2);
-
-    Eigen::Vector3d T3D = n1.cross(n2) / (n1.cross(n2) ).norm();
-    tangents_3D = T3D;
-}
 
 
 

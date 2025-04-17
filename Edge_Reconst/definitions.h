@@ -1,7 +1,11 @@
 //> Macros
 
+//> Whether to delete output files automatically
+#define OUTPUT_FOLDER_NAME              std::string("../../outputs")
+#define DELETE_ALL_FILES_UNDER_OUTPUTS  (true)
+
 //> Write to the files
-#define WRITE_3D_EDGES                (true)
+#define WRITE_3D_EDGES                 (true)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS     (false)

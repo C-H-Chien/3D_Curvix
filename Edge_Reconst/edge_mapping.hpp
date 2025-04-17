@@ -158,13 +158,19 @@ public:
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
     build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map);
     
-    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                   HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    // std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+    //                HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    // computeGraphEdgeDistanceAndAngleStats(
+    // std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+    //                    HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+    // double lambda1, double lambda2);
 
-    computeGraphEdgeDistanceAndAngleStats(
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
-    double lambda1, double lambda2);
+                       HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    pruneEdgeGraph_by_3DProximityAndOrientation(
+        std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                           HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+        double lambda1, double lambda2);
 
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
@@ -187,6 +193,8 @@ public:
 
 private:
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
+
+    void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
 
 };
 

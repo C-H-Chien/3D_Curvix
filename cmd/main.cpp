@@ -50,6 +50,15 @@ using namespace MultiviewGeometryUtil;
 
 int main(int argc, char **argv) {
 
+#if DELETE_ALL_FILES_UNDER_OUTPUTS
+  std::string command = "rm -f " + OUTPUT_FOLDER_NAME + "/*";
+  if (system(command.c_str()) == 0) {
+      std::cout << "Files under ../../outputs/ are removed successfully." << std::endl;
+  } else {
+      std::cerr << "Error removing files under ../../outputs/" << std::endl;
+  }
+#endif
+
   //> YAML file path
   std::string Edge_Sketch_Settings_Path = "../../3D_Edge_Sketch_Settings.yaml";
 
