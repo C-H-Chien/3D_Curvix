@@ -1,4 +1,5 @@
 # 3D Edge Sketch and Grouping
+This is a heavily under-developed on-going research by LEMS Lab at Brown University.
 
 ## Dependencies:
 (1) CMake 3.14 or higher <br />
@@ -21,7 +22,10 @@ and also manually add the YAML library to ``LD_LIBRARY_PATH``:
 ```bash
 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/XXX/bin/lib64/
 ```
-where ``XX`` is the installed prefix path of your YAML-CPP.
+where ``XXX`` is the installed prefix path of your YAML-CPP.
+
+## Outputs
+Some intermidiate data when running the code will be saved to files which are stored in a ``outputs/`` folder. All files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
 
 ## Contributors:
 Qiwu Zhang (qiwu_zhang@brown.edu) <br />
