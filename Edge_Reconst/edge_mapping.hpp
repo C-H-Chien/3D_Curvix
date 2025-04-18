@@ -9,6 +9,7 @@
 #include <numeric>
 #include <memory>
 
+#include "util.hpp"
 
 // Hash function for Eigen::Vector3d to use in unordered_map
 struct HashEigenVector3d {
@@ -21,14 +22,14 @@ struct HashEigenVector3d {
     }
 };
 
-// Hash function for Eigen::Vector2d to use in unordered_map
-struct HashEigenVector2d {
-    std::size_t operator()(const Eigen::Vector2d& vec) const {
-        std::size_t h1 = std::hash<double>()(vec(0));
-        std::size_t h2 = std::hash<double>()(vec(1));
-        return h1 ^ (h2 << 1); // Combine hashes
-    }
-};
+// // Hash function for Eigen::Vector2d to use in unordered_map
+// struct HashEigenVector2d {
+//     std::size_t operator()(const Eigen::Vector2d& vec) const {
+//         std::size_t h1 = std::hash<double>()(vec(0));
+//         std::size_t h2 = std::hash<double>()(vec(1));
+//         return h1 ^ (h2 << 1); // Combine hashes
+//     }
+// };
 
 
 struct FuzzyVector3dEqual {
@@ -99,8 +100,9 @@ public:
     //////////////////////////// mapping 2D edge to 3D ////////////////////////////
 
     struct EdgeNode {
-        Eigen::Vector3d value;
-        std::vector<std::pair<EdgeNode*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>> neighbors;
+        Eigen::Vector3d location;  
+        Eigen::Vector3d orientation; 
+        std::vector<EdgeNode*> neighbors;
     };
 
 
@@ -148,20 +150,26 @@ public:
     void printFirst10Edges();
     // void write_edge_linking_to_file();
 
-    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d>& all_R,const std::vector<Eigen::Vector3d>& all_T,int Num_Of_Total_Imgs);
+    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
+    
     std::unordered_map<Eigen::Vector3d, std::vector<SupportingEdgeData>, HashEigenVector3d> edge_3D_to_supporting_edges;
-    std::unordered_map<int, std::unordered_map<Eigen::Vector2d, std::vector<Eigen::Vector3d>, HashEigenVector2d>> frame_to_edge_to_3D_map;
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
     build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map);
     
-    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                   HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    // std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+    //                HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    // computeGraphEdgeDistanceAndAngleStats(
+    // std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+    //                    HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+    // double lambda1, double lambda2);
 
-    computeGraphEdgeDistanceAndAngleStats(
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
-    double lambda1, double lambda2);
+                       HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    pruneEdgeGraph_by_3DProximityAndOrientation(
+        std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                           HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+        double lambda1, double lambda2);
 
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
@@ -169,6 +177,22 @@ public:
                                 HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
 
     void smooth3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations);
+
+    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                   HashEigenVector3dPair, FuzzyVector3dPairEqual>
+    pruneEdgeGraphbyProjections(
+    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+    const std::vector<Eigen::Matrix3d> All_R,
+    const std::vector<Eigen::Vector3d> All_T,
+    const Eigen::Matrix3d K,
+    const int Num_Of_Total_Imgs
+    );
+
+private:
+    std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
+
+    void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
 
 };
 

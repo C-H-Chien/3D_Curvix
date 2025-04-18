@@ -50,6 +50,15 @@ using namespace MultiviewGeometryUtil;
 
 int main(int argc, char **argv) {
 
+#if DELETE_ALL_FILES_UNDER_OUTPUTS
+  std::string command = "rm -f " + OUTPUT_FOLDER_NAME + "/*";
+  if (system(command.c_str()) == 0) {
+      std::cout << "Files under ../../outputs/ are removed successfully." << std::endl;
+  } else {
+      std::cerr << "Error removing files under ../../outputs/" << std::endl;
+  }
+#endif
+
   //> YAML file path
   std::string Edge_Sketch_Settings_Path = "../../3D_Edge_Sketch_Settings.yaml";
 
@@ -133,7 +142,7 @@ int main(int argc, char **argv) {
   // edgeMapping->printFirst10Edges();
   std::cout << "====================================================================" << std::endl;
 
-  std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.Num_Of_Total_Imgs);
+  std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
   std::string outputFilePath = "../../outputs/grouped_mvt.txt";
   std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
   NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);

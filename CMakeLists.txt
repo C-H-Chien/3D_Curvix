@@ -130,3 +130,4 @@ TEST_BIG_ENDIAN(MY_BIG_ENDIAN)
 add_subdirectory( Edge_Reconst )
 # commands / executables
 add_subdirectory(cmd)
+add_subdirectory(test)

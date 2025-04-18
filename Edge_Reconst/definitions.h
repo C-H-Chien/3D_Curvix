@@ -1,7 +1,11 @@
 //> Macros
 
+//> Whether to delete output files automatically
+#define OUTPUT_FOLDER_NAME              std::string("../../outputs")
+#define DELETE_ALL_FILES_UNDER_OUTPUTS  (true)
+
 //> Write to the files
-#define WRITE_3D_EDGES                (true)
+#define WRITE_3D_EDGES                 (true)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS     (false)
@@ -21,6 +25,7 @@
 #define LOG_TIMEIMGS(time_msg)          printf("\033[1;35m[TIME] %s\033[0m\n", std::string(time_msg).c_str() );
 #define LOG_FILE_ERROR(err_msg)         printf("\033[1;31m[ERROR] File %s not found!\033[0m\n", std::string(err_msg).c_str() );
 #define LOG_ERROR(err_msg)              printf("\033[1;31m[ERROR] %s\033[0m", std::string(err_msg).c_str() );
+#define LOG_WARNING(warn_msg)           printf("\033[1;31m[WARNING] %s\033[0m", std::string(warn_msg).c_str() );
 #define LOG_DATA_LOAD_ERROR(err_msg)    printf("\033[1;31m[DATA LOAD ERROR] %s not loaded successfully!\033[0m\n", std::string(err_msg).c_str() );
 
 //> MVT definitions

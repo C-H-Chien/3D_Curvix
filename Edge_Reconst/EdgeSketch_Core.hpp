@@ -55,15 +55,7 @@ public:
     void Clear_Data();
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
-    void Compute_3D_Tangents(const Eigen::MatrixXd& pt_edge_view1,
-    const Eigen::MatrixXd& pt_edge_view2,
-    const Eigen::Matrix3d& K1,
-    const Eigen::Matrix3d& K2,
-    const Eigen::Matrix3d& R21,
-    const Eigen::Vector3d& T21,
-    Eigen::MatrixXd& tangents_3D);
 
-    void test_3D_tangent();
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);

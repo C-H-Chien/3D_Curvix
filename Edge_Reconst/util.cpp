@@ -65,6 +65,90 @@ namespace MultiviewGeometryUtil {
         return R_2 * (C1 - C2); 
     }
 
+    //> Projecting a 3D tangent vector located in the world coordinate to the image
+    Eigen::Vector3d multiview_geometry_util::project_3DTangent_to_Image(Eigen::Matrix3d Rot, Eigen::Matrix3d K, Eigen::Vector3d Tangent_3D_world, Eigen::Vector3d Point_Location_in_Pixels) {
+        
+        Eigen::Vector3d point_in_meters = K.inverse() * Point_Location_in_Pixels;
+
+        // e3     = [0;0;1];
+        // T1 = R1*pick_scene_tangent(:,:,n)';
+        // t1 = T1 - (e3' * T1)*gamma1;
+        // t1 = t1 ./ norm(t1);
+
+        Eigen::Vector3d Tangent_3D_cam = Rot * Tangent_3D_world;
+        Eigen::Vector3d tangent_2D   = Tangent_3D_cam - Tangent_3D_cam(2) * point_in_meters;
+        tangent_2D.normalize();
+        return tangent_2D;
+    }
+
+    Eigen::Vector3d multiview_geometry_util::findClosestVectorFromPointToLine(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2) {
+        //> ------^-------- P1 ------------
+        //        |
+        //        | 
+        //        |
+        //        P2
+        double a = (P2 - P1).dot(d1);
+        Eigen::Vector3d closest_point_on_line = P1 + a * d1;
+        return closest_point_on_line - P2;
+    }
+
+    Eigen::Vector3d multiview_geometry_util::get3DTangentFromTwo2Dtangents( 
+        const Eigen::MatrixXd pt_edge_view1, const Eigen::MatrixXd pt_edge_view2,
+        const Eigen::Matrix3d K1,  const Eigen::Matrix3d K2,
+        const Eigen::Matrix3d R1,  const Eigen::Vector3d T1,
+        const Eigen::Matrix3d R2,  const Eigen::Vector3d T2 )
+    {
+        Eigen::Matrix3d R21, R12;
+        Eigen::Vector3d T21, T12;
+
+        getRelativePoses(R1, T1, R2, T2, R21, T21, R12, T12);
+
+        Eigen::Vector3d e1  = {1,0,0};
+        Eigen::Vector3d e3  = {0,0,1};
+        Eigen::Vector3d Gamma1 = K1.inverse() * Eigen::Vector3d(pt_edge_view1(0), pt_edge_view1(1), 1.0);
+        Eigen::Vector3d Gamma2 = K2.inverse() * Eigen::Vector3d(pt_edge_view2(0), pt_edge_view2(1), 1.0);
+
+        Eigen::Vector3d tgt1(cos(pt_edge_view1(2)), sin(pt_edge_view1(2)), 0.0);
+        Eigen::Vector3d tgt2(cos(pt_edge_view2(2)), sin(pt_edge_view2(2)), 0.0);
+        Eigen::Vector3d tgt1_meters = K1.inverse() * tgt1;
+        Eigen::Vector3d tgt2_meters = K2.inverse() * tgt2;
+
+        // double rho1 = (double(e1.transpose() * T21) - double(e3.transpose() * T21) * double(e1.transpose() *Gamma2))/(double(e3.transpose() * R21 * Gamma1)* double(e1.transpose() * Gamma2) - double(e1.transpose() * R21 * Gamma1));
+
+        Eigen::Vector3d n1 = tgt1_meters.cross(Gamma1);
+        Eigen::Vector3d n2 = R21.transpose() * tgt2_meters.cross(Gamma2);
+
+        //> This 3D tangent is in the first camera coordinate
+        Eigen::Vector3d T3D = n1.cross(n2) / (n1.cross(n2) ).norm();
+
+        //> Convert the 3D tangent from the first camera coordinate to the world coordinate
+        Eigen::Vector3d tangents_3D_world = R1.transpose() * T3D;
+
+        return tangents_3D_world;
+    }
+
+    Eigen::Vector3d multiview_geometry_util::getNormalizedProjectedPoint(Eigen::Vector3d proj_point) {
+        proj_point(0) /= proj_point(2);
+        proj_point(1) /= proj_point(2);
+        proj_point(2) = 1.0;
+        return proj_point;
+    }
+
+    Eigen::Matrix3d multiview_geometry_util::getRodriguesRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2) {
+
+        //> make sure that the input vectors are unit-vectors
+        v1 /= v1.norm();
+        v2 /= v2.norm();
+
+        Eigen::Vector3d v1_cross_v2 = v1.cross(v2);
+        double s = v1_cross_v2.norm();
+        double c = v1.dot(v2);
+        double coeff = 1.0 / (1.0 + c);
+        Eigen::Matrix3d v_x = getSkewSymmetric(v1_cross_v2);
+        Eigen::Matrix3d R = Eigen::Matrix3d::Identity() + v_x + coeff * v_x * v_x;
+        return R;
+    }
+
     Eigen::Vector3d multiview_geometry_util::linearTriangulation(
         const int N,
         const std::vector<Eigen::Vector2d> pts, 
