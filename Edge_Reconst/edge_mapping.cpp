@@ -140,8 +140,7 @@ std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
                    HashEigenVector3dPair, FuzzyVector3dPairEqual>
 EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
-    double lambda1, double lambda2)
+                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph )
 {
     //> write the 3D edge graph before pruning
     write_edge_graph( graph, "3D_edge_graph" );
@@ -219,7 +218,7 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(
         access_index++;
         edge_link_counter++;
 
-        if ((proximity_diff < mu1 + sigma1*lambda1 && angle_diff < mu2 + sigma2*lambda2) || weight > 1) {
+        if ((proximity_diff < mu1 + sigma1*PRUNE_3D_EDGE_GRAPH_LAMBDA1 && angle_diff < mu2 + sigma2*PRUNE_3D_EDGE_GRAPH_LAMBDA2) || weight > 1) {
             pruned_graph[pair]++;
         }
     }
@@ -251,11 +250,16 @@ EdgeMapping::pruneEdgeGraphbyProjections(
 
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 
+    // std::cout << "Begin of edge graph pruning by projections ..." << std::endl;
+
     for (const auto& [pair, weight] : graph) {
 
         //> Find the locations and tangents of the 3D edge pair
         const Eigen::Vector3d& Edge3D_1_Location = pair.first;
         const Eigen::Vector3d& Edge3D_2_Location = pair.second;
+
+        // if (fabs(Edge3D_2_Location(0) - 0.517675) < 0.0001 && fabs(Edge3D_2_Location(1) - 0.267291) < 0.0001 && fabs(Edge3D_2_Location(2) - 0.351295) < 0.0001 && \
+        //     fabs(Edge3D_1_Location(0) - 0.489324) < 0.0001 && fabs(Edge3D_1_Location(1) - 0.24528) < 0.0001 && fabs(Edge3D_1_Location(2) - 0.295694) < 0.0001) {
 
         auto it1 = edge_3D_to_supporting_edges.find(Edge3D_1_Location);
         auto it2 = edge_3D_to_supporting_edges.find(Edge3D_2_Location);
@@ -267,8 +271,7 @@ EdgeMapping::pruneEdgeGraphbyProjections(
         Eigen::Vector3d unit_Tangent3D_2 = it2->second.front().tangents_3D_world.normalized();
 
         bool prune_flag = false;
-        double Orientation_Diff_Thresh = 30; //> in degrees
-        double ore_diff_threshold = cos(double(Orientation_Diff_Thresh)/180*PI);
+        double ore_diff_threshold = cos(double(PRUNE_BY_PROJ_ORIE_THRESH)/180*PI);
         
         //> Project to all views 
         for (unsigned vi = 0; vi < Num_Of_Total_Imgs; vi++) {
@@ -279,13 +282,21 @@ EdgeMapping::pruneEdgeGraphbyProjections(
             proj_edge_1_location = util->getNormalizedProjectedPoint( proj_edge_1_location );
             proj_edge_2_location = util->getNormalizedProjectedPoint( proj_edge_2_location );
 
+            // std::cout << "[Image #" << vi << "] ";
+            // std::cout << "Projected locations: (" << proj_edge_1_location(0) << ", " << proj_edge_1_location(1) << ", " << proj_edge_1_location(2) << "), (" \
+            //           << proj_edge_2_location(0) << ", " << proj_edge_2_location(1) << ", " << proj_edge_2_location(2) << ")" << ", norm = " << (proj_edge_1_location - proj_edge_2_location).norm() << " ";
+
             //> Project 3D tangent to the 2D image
             Eigen::Vector3d proj_tangent_1 = util->project_3DTangent_to_Image(All_R[vi], K, unit_Tangent3D_1, proj_edge_1_location);
             Eigen::Vector3d proj_tangent_2 = util->project_3DTangent_to_Image(All_R[vi], K, unit_Tangent3D_2, proj_edge_2_location);
 
             //> Rule out if the distance between the projected 3D edge points are over a threshold
             //> TODO: make the threhold as a Macro
-            prune_flag = ((proj_edge_1_location - proj_edge_2_location).norm() > 3) ? (true) : (false);
+            prune_flag = ((proj_edge_1_location - proj_edge_2_location).norm() > PRUNE_BY_PROJ_PROX_THRESH) ? (true) : (false);
+            if (prune_flag) break;
+
+            // std::cout << "Projected tangents: (" << proj_tangent_1(0) << ", " << proj_tangent_1(1) << ", " << proj_tangent_1(2) << "), (" \
+            //           << proj_tangent_2(0) << ", " << proj_tangent_2(1) << ", " << proj_tangent_2(2) << ")" << std::endl;
 
             //> Rule out if the orientation difference is over a threshold
             //> TODO: make the threhold as a Macro
@@ -295,13 +306,16 @@ EdgeMapping::pruneEdgeGraphbyProjections(
             if (prune_flag) break;
         }
 
+        // std::cout << "prune_flag = " << prune_flag << std::endl;
+
         if (!prune_flag) 
             pruned_graph_by_proj[pair]++;
+        // }
     }
 
     //> write the 3D edge graph after pruning by projection
     write_edge_graph( pruned_graph_by_proj, "3D_edge_pruned_graph_by_proj" );
-
+    // return graph;
     return pruned_graph_by_proj;
 }
 
@@ -452,9 +466,9 @@ EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
 
     //pruning
     // auto pruned_graph = computeGraphEdgeDistanceAndAngleStats(graph, 0, 0);
-    auto pruned_graph = pruneEdgeGraph_by_3DProximityAndOrientation(graph, 0.5, 0.5);
+    auto pruned_graph = pruneEdgeGraph_by_3DProximityAndOrientation( graph );
 
-    // auto pruned_graph_by_projection = pruneEdgeGraphbyProjections(pruned_graph, all_R, all_T, K, Num_Of_Total_Imgs);
+    auto pruned_graph_by_projection = pruneEdgeGraphbyProjections(pruned_graph, all_R, all_T, K, Num_Of_Total_Imgs);
 
     // crate 3d -> its neighbor data structure
     auto neighbor_map = buildEdgeNodeGraph(pruned_graph);

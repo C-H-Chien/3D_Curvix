@@ -168,8 +168,7 @@ public:
                        HashEigenVector3dPair, FuzzyVector3dPairEqual>
     pruneEdgeGraph_by_3DProximityAndOrientation(
         std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                           HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
-        double lambda1, double lambda2);
+                           HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph );
 
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
