@@ -134,6 +134,21 @@ namespace MultiviewGeometryUtil {
         return proj_point;
     }
 
+    Eigen::Vector3d multiview_geometry_util::getAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2) {
+        Eigen::Matrix3d R_align_v1_to_v2 = getRodriguesRotationMatrix(v1, v2);
+        Eigen::Vector3d eulerAnglesXYZ = R_align_v1_to_v2.eulerAngles(0, 1, 2);
+        eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
+        if (eulerAnglesXYZ(0) < -90 || eulerAnglesXYZ(0) > 90 || eulerAnglesXYZ(1) < -90 || eulerAnglesXYZ(1) > 90 || eulerAnglesXYZ(2) < -90 || eulerAnglesXYZ(2) > 90) {
+            Eigen::Matrix3d R_align_v2_to_v1 = getRodriguesRotationMatrix(v2, v1);
+            eulerAnglesXYZ = R_align_v2_to_v1.eulerAngles(0, 1, 2);
+            eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
+            eulerAnglesXYZ *= -1;
+            return eulerAnglesXYZ;
+        }
+        else
+            return eulerAnglesXYZ;
+    }
+
     Eigen::Matrix3d multiview_geometry_util::getRodriguesRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2) {
 
         //> make sure that the input vectors are unit-vectors
@@ -147,6 +162,19 @@ namespace MultiviewGeometryUtil {
         Eigen::Matrix3d v_x = getSkewSymmetric(v1_cross_v2);
         Eigen::Matrix3d R = Eigen::Matrix3d::Identity() + v_x + coeff * v_x * v_x;
         return R;
+    }
+
+    Eigen::Matrix3d multiview_geometry_util::euler_to_rotation_matrix(double roll, double pitch, double yaw) {
+        //> Create rotation matrices for each axis
+        Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+        Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+        Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+    
+        //> Combine the rotations 
+        Eigen::Quaterniond q = yawAngle * pitchAngle * rollAngle;
+        
+        //> Convert to rotation matrix
+        return q.toRotationMatrix();
     }
 
     Eigen::Vector3d multiview_geometry_util::linearTriangulation(

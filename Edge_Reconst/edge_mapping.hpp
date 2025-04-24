@@ -149,6 +149,8 @@ public:
 
     void printFirst10Edges();
     // void write_edge_linking_to_file();
+    using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
+
 
     std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
     
@@ -156,21 +158,15 @@ public:
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
     build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map);
-    
-    // std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-    //                HashEigenVector3dPair, FuzzyVector3dPairEqual>
-    // computeGraphEdgeDistanceAndAngleStats(
-    // std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-    //                    HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
-    // double lambda1, double lambda2);
+    EdgeNodeList createEdgeNodesFromEdges(const std::vector<Eigen::Vector3d>& locations, const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
+    EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file, 
+                                                                const std::string& tangents_file, 
+                                                                const std::string& connections_file);
 
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
                        HashEigenVector3dPair, FuzzyVector3dPairEqual>
-    pruneEdgeGraph_by_3DProximityAndOrientation(
-        std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+    pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
                            HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph );
-
-    using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
     EdgeNodeList buildEdgeNodeGraph(const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
                                 HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);

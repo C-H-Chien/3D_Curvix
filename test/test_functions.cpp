@@ -5,9 +5,219 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/SVD>
+#include <memory>
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
+
+//> Select the test
+#define TEST_EDGE_ALIGNMENT         (true)
+#define TANGENT_COORD_TRANSFORM     (false)
+#define ALIGN_VEC_BY_RODRIGUE       (false)
+#define TEST_KABSCH_ALGORITHM       (false)
+#define TANGENT_PROJECTION          (false)
+
+struct EdgeNode {
+    Eigen::Vector3d location;  
+    Eigen::Vector3d orientation; 
+    std::vector<EdgeNode*> neighbors;
+};
+
+using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
+
+///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
+void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size) {
+
+    std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
+    util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+
+    std::ofstream before_out("../../outputs/test_3D_edges_before_smoothing.txt");
+
+    for (size_t i = 0; i < edge_nodes.size(); ++i) {
+        const auto& node = edge_nodes[i];
+        std::cout << node->location.transpose() << "; ";
+        before_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
+    }
+    std::cout << "\n";
+    before_out.close();
+    std::ofstream after_out("../../outputs/test_3D_edges_after_smoothing.txt");
+    std::cout << "Start aligning edges..." << std::endl;
+
+    for (int iter = 0; iter < iterations; ++iter) {
+        std::vector<Eigen::Vector3d> new_locations(edge_nodes.size());
+        std::vector<Eigen::Vector3d> new_orientations(edge_nodes.size());
+
+        for (size_t i = 0; i < edge_nodes.size(); ++i) {
+            const auto& node = edge_nodes[i];
+            if (node->neighbors.empty()) {
+                new_locations[i] = node->location;
+                new_orientations[i] = node->orientation;
+                continue;
+            }
+
+            // if (i == 0) std::cout << "First point tangential force: " << std::endl;
+            // unsigned neighbor_count = 0;
+
+            Eigen::Vector3d sum_force = Eigen::Vector3d::Zero();
+            for (const auto& neighbor : node->neighbors) {
+                const Eigen::Vector3d& p = neighbor->location;
+                const Eigen::Vector3d& t_neighbor = neighbor->orientation;
+                const Eigen::Vector3d& B = node->location;
+
+                Eigen::Vector3d tangential_dist = util->findClosestVectorFromPointToLine(p, t_neighbor, B);
+                sum_force += tangential_dist;
+
+                // if (i == 0) {
+                //     std::cout << "neighbor " << neighbor_count << ": " << tangential_dist.transpose() << std::endl;
+                //     neighbor_count++;
+                // }
+            }
+            sum_force /= static_cast<double>(node->neighbors.size());
+            
+            new_locations[i] = node->location + step_size * sum_force;
+
+            //> Orientation aligning
+            Eigen::Vector3d sum_tangent = Eigen::Vector3d::Zero();
+            Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
+            for (const auto& neighbor : node->neighbors) {
+                Eigen::Vector3d euler_angles = util->getAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
+                
+                sum_euler_angles += euler_angles;
+                // sum_tangent += neighbor->orientation - node->orientation;
+            }
+            // sum_tangent /= static_cast<double>(node->neighbors.size());
+            // sum_tangent /= sum_tangent.norm();
+
+            sum_euler_angles /= static_cast<double>(node->neighbors.size());
+            sum_euler_angles *= step_size;
+            // std::cout << "sum_euler_angles = " << sum_euler_angles.transpose() << std::endl;
+
+            //> convert from degrees to radians
+            sum_euler_angles = sum_euler_angles * M_PI / 180.0;
+            Eigen::Matrix3d R_align = util->euler_to_rotation_matrix(sum_euler_angles(0), sum_euler_angles(1), sum_euler_angles(2));
+            new_orientations[i] = R_align * node->orientation;
+
+            // std::cout << "R_align:" << std::endl << R_align << std::endl;
+            
+            // new_orientations[i] = node->orientation + 0.1 * sum_tangent;
+            //std::cout<<"iteration: "<<iter<<": orientation force is: "<<sum_tangent.transpose()<<std::endl;
+        }
+
+        //> Update all edge locations and orientations
+        for (size_t i = 0; i < edge_nodes.size(); ++i) {
+            edge_nodes[i]->location = new_locations[i];
+            edge_nodes[i]->orientation = new_orientations[i];
+            const auto& node = edge_nodes[i];
+
+            // std::cout << node->location.transpose()<< "; ";
+            //std::cout << node->orientation.transpose() << ";";
+
+            // if(iter == iterations-1){
+                after_out << node->location.transpose() << " " << node->orientation.transpose() << "\n";
+                // if (target_indices.count(i)){
+                //     //std::cout << node->location.transpose()<<" "<<node->orientation.transpose()<< "; "<<std::endl;
+                // }
+            // }
+        }
+        // std::cout << "\n";
+    }
+
+    after_out.close();
+    std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(iterations) + " iterations with step size " + std::to_string(step_size); 
+    LOG_GEN_MESG(msg);
+}
+
+EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file, 
+    const std::string& tangents_file, 
+    const std::string& connections_file) 
+{
+    // Initialize the EdgeNodeList and a map to store nodes by index for easy referencing
+    EdgeNodeList node_list;
+    std::vector<EdgeNode*> node_ptrs;
+
+    // Read line points file
+    std::ifstream points_infile(points_file);
+    if (!points_infile.is_open()) {
+        std::cerr << "Failed to open file: " << points_file << std::endl;
+        return node_list;
+    }
+
+    // Read line tangents file
+    std::ifstream tangents_infile(tangents_file);
+    if (!tangents_infile.is_open()) {
+        std::cerr << "Failed to open file: " << tangents_file << std::endl;
+        return node_list;
+    }
+
+    // Create nodes with their locations and orientations
+    double x, y, z;
+    size_t index = 0;
+
+    while (points_infile >> x >> y >> z) {
+        Eigen::Vector3d location(x, y, z);
+
+        // Read tangent
+        double tx, ty, tz;
+        if (!(tangents_infile >> tx >> ty >> tz)) {
+        std::cerr << "Error: Mismatch between points and tangents files at index " << index << std::endl;
+        return node_list;
+        }
+        Eigen::Vector3d tangent(tx, ty, tz);
+
+        std::unique_ptr<EdgeNode> node(new EdgeNode());
+        node->location = location;
+        node->orientation = tangent.normalized();
+
+        node_ptrs.push_back(node.get());
+
+        node_list.push_back(std::move(node));
+        index++;
+    }
+
+    points_infile.close();
+    tangents_infile.close();
+
+    // Read connections file and establish neighbor relationships
+    std::ifstream connections_infile(connections_file);
+    if (!connections_infile.is_open()) {
+        std::cerr << "Failed to open file: " << connections_file << std::endl;
+        return node_list;
+    }
+
+    std::string line;
+    index = 0;
+
+    while (std::getline(connections_infile, line)) {
+        if (index >= node_ptrs.size()) {
+            std::cerr << "Error: More connection lines than nodes at index " << index << std::endl;
+            break;
+        }
+
+        EdgeNode* current_node = node_ptrs[index];
+
+        // Parse the line to get neighbor indices
+        std::istringstream iss(line);
+        int neighbor_index;
+
+        while (iss >> neighbor_index) {
+            // Skip the current node's own index
+            if (neighbor_index != index && neighbor_index >= 0 && neighbor_index < node_ptrs.size()) {
+                // Add neighbor to current node
+                current_node->neighbors.push_back(node_ptrs[neighbor_index]);
+            }
+        }
+        index++;
+    }
+
+    connections_infile.close();
+
+    // Print node list information
+    std::cout << std::endl;
+    LOG_GEN_MESG("[NODE LIST SUMMARY]");
+    std::cout << "Total nodes: " << node_list.size() << std::endl;
+    std::cout << "Created " << node_list.size() << " edge nodes with connections from files." << std::endl;
+    return node_list;
+}
 
 Eigen::Matrix3d getSkewSymmetric(Eigen::Vector3d T) {
     Eigen::Matrix3d T_x = (Eigen::Matrix3d() << 0.,  -T(2),   T(1), T(2),  0.,  -T(0), -T(1),  T(0),   0.).finished();
@@ -61,8 +271,37 @@ void Compute_3D_Tangents(
     tangents_3D = T3D;
 }
 
+Eigen::Matrix3d euler_to_rotation_matrix(double roll, double pitch, double yaw) {
+    //> Create rotation matrices for each axis
+    Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+    Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+    Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+
+    //> Combine the rotations 
+    Eigen::Quaterniond q = yawAngle * pitchAngle * rollAngle;
+    
+    //> Convert to rotation matrix
+    return q.toRotationMatrix();
+}
+
 int main(int argc, char **argv) {
 
+#if TEST_EDGE_ALIGNMENT
+    //> [TEST]
+    /////////// Create EdgeNodes from input files ///////////
+    std::string points_file = "../../files/line_noisy_points.txt";
+    std::string tangents_file = "../../files/line_noisy_tangents.txt";
+    std::string connections_file = "../../files/line_connections.txt";
+    
+    EdgeNodeList edge_node = createEdgeNodesFromFiles(points_file, tangents_file, connections_file);
+
+    int num_iteration = 1000;
+    double step_size = 0.1;
+    align3DEdgesUsingEdgeNodes(edge_node, num_iteration, step_size); //call it align
+#endif
+
+//> ---------------------------------------
+#if TANGENT_COORD_TRANSFORM
     //> [TEST] 3D tangents
     // Given Rotation and Translation Matrices
     MultiviewGeometryUtil::multiview_geometry_util util;
@@ -124,20 +363,43 @@ int main(int argc, char **argv) {
         std::cout << "Point " << i + 1 << ": (" << edge_pt_3D_world(0) << ", " << edge_pt_3D_world(1) << ", " << edge_pt_3D_world(2) << ")" << std::endl;
         std::cout << "Tangent " << i + 1 << ": (" << tangent_3D_world(0) << ", " << tangent_3D_world(1) << ", " << tangent_3D_world(2) << ")" << std::endl;
     }
-
     std::cout << "----------------------------------------------------------------------" << std::endl;
+#endif
 
-    //> [TEST] Verify the correctness of the aligning two unit vectors in 3D by Rodrigue's formula
-    Eigen::Vector3d v1(0.700390490817757, 0.114407726497277, 0.704531072763853);
-    Eigen::Vector3d v2(0.714979548359578, 0.362563357150639, 0.597789308602281);
+#if ALIGN_VEC_BY_RODRIGUE
+    std::cout << "[TEST] Verify the correctness of the aligning two unit vectors in 3D by Rodrigues' formula" << std::endl;
+    Eigen::Vector3d v1(0.0838570596738639,	0.941037461651904,	0.327744548864806);
+    Eigen::Vector3d v2(0.0245471150744476,	0.969469975008114,	0.243978291450876);
     Eigen::Matrix3d R_align_v1_to_v2 = getRodriguesRotationMatrix(v1, v2);
+    Eigen::Matrix3d R_align_v2_to_v1 = getRodriguesRotationMatrix(v2, v1);
+    // Eigen::Quaterniond q = Eigen::Quaterniond::FromTwoVectors(v1, v2);
+    // Eigen::Matrix3d R_align_v1_to_v2 = q.toRotationMatrix();
+
+
     Eigen::Vector3d aligned_v2 = R_align_v1_to_v2 * v1;
-    std::cout << aligned_v2 << std::endl;
+    std::cout << aligned_v2.transpose() << std::endl;
     Eigen::Vector3d eulerAnglesXYZ = R_align_v1_to_v2.eulerAngles(0, 1, 2);
-    std::cout << "Euler angles:" << std::endl << eulerAnglesXYZ << std::endl;
+    eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
+    std::cout << "Euler angles (in degrees):" << std::endl << eulerAnglesXYZ.transpose() << std::endl;
+
+    eulerAnglesXYZ = R_align_v2_to_v1.eulerAngles(0, 1, 2);
+    eulerAnglesXYZ *= -1;
+    Eigen::Matrix3d R_test = euler_to_rotation_matrix(eulerAnglesXYZ(0), eulerAnglesXYZ(1), eulerAnglesXYZ(2));
+    eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
+    std::cout << "Euler angles (in degrees):" << std::endl << eulerAnglesXYZ.transpose() << std::endl;
+    
+
+    // R_align_v1_to_v2 = R_align_v2_to_v1.transpose();
+    aligned_v2 = R_test * v1;
+    std::cout << aligned_v2.transpose() << std::endl;
+    eulerAnglesXYZ = R_test.eulerAngles(0, 1, 2);
+    eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
+    std::cout << "Euler angles (in degrees):" << std::endl << eulerAnglesXYZ.transpose() << std::endl;
 
     std::cout << "----------------------------------------------------------------------" << std::endl;
+#endif
 
+#if TANGENT_PROJECTION
     //> [TEST] Verify the correctness of projecting a 3D unit tangent vector (in world coordinate) to a 2D image
     Eigen::Vector3d Tangent_3D_w(-0.604940217207650, 0.119991911797586, 0.787178045112998);
     Eigen::Matrix3d Rot;
@@ -156,6 +418,6 @@ int main(int argc, char **argv) {
     Eigen::Vector3d tangent_2D   = Tangent_3D_c - Tangent_3D_c(2) * point_in_meters;
     tangent_2D.normalize();
     std::cout << "projected tangent is (" << tangent_2D(0) << ", " << tangent_2D(1) << ", " << tangent_2D(2) << ")" << std::endl;
-
+#endif
     return 0;
 }
