@@ -42,6 +42,8 @@ namespace MultiviewGeometryUtil {
         Eigen::Vector3d getNormalizedProjectedPoint(Eigen::Vector3d proj_point);
         Eigen::Matrix3d getRodriguesRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2);
         Eigen::Matrix3d euler_to_rotation_matrix(double roll, double pitch, double yaw);
+        Eigen::Vector3d getShortestAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2);
+        bool b_angles_are_large_degrees(Eigen::Vector3d euler_angles);
         Eigen::Vector3d getAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2);
 
         Eigen::Vector3d findClosestVectorFromPointToLine(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2);

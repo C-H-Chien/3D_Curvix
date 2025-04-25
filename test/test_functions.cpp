@@ -14,7 +14,6 @@
 #define TEST_EDGE_ALIGNMENT         (true)
 #define TANGENT_COORD_TRANSFORM     (false)
 #define ALIGN_VEC_BY_RODRIGUE       (false)
-#define TEST_KABSCH_ALGORITHM       (false)
 #define TANGENT_PROJECTION          (false)
 
 struct EdgeNode {
@@ -26,7 +25,7 @@ struct EdgeNode {
 using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
 ///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
-void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size) {
+void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double location_step_size, double orientation_step_size) {
 
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
@@ -55,52 +54,35 @@ void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double
                 continue;
             }
 
-            // if (i == 0) std::cout << "First point tangential force: " << std::endl;
-            // unsigned neighbor_count = 0;
-
+            //> Force on the edge location orthogonal to neighbor's tangential direction
             Eigen::Vector3d sum_force = Eigen::Vector3d::Zero();
             for (const auto& neighbor : node->neighbors) {
                 const Eigen::Vector3d& p = neighbor->location;
                 const Eigen::Vector3d& t_neighbor = neighbor->orientation;
                 const Eigen::Vector3d& B = node->location;
 
-                Eigen::Vector3d tangential_dist = util->findClosestVectorFromPointToLine(p, t_neighbor, B);
-                sum_force += tangential_dist;
-
-                // if (i == 0) {
-                //     std::cout << "neighbor " << neighbor_count << ": " << tangential_dist.transpose() << std::endl;
-                //     neighbor_count++;
-                // }
+                Eigen::Vector3d tangential_direction = util->findClosestVectorFromPointToLine(p, t_neighbor, B);
+                sum_force += tangential_direction;
             }
             sum_force /= static_cast<double>(node->neighbors.size());
-            
-            new_locations[i] = node->location + step_size * sum_force;
+            new_locations[i] = node->location + location_step_size * sum_force;
 
-            //> Orientation aligning
+            //> Alining the orientation by Rodrigues' formula but with careful check on geometric lock
             Eigen::Vector3d sum_tangent = Eigen::Vector3d::Zero();
             Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
             for (const auto& neighbor : node->neighbors) {
-                Eigen::Vector3d euler_angles = util->getAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
-                
+                //> the returned euler angles are in degrees
+                Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
                 sum_euler_angles += euler_angles;
-                // sum_tangent += neighbor->orientation - node->orientation;
             }
-            // sum_tangent /= static_cast<double>(node->neighbors.size());
-            // sum_tangent /= sum_tangent.norm();
-
             sum_euler_angles /= static_cast<double>(node->neighbors.size());
-            sum_euler_angles *= step_size;
+            sum_euler_angles *= orientation_step_size;
             // std::cout << "sum_euler_angles = " << sum_euler_angles.transpose() << std::endl;
 
-            //> convert from degrees to radians
+            //> Convert from degrees to radians
             sum_euler_angles = sum_euler_angles * M_PI / 180.0;
             Eigen::Matrix3d R_align = util->euler_to_rotation_matrix(sum_euler_angles(0), sum_euler_angles(1), sum_euler_angles(2));
             new_orientations[i] = R_align * node->orientation;
-
-            // std::cout << "R_align:" << std::endl << R_align << std::endl;
-            
-            // new_orientations[i] = node->orientation + 0.1 * sum_tangent;
-            //std::cout<<"iteration: "<<iter<<": orientation force is: "<<sum_tangent.transpose()<<std::endl;
         }
 
         //> Update all edge locations and orientations
@@ -123,7 +105,9 @@ void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double
     }
 
     after_out.close();
-    std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(iterations) + " iterations with step size " + std::to_string(step_size); 
+    std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(iterations) \
+                    + " iterations with location step size " + std::to_string(location_step_size) \
+                    + " and orientation step size " + std::to_string(orientation_step_size); 
     LOG_GEN_MESG(msg);
 }
 
@@ -295,9 +279,10 @@ int main(int argc, char **argv) {
     
     EdgeNodeList edge_node = createEdgeNodesFromFiles(points_file, tangents_file, connections_file);
 
-    int num_iteration = 1000;
-    double step_size = 0.1;
-    align3DEdgesUsingEdgeNodes(edge_node, num_iteration, step_size); //call it align
+    int num_iteration = 50;
+    double location_step_size = 0.1;
+    double orientation_step_size = 0.02;
+    align3DEdgesUsingEdgeNodes(edge_node, num_iteration, location_step_size, orientation_step_size); //call it align
 #endif
 
 //> ---------------------------------------

@@ -134,19 +134,45 @@ namespace MultiviewGeometryUtil {
         return proj_point;
     }
 
+    // MARK: get shortest aligne
+    Eigen::Vector3d multiview_geometry_util::getShortestAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2) {
+
+        //> first check if v1 and v2 are in opposite directions
+        Eigen::Vector3d eulerAnglesXYZ_v1_to_v2 = getAlignEulerAnglesDegrees(v1, v2);
+        Eigen::Vector3d eulerAnglesXYZ_v2_to_v1 = getAlignEulerAnglesDegrees(v2, v1);
+
+        if ( b_angles_are_large_degrees(eulerAnglesXYZ_v1_to_v2) && b_angles_are_large_degrees(eulerAnglesXYZ_v2_to_v1) ) {
+            Eigen::Vector3d v2_rev = -v2;
+            Eigen::Vector3d eulerAnglesXYZ_v1_to_v2_rev = getAlignEulerAnglesDegrees(v1, v2_rev);
+            //> check if the rotation gives the minimal path to align two vectors
+            if ( b_angles_are_large_degrees(eulerAnglesXYZ_v1_to_v2_rev) ) {
+                Eigen::Vector3d eulerAnglesXYZ_v2_rev_to_v1 = getAlignEulerAnglesDegrees(v2_rev, v1);
+                eulerAnglesXYZ_v2_rev_to_v1 *= -1;
+                return eulerAnglesXYZ_v2_rev_to_v1;
+            }
+            else
+                return eulerAnglesXYZ_v1_to_v2_rev;
+        }
+        else {
+            //> check if the rotation gives the minimal path to align two vectors
+            if ( b_angles_are_large_degrees(eulerAnglesXYZ_v1_to_v2) ) {
+                eulerAnglesXYZ_v2_to_v1 *= -1;
+                return eulerAnglesXYZ_v2_to_v1;
+            }
+            else
+                return eulerAnglesXYZ_v1_to_v2;
+        }
+    }
+
+    bool multiview_geometry_util::b_angles_are_large_degrees(Eigen::Vector3d euler_angles) {
+        return (euler_angles(0) < -90 || euler_angles(0) > 90 || euler_angles(1) < -90 || euler_angles(1) > 90 || euler_angles(2) < -90 || euler_angles(2) > 90);
+    }
+
     Eigen::Vector3d multiview_geometry_util::getAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2) {
         Eigen::Matrix3d R_align_v1_to_v2 = getRodriguesRotationMatrix(v1, v2);
-        Eigen::Vector3d eulerAnglesXYZ = R_align_v1_to_v2.eulerAngles(0, 1, 2);
-        eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
-        if (eulerAnglesXYZ(0) < -90 || eulerAnglesXYZ(0) > 90 || eulerAnglesXYZ(1) < -90 || eulerAnglesXYZ(1) > 90 || eulerAnglesXYZ(2) < -90 || eulerAnglesXYZ(2) > 90) {
-            Eigen::Matrix3d R_align_v2_to_v1 = getRodriguesRotationMatrix(v2, v1);
-            eulerAnglesXYZ = R_align_v2_to_v1.eulerAngles(0, 1, 2);
-            eulerAnglesXYZ = eulerAnglesXYZ * (180.0 / M_PI);
-            eulerAnglesXYZ *= -1;
-            return eulerAnglesXYZ;
-        }
-        else
-            return eulerAnglesXYZ;
+        Eigen::Vector3d eulerAnglesXYZ_v1_to_v2 = R_align_v1_to_v2.eulerAngles(0, 1, 2);
+        eulerAnglesXYZ_v1_to_v2 = eulerAnglesXYZ_v1_to_v2 * (180.0 / M_PI);
+        return eulerAnglesXYZ_v1_to_v2;
     }
 
     Eigen::Matrix3d multiview_geometry_util::getRodriguesRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2) {
