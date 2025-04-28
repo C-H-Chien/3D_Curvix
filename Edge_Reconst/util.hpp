@@ -47,6 +47,8 @@ namespace MultiviewGeometryUtil {
         Eigen::Vector3d getAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2);
 
         Eigen::Vector3d findClosestVectorFromPointToLine(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2);
+        double getLineVariable(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2);
+        bool checkOrientationConsistency(Eigen::Vector3d source_tangent, Eigen::Vector3d target_tangent);
         
         Eigen::Vector3d linearTriangulation(int N, const std::vector<Eigen::Vector2d> pts,  \
                                                    const std::vector<Eigen::Matrix3d> & Rs, \

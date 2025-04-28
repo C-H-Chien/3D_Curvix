@@ -6,12 +6,14 @@
 #include <Eigen/Dense>
 #include <Eigen/SVD>
 #include <memory>
+#include <cmath>
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
 
 //> Select the test
 #define TEST_EDGE_ALIGNMENT         (true)
+#define TEST_CONNECTIVITY_GRAPH     (true)  //> TEST_EDGE_ALIGNMENT has to be true to activate this test
 #define TANGENT_COORD_TRANSFORM     (false)
 #define ALIGN_VEC_BY_RODRIGUE       (false)
 #define TANGENT_PROJECTION          (false)
@@ -19,10 +21,125 @@
 struct EdgeNode {
     Eigen::Vector3d location;  
     Eigen::Vector3d orientation; 
-    std::vector<EdgeNode*> neighbors;
+    std::vector<std::pair<int, EdgeNode*>> neighbors;
 };
 
 using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
+
+std::pair<int, int> findConnectedEdges(std::vector<double> proj_neighbor) {
+    if (proj_neighbor.size() < 2) {
+        return {-1, -1}; 
+    }
+
+    int left_index, right_index;
+
+    //> Split into all positive latent variables and all negative latent variables
+    std::vector<double> positive_latent_variables;
+    std::vector<double> negative_latent_variables;
+    for (size_t i = 0; i < proj_neighbor.size(); ++i) {
+        if (proj_neighbor[i] >= 0)
+            positive_latent_variables.push_back(proj_neighbor[i]);
+        else
+            negative_latent_variables.push_back(proj_neighbor[i]);
+    }
+
+    //> Check if there exists a left edge and if so, find the min of positive_latent_variables
+    if (positive_latent_variables.empty()) {
+        left_index = -1;
+    }
+    else {
+        auto min_element_it = std::min_element(positive_latent_variables.begin(), positive_latent_variables.end());
+        double min_val = *min_element_it;
+        auto it = std::find(proj_neighbor.begin(), proj_neighbor.end(), min_val);
+        left_index = std::distance(proj_neighbor.begin(), it);
+    }
+
+    //> Check if there exists a right edge and if so, find the max of negative_latent_variables
+    if (negative_latent_variables.empty()) {
+        right_index = -1;
+    }
+    else {
+        auto max_element_it = std::max_element(negative_latent_variables.begin(), negative_latent_variables.end());
+        double max_val = *max_element_it;
+        auto it = std::find(proj_neighbor.begin(), proj_neighbor.end(), max_val);
+        right_index = std::distance(proj_neighbor.begin(), it);
+    }
+    // std::cout << "left_index = " << left_index << ", right_index = " << right_index << std::endl;
+
+    return {left_index, right_index};
+}
+
+std::vector<std::pair<int, Eigen::Vector3d>> getConnectivityGraph(EdgeNode* node, int& left_index, int& right_index) {
+
+    //>**************************************************************************************************
+    //> Write to the file for testing
+    std::ofstream before_out("../../outputs/test_3D_edges_before_connectivity_graph.txt");
+    before_out << node->location.transpose() << "\t" << node->orientation.transpose() << "\n";
+    for (const auto& neighbor_pair : node->neighbors) {
+        const EdgeNode* neighbor = neighbor_pair.second;
+        before_out << neighbor->location.transpose() << "\t" << neighbor->orientation.transpose() << "\n";
+    }
+    before_out.close();
+    //>**************************************************************************************************
+
+    //> Begin of constructing connectivity graph
+    std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
+    util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+
+    std::vector<std::pair<int, Eigen::Vector3d>> updated_neighbors;
+    std::vector<double> proj_neighbor;
+    for (const auto& neighbor_pair : node->neighbors) {
+        const int neighbor_index = neighbor_pair.first;
+        const EdgeNode* neighbor = neighbor_pair.second;
+
+        //> Check if the neighbor edge should flip its orientation
+        double factor = (util->checkOrientationConsistency(node->orientation, neighbor->orientation)) ? (1) : (-1);
+        updated_neighbors.push_back(std::make_pair(neighbor_index, factor * neighbor->orientation));
+
+        //> Find the latent variable of the line that the node edge is on
+        double line_latent_variable = util->getLineVariable(node->location, node->orientation, neighbor->location);
+        proj_neighbor.push_back(line_latent_variable);
+
+        // std::cout << neighbor->location.transpose() << "\tline_latent_variable = " << line_latent_variable << std::endl;
+    }
+    std::pair<int, int> connected_edge_index = findConnectedEdges( proj_neighbor );
+
+    //>**************************************************************************************************
+    //> Write updated_neighbors to the file for testing
+    std::ofstream after_out("../../outputs/test_3D_edges_after_connectivity_graph.txt");
+    after_out << node->location.transpose() << "\t" << node->orientation.transpose() << "\n";
+    int neighbor_counter = 0;
+    for (const auto& neighbor_pair : node->neighbors) {
+        const EdgeNode* neighbor = neighbor_pair.second;
+        Eigen::Vector3d updated_orientation = updated_neighbors[neighbor_counter].second;
+        after_out << neighbor->location.transpose() << "\t" << updated_orientation.transpose() << "\n";
+        neighbor_counter++;
+    }
+    after_out.close();
+    //>**************************************************************************************************
+
+    if (connected_edge_index.first == -1 && connected_edge_index.second == -1) {
+        LOG_WARNING("No left nor right edges!");
+    }
+    else if (connected_edge_index.first == -1) {
+        LOG_WARNING("No left edge!");
+        std::pair<int, Eigen::Vector3d> right_neighbor = updated_neighbors[connected_edge_index.second];
+        right_index = right_neighbor.first;
+    }
+    else if (connected_edge_index.second == -1) {
+        LOG_WARNING("No right edge!");
+        std::pair<int, Eigen::Vector3d> left_neighbor = updated_neighbors[connected_edge_index.first];
+        left_index = left_neighbor.first;
+    }
+    else {
+        std::pair<int, Eigen::Vector3d> left_neighbor = updated_neighbors[connected_edge_index.first];
+        std::pair<int, Eigen::Vector3d> right_neighbor = updated_neighbors[connected_edge_index.second];
+        left_index = left_neighbor.first;
+        right_index = right_neighbor.first;
+    }
+
+    return updated_neighbors;
+}
 
 ///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
 void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double location_step_size, double orientation_step_size) {
@@ -56,7 +173,8 @@ void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double
 
             //> Force on the edge location orthogonal to neighbor's tangential direction
             Eigen::Vector3d sum_force = Eigen::Vector3d::Zero();
-            for (const auto& neighbor : node->neighbors) {
+            for (const auto& neighbor_pair : node->neighbors) {
+                const EdgeNode* neighbor = neighbor_pair.second;
                 const Eigen::Vector3d& p = neighbor->location;
                 const Eigen::Vector3d& t_neighbor = neighbor->orientation;
                 const Eigen::Vector3d& B = node->location;
@@ -70,7 +188,8 @@ void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double
             //> Alining the orientation by Rodrigues' formula but with careful check on geometric lock
             Eigen::Vector3d sum_tangent = Eigen::Vector3d::Zero();
             Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
-            for (const auto& neighbor : node->neighbors) {
+            for (const auto& neighbor_pair : node->neighbors) {
+                const EdgeNode* neighbor = neighbor_pair.second;
                 //> the returned euler angles are in degrees
                 Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
                 sum_euler_angles += euler_angles;
@@ -186,8 +305,9 @@ EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file,
         while (iss >> neighbor_index) {
             // Skip the current node's own index
             if (neighbor_index != index && neighbor_index >= 0 && neighbor_index < node_ptrs.size()) {
-                // Add neighbor to current node
-                current_node->neighbors.push_back(node_ptrs[neighbor_index]);
+                //> Add neighbor to current node
+                // current_node->neighbors.push_back(node_ptrs[neighbor_index]);
+                current_node->neighbors.push_back(std::make_pair(neighbor_index, node_ptrs[neighbor_index]));
             }
         }
         index++;
@@ -268,6 +388,7 @@ Eigen::Matrix3d euler_to_rotation_matrix(double roll, double pitch, double yaw) 
     return q.toRotationMatrix();
 }
 
+// MARK: MAIN
 int main(int argc, char **argv) {
 
 #if TEST_EDGE_ALIGNMENT
@@ -282,8 +403,66 @@ int main(int argc, char **argv) {
     int num_iteration = 50;
     double location_step_size = 0.1;
     double orientation_step_size = 0.02;
-    align3DEdgesUsingEdgeNodes(edge_node, num_iteration, location_step_size, orientation_step_size); //call it align
+    align3DEdgesUsingEdgeNodes(edge_node, num_iteration, location_step_size, orientation_step_size);
+
+#if TEST_CONNECTIVITY_GRAPH
+    const auto& target_node = edge_node[13];
+    int left_edge_index = -1;
+    int right_edge_index = -1;
+    std::vector<std::pair<int, Eigen::Vector3d>> updated_neighbors;
+    updated_neighbors = getConnectivityGraph(target_node.get(), left_edge_index, right_edge_index);
+
+    //> Update the orientation of the neighbors
+    for (const auto& updated_neighbor_pair : updated_neighbors) {
+        int index = updated_neighbor_pair.first;
+        Eigen::Vector3d updated_orientation = updated_neighbor_pair.second;
+        const auto& node = edge_node[index];
+        node->orientation = updated_orientation;
+    }
+
+    if ( left_edge_index >= 0 && right_edge_index >= 0 ) {
+        //> If both left and right edges exist
+        const auto& left_node = edge_node[left_edge_index];
+        const auto& right_node = edge_node[right_edge_index];
+
+        //>**************************************************************************************************
+        //> Write to the file for testing
+        std::ofstream target_left_right_out("../../outputs/test_3D_edge_left_and_right.txt");
+        target_left_right_out << target_node->location.transpose() << "\t" << target_node->orientation.transpose() << "\n";
+        target_left_right_out << left_node->location.transpose() << "\t" << left_node->orientation.transpose() << "\n";
+        target_left_right_out << right_node->location.transpose() << "\t" << right_node->orientation.transpose() << "\n";
+        target_left_right_out.close();
+        //>**************************************************************************************************
+    }
+    else if ( left_edge_index == -1 && right_edge_index >= 0 ) {
+        //> If only the right edge exists
+        const auto& right_node = edge_node[right_edge_index];
+
+        //>**************************************************************************************************
+        //> Write to the file for testing
+        std::ofstream target_left_right_out("../../outputs/test_3D_edge_left_and_right.txt");
+        target_left_right_out << target_node->location.transpose() << "\t" << target_node->orientation.transpose() << "\n";
+        target_left_right_out << right_node->location.transpose() << "\t" << right_node->orientation.transpose() << "\n";
+        target_left_right_out << right_node->location.transpose() << "\t" << right_node->orientation.transpose() << "\n";
+        target_left_right_out.close();
+        //>**************************************************************************************************
+    }
+    else {
+        //> If only the left edge exists
+        const auto& left_node = edge_node[left_edge_index];
+
+        //>**************************************************************************************************
+        //> Write to the file for testing
+        std::ofstream target_left_right_out("../../outputs/test_3D_edge_left_and_right.txt");
+        target_left_right_out << target_node->location.transpose() << "\t" << target_node->orientation.transpose() << "\n";
+        target_left_right_out << left_node->location.transpose() << "\t" << left_node->orientation.transpose() << "\n";
+        target_left_right_out << left_node->location.transpose() << "\t" << left_node->orientation.transpose() << "\n";
+        target_left_right_out.close();
+        //>**************************************************************************************************
+    }
 #endif
+
+#endif  //> end of TEST_EDGE_ALIGNMENT
 
 //> ---------------------------------------
 #if TANGENT_COORD_TRANSFORM
