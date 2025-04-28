@@ -102,7 +102,7 @@ public:
     struct EdgeNode {
         Eigen::Vector3d location;  
         Eigen::Vector3d orientation; 
-        std::vector<EdgeNode*> neighbors;
+        std::vector<std::pair<int, EdgeNode*>> neighbors;
     };
 
 
@@ -158,10 +158,8 @@ public:
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
     build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map);
-    EdgeNodeList createEdgeNodesFromEdges(const std::vector<Eigen::Vector3d>& locations, const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
-    EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file, 
-                                                                const std::string& tangents_file, 
-                                                                const std::string& connections_file);
+    //EdgeNodeList createEdgeNodesFromEdges(const std::vector<Eigen::Vector3d>& locations, const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
+    //EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file, const std::string& tangents_file, const std::string& connections_file);
 
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
                        HashEigenVector3dPair, FuzzyVector3dPairEqual>
@@ -171,7 +169,7 @@ public:
     EdgeNodeList buildEdgeNodeGraph(const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
                                 HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
 
-    void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size);
+    void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size_force, double step_size_torque);
 
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
                    HashEigenVector3dPair, FuzzyVector3dPairEqual>

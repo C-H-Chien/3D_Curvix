@@ -134,6 +134,15 @@ namespace MultiviewGeometryUtil {
         return proj_point;
     }
 
+    //> MARK: get line latent variable
+    double multiview_geometry_util::getLineVariable(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2) {
+        return (P2 - P1).dot(d1);
+    }
+
+    bool multiview_geometry_util::checkOrientationConsistency(Eigen::Vector3d source_tangent, Eigen::Vector3d target_tangent) {
+        return (fabs(source_tangent.dot(target_tangent) > 0)) ? (true) : (false);
+    }
+
     // MARK: get shortest aligne
     Eigen::Vector3d multiview_geometry_util::getShortestAlignEulerAnglesDegrees(Eigen::Vector3d v1, Eigen::Vector3d v2) {
 

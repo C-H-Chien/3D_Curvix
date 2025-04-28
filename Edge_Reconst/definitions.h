@@ -14,7 +14,7 @@
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (0.5)
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (0.5)
 #define PRUNE_BY_PROJ_PROX_THRESH       (6)     //> in pixels
-#define PRUNE_BY_PROJ_ORIE_THRESH       (20)    //> in degrees
+#define PRUNE_BY_PROJ_ORIE_THRESH       (60)    //> in degrees
 
 //> Debugging purpose
 #define DEBUG                      (0)
@@ -32,7 +32,7 @@
 #define LOG_TIMEIMGS(time_msg)          printf("\033[1;35m[TIME] %s\033[0m\n", std::string(time_msg).c_str() );
 #define LOG_FILE_ERROR(err_msg)         printf("\033[1;31m[ERROR] File %s not found!\033[0m\n", std::string(err_msg).c_str() );
 #define LOG_ERROR(err_msg)              printf("\033[1;31m[ERROR] %s\033[0m", std::string(err_msg).c_str() );
-#define LOG_WARNING(warn_msg)           printf("\033[1;31m[WARNING] %s\033[0m", std::string(warn_msg).c_str() );
+#define LOG_WARNING(warn_msg)           printf("\033[1;35m[WARNING] %s\033[0m\n", std::string(warn_msg).c_str() );
 #define LOG_DATA_LOAD_ERROR(err_msg)    printf("\033[1;31m[DATA LOAD ERROR] %s not loaded successfully!\033[0m\n", std::string(err_msg).c_str() );
 
 //> MVT definitions
