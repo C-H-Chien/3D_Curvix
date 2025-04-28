@@ -27,11 +27,12 @@ where ``XXX`` is the installed prefix path of your YAML-CPP.
 ## Outputs
 Some intermidiate data when running the code will be saved to files which are stored in a ``outputs/`` folder. All files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
 
+## Test
+There is a test file under ``test/`` which is primarily used to test part of the functionalities of the 3D edge sketch and grouping. It is compiled in conjunction with the main code, and the executable file resides uner ``/buid/bin``.
+
 ## Contributors:
 Qiwu Zhang (qiwu_zhang@brown.edu) <br />
 Chiang-Heng Chien (chiang-heng_chien@brown.edu) <br />
 
-## References
-Third-Order Edge Detector: [paper](https://ieeexplore.ieee.org/abstract/document/8382271) and [code](https://github.com/C-H-Chien/Third-Order-Edge-Detector). The code has been embedded to this repository.
 
 
