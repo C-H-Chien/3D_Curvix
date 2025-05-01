@@ -105,9 +105,20 @@ public:
         std::vector<std::pair<int, EdgeNode*>> neighbors;
     };
 
+    struct ConnectivityGraphNode {
+        Eigen::Vector3d location;  
+        Eigen::Vector3d orientation;      
+        std::pair<int, Eigen::Vector3d> left_neighbor;  
+        std::pair<int, Eigen::Vector3d> right_neighbor; 
+    };
+
+    struct Curve {
+        std::vector<int> edge_indices;
+    };
+
 
     using PointerNeighborMap = std::unordered_map<const Eigen::Vector3d*, std::vector<std::pair<const Eigen::Vector3d*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>>;
-
+    using ConnectivityGraph = std::unordered_map<int, ConnectivityGraphNode>;
 
     
     // Custom hash function
@@ -171,16 +182,20 @@ public:
 
     void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size_force, double step_size_torque);
 
-    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                   HashEigenVector3dPair, FuzzyVector3dPairEqual>
-    pruneEdgeGraphbyProjections(
-    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                       HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
-    const std::vector<Eigen::Matrix3d> All_R,
-    const std::vector<Eigen::Vector3d> All_T,
-    const Eigen::Matrix3d K,
-    const int Num_Of_Total_Imgs
-    );
+    ConnectivityGraph createConnectivityGraph(EdgeNodeList& edge_nodes);
+
+    void writeConnectivityGraphToFile(const ConnectivityGraph& graph, const std::string& file_name);
+    std::vector<Curve> buildCurvesFromConnectivityGraph(const ConnectivityGraph& connectivity_graph);
+    void writeCurvesToFile(const std::vector<Curve>& curves, const ConnectivityGraph& connectivity_graph, const std::string& file_name, bool b_write_curve_info);
+    
+    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual> pruneEdgeGraphbyProjections(
+                                                                                                                                                    std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
+                                                                                                                                                    HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph,
+                                                                                                                                                    const std::vector<Eigen::Matrix3d> All_R,
+                                                                                                                                                    const std::vector<Eigen::Vector3d> All_T,
+                                                                                                                                                    const Eigen::Matrix3d K,
+                                                                                                                                                    const int Num_Of_Total_Imgs
+                                                                                                                                                    );
 
 private:
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;

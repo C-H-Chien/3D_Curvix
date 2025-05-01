@@ -304,19 +304,19 @@ void writeTangentFile(const std::string& outputTangentFilePath, const std::vecto
 /////////////////////////////////// 3D RECONSTRUCTION ///////////////////////////////////////////////////////
 
 
-Eigen::MatrixXd mvt(int hyp1, int hyp2) {
+Eigen::MatrixXd mvt(int hyp1, int hyp2, std::string Scene_Name) {
 
     std::string basePath = "../../outputs/";
     std::string filePath = basePath + "paired_edges_final_" + std::to_string(hyp1) + "_" + std::to_string(hyp2) + ".txt";
-    std::string outputFilePath = basePath + "triangulated_3D_edges_ABC-NEF_00000006_hypo1_" + 
+    std::string outputFilePath = basePath + "triangulated_3D_edges_ABC-NEF_" + Scene_Name + "_hypo1_" + 
                                 std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
-                                "_t1to1_delta03_theta15.000000_N4.txt";
-    std::string points3DFile = basePath + "3D_edges_ABC-NEF_00000006_hypo1_" + 
+                                "_t4to4_delta03_theta15.000000_N4.txt";
+    std::string points3DFile = basePath + "3D_edges_ABC-NEF_" + Scene_Name + "_hypo1_" + 
                             std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
-                            "_t1to1_delta03_theta15.000000_N4.txt";
-    std::string tangentFilePath = basePath + "3D_tangents_ABC-NEF_00000006_hypo1_" + 
+                            "_t4to4_delta03_theta15.000000_N4.txt";
+    std::string tangentFilePath = basePath + "3D_tangents_ABC-NEF_" + Scene_Name + "_hypo1_" + 
                             std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
-                            "_t1to1_delta03_theta15.000000_N4.txt";
+                            "_t4to4_delta03_theta15.000000_N4.txt";
     std::string outputTangentFilePath = "../../outputs/updated_tangents.txt"; 
     std::vector<Eigen::Vector3d> points3D;
 

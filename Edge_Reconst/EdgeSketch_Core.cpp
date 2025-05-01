@@ -260,69 +260,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 clusters.push_back(kv.second);
             }
 
-
-            // // // ========== Sanity Check for Cluster Validity ==========
-            // for (size_t i = 0; i < clusters.size(); ++i) {
-            //     const auto& cluster_i = clusters[i];
-
-            //     // Intra-cluster distance check (> 1 pixel)
-            //     for (size_t m = 0; m < cluster_i.size(); ++m) {
-            //         for (size_t n = m + 1; n < cluster_i.size(); ++n) {
-            //             double dist = (Edges_HYPO2_final.row(cluster_i[m]).head<2>() - 
-            //                         Edges_HYPO2_final.row(cluster_i[n]).head<2>()).norm();
-            //             if (dist > 2.0) {
-            //                 std::cout << "Cluster " << i << " has intra-cluster distance > 2 pixel\n";
-            //                 for (int idx : cluster_i) {
-            //                     std::cout << "  Edge at (" << Edges_HYPO2_final(idx, 0) << ", " 
-            //                             << Edges_HYPO2_final(idx, 1) << ")\n";
-            //                 }
-            //                 exit(0);
-            //             }
-            //         }
-            //     }
-
-            //     // Inter-cluster distance check (< 2 pixels)
-            //     for (size_t j = i + 1; j < clusters.size(); ++j) {
-            //         const auto& cluster_j = clusters[j];
-            //         for (int idx_i : cluster_i) {
-            //             for (int idx_j : cluster_j) {
-            //                 double dist = (Edges_HYPO2_final.row(idx_i).head<2>() - 
-            //                             Edges_HYPO2_final.row(idx_j).head<2>()).norm();
-            //                 if (dist < 3.0) {
-            //                     std::cout << "Clusters " << i << " and " << j << " have inter-cluster distance < 2 pixels\n";
-            //                     std::cout << "  Cluster " << i << ":\n";
-            //                     for (int idx : cluster_i) {
-            //                         std::cout << "    (" << Edges_HYPO2_final(idx, 0) << ", " 
-            //                                 << Edges_HYPO2_final(idx, 1) << ")\n";
-            //                     }
-            //                     std::cout << "  Cluster " << j << ":\n";
-            //                     for (int idx : cluster_j) {
-            //                         std::cout << "    (" << Edges_HYPO2_final(idx, 0) << ", " 
-            //                                 << Edges_HYPO2_final(idx, 1) << ")\n";
-            //                     }
-            //                     exit(0);
-            //                 }
-            //             }
-            //         }
-            //     }
-            //}
-            // ========== End Sanity Check ==========
-
-
-            // if (std::abs(Edges_HYPO1(H1_edge_idx, 0) - 488.52) < 0.01 && std::abs(Edges_HYPO1(H1_edge_idx, 1) - 447.611) < 0.01) {
-            //     std::cout << "Clusters for edge H1 index " << H1_edge_idx << ":\n";
-            //     int cluster_id = 0;
-            //     for (const auto& cluster : clusters) {
-            //         std::cout << "  Cluster " << cluster_id++ << ":\n";
-            //         for (int idx : cluster) {
-            //             double x = Edges_HYPO2_final(idx, 0);
-            //             double y = Edges_HYPO2_final(idx, 1);
-            //             std::cout << "    Edge at (" << x << ", " << y << ")\n";
-            //         }
-            //     }
-            // }
-
-
             // averaging each cluster
             HYPO2_idx.resize(N, 1);
             for (const auto& cluster : clusters) {
@@ -1041,7 +978,7 @@ void EdgeSketch_Core::Stack_3D_Edges() {
     tangents_file.close();
 #endif
 
-    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt(hyp01_view_indx, hyp02_view_indx);
+    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt(hyp01_view_indx, hyp02_view_indx, Scene_Name);
 
     //> Concatenate reconstructed 3D edges
     if (all_3D_Edges.rows() == 0) {

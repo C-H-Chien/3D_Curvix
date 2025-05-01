@@ -6,81 +6,76 @@ clear;
 clc;
 close all;
 
+%> Dataset
+dataset_name = "ABC-NEF";
+
 %> Define the folder path containing the 3D edge output files
 data_folder_name = 'outputs';
 data_folder_path = fullfile(fileparts(mfilename('fullpath')), '..', data_folder_name);
 
 %> Specify the common pattern in the file names
-file_pattern = "grouped_mvt.txt";
-tangent_file_pattern = "grouped_mvt_tangent.txt";
+file_pattern = "3D_edges_" + dataset_name + "_*.txt";
+
 %> Get all files matching the pattern
 edge_files = dir(fullfile(data_folder_path, file_pattern));
-tangent_file = fullfile(data_folder_path, tangent_file_pattern);
+
 %> Define a set of colors to be used for different files through 'lines' colormap
 colors = lines(length(edge_files)); 
 
-% Create a figure for plotting
+%> Create a figure for plotting
 figure;
+ax = axes();
 hold on;
 
-%> Scalar for tangent vectors
-mag = 0.0025; 
-
 %> Loop through each file and plot its edges in 3D
+hLegs = [];
 for i = 1:length(edge_files)
-    %> Read the current 3D edge file
+    %> Read the current file
     current_file_path = fullfile(data_folder_path, edge_files(i).name);
     edges_file_read = fopen(current_file_path, 'r');
     disp(current_file_path);
-    
-    %> Read the corresponding tangent file
-    if ~exist(tangent_file, 'file')
-        disp(['Tangent file not found for: ', tangent_file]);
-        continue;
-    end
-    tangent_file_read = fopen(tangent_file, 'r');
-    disp(['Reading tangents: ', tangent_file]);
-    tangent_data = textscan(tangent_file_read, '%f\t%f\t%f', 'CollectOutput', true);
-    tangents_3d = double(tangent_data{1, 1});
-    fclose(tangent_file_read);
 
     %> parse 3D edge data
     ldata = textscan(edges_file_read, '%f\t%f\t%f', 'CollectOutput', true);
     edges_3d = double(ldata{1,1});
     fclose(edges_file_read);
-    
+
     %> Get the legend
     hypothesis_view1_index = extractBetween(edge_files(i).name, 'hypo1_', '_hypo2');
     hypothesis_view2_index = extractBetween(edge_files(i).name, 'hypo2_', '_t');
     show_legend = strcat("3D edges from hypothesis views ", hypothesis_view1_index, " and ", hypothesis_view2_index);
 
-    %> Plot the edges using a different color for each file
-    % plot3(edges_3d(:,1), edges_3d(:,2), edges_3d(:,3), ...
-    %       'Color', colors(i, :), 'Marker', '.', 'LineStyle', 'none', ...
-    %       'LineWidth', 0.1, 'MarkerSize', 3, 'DisplayName', show_legend);
-    disp("Using plot3: ");
-    plot3(edges_3d(:,1), edges_3d(:,2), edges_3d(:,3), '.', 'LineWidth', 0.1, 'MarkerSize', 3);
-    
-    % for j = 1:size(edges_3d, 1)
-    %     P = edges_3d(j, :)'; % Current edge point
-    %     T_v = tangents_3d(j, :)'; % Corresponding tangent vector
-    % 
-    %     % Plot tangent vector as a line originating from the point, no legend
-    %     line([P(1) + mag*T_v(1), P(1) - mag*T_v(1)], ...
-    %          [P(2) + mag*T_v(2), P(2) - mag*T_v(2)], ...
-    %          [P(3) + mag*T_v(3), P(3) - mag*T_v(3)], ...
-    %          'Color', 'k', 'LineWidth', 0.5, 'HandleVisibility', 'off'); % Exclude from legend
+    %> (Optional) remove 3D edges that are too "isolated" in the 3D space
+    % invalid_edge_index = [];
+    % for ei = 1:size(edges_3d, 1)
+    %     dist_norms = vecnorm(edges_3d(ei,:) - edges_3d, 2, 2);
+    %     yy = find(dist_norms < 0.04);
+    %     if length(yy) < 4
+    %         invalid_edge_index = [invalid_edge_index; ei];
+    %     end
     % end
-    view(3); % Set 3D perspective
+    % edges_3d(invalid_edge_index, :) = [];
 
+    %> Plot the edges using a different color for each file
+    h = plot3(edges_3d(:,1), edges_3d(:,2), edges_3d(:,3), ...
+             'Color', colors(i, :), 'Marker', '.', 'MarkerSize', 3.5, 'LineStyle', 'none', ...
+             'DisplayName', show_legend);
 
+    %> Make marker size larger in the legend. This would make visualization clearer especially when multiple passes of hypothesis views are used for 3D edge sketch.
+    hLeg = copyobj(h, ax);
+    set(hLeg, 'XData', NaN, 'YData', NaN, 'ZData', NaN, 'MarkerSize', 20);
+    hLegs = [hLegs, hLeg];
 end
 
 %> Set the plot settings
 axis equal;
 axis off;
 set(gcf, 'color', 'w');
+
+%> Avoid 3D edge points vanish when zomming in
 ax = gca;
 ax.Clipping = "off";
 
+%> Add a legend for each file
+legend(hLegs);
 hold off;
