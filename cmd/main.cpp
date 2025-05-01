@@ -99,7 +99,8 @@ int main(int argc, char **argv) {
     MWV_Edge_Rec.Set_Hypothesis_Views_Camera();
 
     //> Multiple edge thresholding
-    for (int edge_thresh = MWV_Edge_Rec.Edge_Detection_Init_Thresh; edge_thresh >= 1; edge_thresh/=2) {
+    for (int edge_thresh = MWV_Edge_Rec.Edge_Detection_Init_Thresh; edge_thresh >= MWV_Edge_Rec.Edge_Detection_Final_Thresh; edge_thresh/=2) {
+
       std::cout << "- Edge Threshold = " << edge_thresh << std::endl;
       MWV_Edge_Rec.thresh_EDG = edge_thresh;
 
@@ -143,10 +144,10 @@ int main(int argc, char **argv) {
   std::cout << "====================================================================" << std::endl;
 
   std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
-  std::string outputFilePath = "../../outputs/grouped_mvt.txt";
-  std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
-  NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);
-  std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
+  // std::string outputFilePath = "../../outputs/grouped_mvt.txt";
+  // std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
+  // NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);
+  // std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
 
   //////////////////// Merge edges ////////////////////
 
