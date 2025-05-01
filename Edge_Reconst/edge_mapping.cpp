@@ -736,8 +736,7 @@ void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves,
                         << node.orientation.x() << " " << node.orientation.y() << " " << node.orientation.z() << "\n";
             }
             else {
-                outfile << node.location.x() << " " << node.location.y() << " " << node.location.z() << " "
-                        << node.orientation.x() << " " << node.orientation.y() << " " << node.orientation.z() << "\n";
+                outfile << node.location.x() << " " << node.location.y() << " " << node.location.z() << "\n";
             }
         }
         
