@@ -978,7 +978,7 @@ void EdgeSketch_Core::Stack_3D_Edges() {
     tangents_file.close();
 #endif
 
-    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt(hyp01_view_indx, hyp02_view_indx, Scene_Name);
+    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt(hyp01_view_indx, hyp02_view_indx, Scene_Name, Edge_Detection_Init_Thresh, Edge_Detection_Final_Thresh);
 
     //> Concatenate reconstructed 3D edges
     if (all_3D_Edges.rows() == 0) {
