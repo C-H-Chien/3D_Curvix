@@ -180,7 +180,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--GT_dir",
         type=str,
-        default="evaluation/gt_curve_points/",
+        default="/gpfs/data/bkimia/Datasets/ABC-NEF/gt_curve_points/",
         help="Directory for the GT 3D curve points",
     )
     parser.add_argument("--output_name", type=str, default="outputs", help="output folder name")

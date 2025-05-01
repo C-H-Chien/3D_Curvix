@@ -28,7 +28,7 @@ where ``XXX`` is the installed prefix path of your YAML-CPP.
 Some intermidiate data when running the code will be saved to files which are stored in a ``outputs/`` folder. All files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
 
 ## Evaluations
-A evaluation script is customized and created under ``evaluation`` folder. For ABC-NEF dataset, you can download the ground-truth sampled curve points from [Google Drive](). It is encouraged to launch a conda environment before running the evaluation script. Follow the commands below to install:
+A evaluation script is customized and created under ``evaluation`` folder. For ABC-NEF dataset, you can download the ground-truth sampled curve points from [Google Drive](https://drive.google.com/drive/folders/1FH8_jykq44YA4FGJ6Par4gBMZg7Ayp1q?usp=sharing). It is encouraged to launch a conda environment before running the evaluation script. Follow the commands below to install:
 ```bash
 conda create -n edge_sketch python=3.8
 conda activate edge_sketch
