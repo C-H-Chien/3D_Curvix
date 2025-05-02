@@ -10,6 +10,7 @@ file_reader::file_reader( std::string dataset_path, std::string dataset_name, st
   dataset_name_sequence_path = dataset_path + dataset_name + "/" + scene_name;
 
   Edge_File_Path_First_Half = dataset_name_sequence_path + "/Edges/Edge_";
+  Curvelet_File_Path_First_Half = dataset_name_sequence_path + "/curvelets/Curvelets_";
   Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/R_matrix.txt";
   Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/T_matrix.txt";
   Kmatrix_File_Path = dataset_name_sequence_path + "/RnT/K_matrix.txt";
@@ -62,6 +63,38 @@ Eigen::MatrixXd file_reader::read_Edgels_Of_a_File( int file_idx, int thresh_EDG
   }
   Edge_File.close();
   return Edgels;
+}
+
+//> Read all edge curvelets
+void file_reader::read_All_Curvelets( std::vector<EdgeCurvelet> &All_Curvelets, int thresh_EDG ) {
+  int file_idx = 0;
+  All_Curvelets.clear();
+
+  //> Looping over all frames and read corresponding edgels
+  while( file_idx < Dataset_Total_Num_Of_Images ) 
+  {
+    std::string Curvelet_File_Path = Curvelet_File_Path_First_Half + std::to_string(file_idx) + "_t" + std::to_string(thresh_EDG) + ".txt";
+    std::fstream Curvelet_File;
+    Curvelet_File.open(Curvelet_File_Path, std::ios_base::in);
+    if (!Curvelet_File) {
+      LOG_FILE_ERROR(Curvelet_File_Path); 
+      exit(1);
+    }
+    else {
+      int rd_data_anchor, rd_data_chain1, rd_data_chain2;
+      while (Curvelet_File >> rd_data_anchor >> rd_data_chain1 >> rd_data_chain2 ) {
+        EdgeCurvelet curvelet;
+        curvelet.image_number = file_idx;
+        curvelet.self_edge_index = rd_data_anchor;
+        curvelet.neighbor_edge_index = rd_data_chain1;
+        All_Curvelets.push_back(curvelet);
+      }
+    }
+    file_idx++;    
+  }
+#if SHOW_DATA_LOADING_INFO
+  std::cout << "All edge curvelets are loaded successfully" << std::endl;
+#endif
 }
 
 //> Read rotation matrices of all cameras

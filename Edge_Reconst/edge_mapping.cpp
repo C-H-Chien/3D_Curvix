@@ -25,13 +25,14 @@ void EdgeMapping::add3DToSupportingEdgesMapping(const Eigen::Vector3d &edge_3D,
                                                 const Eigen::Vector2d &supporting_edge, 
                                                 const Eigen::Vector3d &supporting_edge_uncorrected, 
                                                 int image_number, 
+                                                int edge_idx,
                                                 const Eigen::Matrix3d &rotation,
                                                 const Eigen::Vector3d &translation
                                                 ) {
     if (edge_3D_to_supporting_edges.find(edge_3D) == edge_3D_to_supporting_edges.end()) {
         edge_3D_to_supporting_edges[edge_3D] = {};
     }
-    edge_3D_to_supporting_edges[edge_3D].push_back({supporting_edge, supporting_edge_uncorrected, image_number, rotation, translation, tangents_3D_world});
+    edge_3D_to_supporting_edges[edge_3D].push_back({supporting_edge, supporting_edge_uncorrected, image_number, edge_idx, rotation, translation, tangents_3D_world});
 }
 
 ///////////////////////// convert 3d->2d relationship to 2d uncorrect -> 3d /////////////////////////
@@ -44,7 +45,7 @@ EdgeMapping::map_Uncorrected2DEdge_To_SupportingData() {
 
     for (const auto& [edge_3D, support_list] : edge_3D_to_supporting_edges) {
 
-        bool is_target = false;
+        // bool is_target = false;
         // if (edge_3D.isApprox(target_edge1, 1e-6) || edge_3D.isApprox(target_edge2, 1e-6)) {
         //     is_target = true;
         //     std::cout << "Found target 3D edge: (" << edge_3D.x() << ", " << edge_3D.y() << ", " << edge_3D.z() << ")" << std::endl;
@@ -55,6 +56,7 @@ EdgeMapping::map_Uncorrected2DEdge_To_SupportingData() {
             Uncorrected2DEdgeKey key{
                 data.edge_uncorrected,
                 data.image_number,
+                data.edge_idx,
                 data.rotation,
                 data.translation
             };
@@ -88,7 +90,8 @@ EdgeMapping::map_Uncorrected2DEdge_To_SupportingData() {
 
 ///////////////////////// Create the 3D edge weight graph /////////////////////////
 std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
-EdgeMapping::build3DEdgeWeightedGraph(const std::unordered_map<EdgeMapping::Uncorrected2DEdgeKey, std::vector<EdgeMapping::Uncorrected2DEdgeMappingData>, EdgeMapping::HashUncorrected2DEdgeKey>& uncorrected_map) {
+EdgeMapping::build3DEdgeWeightedGraph(const std::unordered_map<EdgeMapping::Uncorrected2DEdgeKey, std::vector<EdgeMapping::Uncorrected2DEdgeMappingData>, EdgeMapping::HashUncorrected2DEdgeKey>& uncorrected_map,
+                                      const std::vector<Eigen::MatrixXd> All_Edgels) {
 
     std::unordered_map<
     std::pair<Eigen::Vector3d, Eigen::Vector3d>,
@@ -99,6 +102,16 @@ EdgeMapping::build3DEdgeWeightedGraph(const std::unordered_map<EdgeMapping::Unco
 
 
     for (const auto& [key, records] : uncorrected_map) {
+
+        // for i in image
+            // for j in image.edges
+                // Uncorrected2DEdgeKey key{
+                //         data.edge_uncorrected,
+                //         data.image_number,
+                //         data.edge_idx,
+                //         data.rotation,
+                //         data.translation
+                //     };
         int size = records.size();
         if (size < 2) continue;
 
@@ -156,20 +169,17 @@ T clamp(T v, T lo, T hi) {
     return std::max(lo, std::min(v, hi));
 }
 
-std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
-                   HashEigenVector3dPair, FuzzyVector3dPairEqual>
+std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
 EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph ){
     //> write the 3D edge graph before pruning
     write_edge_graph( graph, "3D_edge_graph" );
 
     std::vector<double> distances;
+    std::vector<double> tangential_distances;
     std::vector<double> angles;
     std::vector<int> edge_link_indx;
     std::vector<int> invalid_link_indx;
-    std::unordered_map< std::pair<Eigen::Vector3d, Eigen::Vector3d>,
-                        int, 
-                        HashEigenVector3dPair,
-                        FuzzyVector3dPairEqual> pruned_graph;
+    std::unordered_map< std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual> pruned_graph;
 
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 
@@ -193,9 +203,14 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std:
         angles.push_back( std::acos(fabs(t1.dot(t2)))*180/PI );
 
         //> compute the distance between the two
-        //> (here I find the tangential distance rather than the Euclidean distance)
+        //> (here I find the normal distance rather than the Euclidean distance)
         Eigen::Vector3d closest_point = util->findClosestVectorFromPointToLine(p2, t2, p1);
         distances.push_back( closest_point.norm() );
+        
+        //tangential distance
+        Eigen::Vector3d projected_p2 = p2 + closest_point;
+        tangential_distances.push_back((p1 - p2).norm());
+        //std::cout<<"p2: "<<p2.transpose()<<
 
         edge_link_indx.push_back(edge_link_counter);
         edge_link_counter++;
@@ -212,9 +227,11 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std:
 
     auto [mu1, sigma1] = mean_std(distances);
     auto [mu2, sigma2] = mean_std(angles);
+    auto [mu3, sigma3] = mean_std(tangential_distances);
 
     std::cout << "[GRAPH STATS BEFORE PRUNING]\n";
     std::cout << "μ1 (meters): " << mu1 << ", σ1: " << sigma1 << "\n";
+    std::cout << "μ3 (meters): " << mu3 << ", σ3: " << sigma3 << "\n";
     std::cout << "μ2 (degrees): " << mu2 << ", σ2: " << sigma2 << "\n";
     std::cout << "End of CH's work" << std::endl;
 
@@ -231,17 +248,21 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std:
         int index = edge_link_indx[access_index];
         double angle_diff = angles[index];
         double proximity_diff = distances[index];
+        double tangential_dist_fiff = tangential_distances[index];
 
         access_index++;
         edge_link_counter++;
 
-        if ((proximity_diff < mu1 + sigma1*PRUNE_3D_EDGE_GRAPH_LAMBDA1 && angle_diff < mu2 + sigma2*PRUNE_3D_EDGE_GRAPH_LAMBDA2) || weight > 1) {
+        if ((proximity_diff < mu1 + sigma1*PRUNE_3D_EDGE_GRAPH_LAMBDA1 && angle_diff < mu2 + sigma2*PRUNE_3D_EDGE_GRAPH_LAMBDA2 
+            && tangential_dist_fiff < mu3 + sigma3*PRUNE_3D_EDGE_GRAPH_LAMBDA3) || weight > 1) { //
             pruned_graph[pair]++;
         }
     }
 
     //> write the 3D edge graph after pruning
     write_edge_graph( pruned_graph, "3D_edge_pruned_graph" );
+    std::cout << "Original graph size: " << graph.size() << std::endl;
+    std::cout << "Pruned graph size: " << pruned_graph.size() << std::endl;
 
     return pruned_graph;
 }
@@ -813,7 +834,8 @@ std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph(co
 std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
                                                                                                 const std::vector<Eigen::Vector3d> all_T,
                                                                                                 const Eigen::Matrix3d K,
-                                                                                                const int Num_Of_Total_Imgs) { 
+                                                                                                const int Num_Of_Total_Imgs,
+                                                                                                const std::vector<Eigen::MatrixXd> All_Edgels) { 
 
     int num_iteration = 1000;
     double step_size_force = 0.01;
@@ -822,7 +844,7 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
     // convert 3D-> 2D relationship to 2D->3D relationship
     auto uncorrected_map = map_Uncorrected2DEdge_To_SupportingData();
     // {3D edge 1, 3D edge 2} -> weight (how many 2d edges they have in common)
-    auto graph = build3DEdgeWeightedGraph(uncorrected_map);
+    auto graph = build3DEdgeWeightedGraph(uncorrected_map, All_Edgels);
     auto pruned_graph = pruneEdgeGraph_by_3DProximityAndOrientation(graph);
     auto pruned_graph_by_projection = pruneEdgeGraphbyProjections(pruned_graph, all_R, all_T, K, Num_Of_Total_Imgs);
 

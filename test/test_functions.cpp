@@ -10,8 +10,10 @@
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
+#include "../Edge_Reconst/file_reader.hpp"
 
 //> Select the test
+#define TEST_READ_CURVELETS         (true)
 #define TEST_EDGE_ALIGNMENT         (true)
 #define TEST_CONNECTIVITY_GRAPH     (true)  //> TEST_EDGE_ALIGNMENT has to be true to activate this test
 #define TANGENT_COORD_TRANSFORM     (false)
@@ -25,6 +27,23 @@ struct EdgeNode {
 };
 
 using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
+
+void read_curvelets() {
+    std::string Dataset_Path = "/gpfs/data/bkimia/Datasets/";
+    std::string Dataset_Name = "ABC-NEF";
+    std::string Scene_Name = "00000006";
+    int Num_Of_Total_Imgs = 50;
+    std::shared_ptr<file_reader> Load_Data = std::shared_ptr<file_reader>(new file_reader(Dataset_Path, Dataset_Name, Scene_Name, Num_Of_Total_Imgs));
+
+    std::vector<EdgeCurvelet> All_Curvelets;
+    Load_Data->read_All_Curvelets( All_Curvelets, 1 );
+    for (int i = 0; i < 100; i++) {
+        std::cout << "image number = " << All_Curvelets[i].image_number << ", " << \
+                     "anchor edge index = " << All_Curvelets[i].self_edge_index << ", " << \
+                     "neighbor edge index = " << All_Curvelets[i].neighbor_edge_index << std::endl;
+    }
+
+}
 
 std::pair<int, int> findConnectedEdges(std::vector<double> proj_neighbor) {
     if (proj_neighbor.size() < 2) {
@@ -390,6 +409,10 @@ Eigen::Matrix3d euler_to_rotation_matrix(double roll, double pitch, double yaw) 
 
 // MARK: MAIN
 int main(int argc, char **argv) {
+
+#if TEST_READ_CURVELETS
+    read_curvelets();
+#endif
 
 #if TEST_EDGE_ALIGNMENT
     //> [TEST]
