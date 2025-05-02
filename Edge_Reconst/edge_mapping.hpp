@@ -22,14 +22,6 @@ struct HashEigenVector3d {
     }
 };
 
-// // Hash function for Eigen::Vector2d to use in unordered_map
-// struct HashEigenVector2d {
-//     std::size_t operator()(const Eigen::Vector2d& vec) const {
-//         std::size_t h1 = std::hash<double>()(vec(0));
-//         std::size_t h2 = std::hash<double>()(vec(1));
-//         return h1 ^ (h2 << 1); // Combine hashes
-//     }
-// };
 
 
 struct FuzzyVector3dEqual {
@@ -37,6 +29,8 @@ struct FuzzyVector3dEqual {
         return (a - b).norm() < 1e-6;
     }
 };
+
+
 
 struct FuzzyVector3dPairEqual {
     bool operator()(const std::pair<Eigen::Vector3d, Eigen::Vector3d>& a,
@@ -65,6 +59,7 @@ public:
         Eigen::Vector2d edge;
         Eigen::Vector3d edge_uncorrected;
         int image_number;
+        int edge_idx;
         Eigen::Matrix3d rotation;
         Eigen::Vector3d translation;
         Eigen::Vector3d tangents_3D_world;
@@ -87,6 +82,7 @@ public:
     struct Uncorrected2DEdgeKey {
         Eigen::Vector3d edge_uncorrected;
         int image_number;
+        int edge_idx;
         Eigen::Matrix3d rotation;
         Eigen::Vector3d translation;
 
@@ -151,6 +147,7 @@ public:
                                        const Eigen::Vector2d &supporting_edge, 
                                        const Eigen::Vector3d &supporting_edge_uncorrected, 
                                        int image_number,
+                                       int edge_idx,
                                        const Eigen::Matrix3d &rotation,
                                        const Eigen::Vector3d &translation);
 
@@ -163,12 +160,12 @@ public:
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
 
-    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
+    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs,  const std::vector<Eigen::MatrixXd> All_Edgels);
     
     std::unordered_map<Eigen::Vector3d, std::vector<SupportingEdgeData>, HashEigenVector3d> edge_3D_to_supporting_edges;
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
-    build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map);
+    build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map, const std::vector<Eigen::MatrixXd> All_Edgels);
     //EdgeNodeList createEdgeNodesFromEdges(const std::vector<Eigen::Vector3d>& locations, const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
     //EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file, const std::string& tangents_file, const std::string& connections_file);
 

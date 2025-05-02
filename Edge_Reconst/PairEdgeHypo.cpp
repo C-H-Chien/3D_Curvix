@@ -354,8 +354,10 @@ namespace PairEdgeHypothesis {
             double a_edgeH2 = tan(edgels_HYPO2(idx_hypo2,2)); //tan(theta2)
             double b_edgeH2 = -1;
             double c_edgeH2 = -(a_edgeH2*edgels_HYPO2(idx_hypo2,0)-edgels_HYPO2(idx_hypo2,1)); //−(a⋅x2−y2)
-            double x_intersection = ( (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,0) ) / 2;
-            double y_intersection = ( (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,1) ) / 2;
+            // double x_intersection = ( (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,0) ) / 2;
+            // double y_intersection = ( (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,1) ) / 2;
+            double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+            double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
             double dist_diff_edg2    = sqrt((x_intersection - edgels_HYPO2(idx_hypo2,0))*(x_intersection - edgels_HYPO2(idx_hypo2,0))+(y_intersection -  edgels_HYPO2(idx_hypo2,1))*(y_intersection - edgels_HYPO2(idx_hypo2,1)));
             
 
