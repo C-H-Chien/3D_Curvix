@@ -10,6 +10,8 @@
 #include <memory>
 
 #include "util.hpp"
+#include "file_reader.hpp"
+#include "definitions.h"
 
 // Hash function for Eigen::Vector3d to use in unordered_map
 struct HashEigenVector3d {
@@ -99,6 +101,7 @@ public:
         Eigen::Vector3d location;  
         Eigen::Vector3d orientation; 
         std::vector<std::pair<int, EdgeNode*>> neighbors;
+        bool has_orientation_fixed_in_connectivity_graph;
     };
 
     struct ConnectivityGraphNode {
@@ -160,12 +163,14 @@ public:
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
 
-    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs,  const std::vector<Eigen::MatrixXd> All_Edgels);
+    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
     
     std::unordered_map<Eigen::Vector3d, std::vector<SupportingEdgeData>, HashEigenVector3d> edge_3D_to_supporting_edges;
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
-    build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map, const std::vector<Eigen::MatrixXd> All_Edgels);
+    build3DEdgeWeightedGraph(const std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey>& uncorrected_map, 
+                            const std::vector<Eigen::MatrixXd> All_Edgels, std::vector<EdgeCurvelet> all_curvelets,
+                            const std::vector<Eigen::Matrix3d> All_R, const std::vector<Eigen::Vector3d> All_T);
     //EdgeNodeList createEdgeNodesFromEdges(const std::vector<Eigen::Vector3d>& locations, const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
     //EdgeNodeList createEdgeNodesFromFiles(const std::string& points_file, const std::string& tangents_file, const std::string& connections_file);
 
@@ -193,10 +198,11 @@ public:
                                                                                                                                                     const Eigen::Matrix3d K,
                                                                                                                                                     const int Num_Of_Total_Imgs
                                                                                                                                                     );
-
+    std::vector<EdgeCurvelet> read_curvelets(int thresh_EDG = 1);
+    std::vector<Eigen::MatrixXd> read_edgels(int thresh_EDG = 1);
 private:
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
-
+    std::shared_ptr<file_reader> file_reader_ptr = nullptr;
     void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
 
 };

@@ -10,6 +10,10 @@
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS     (false)
 
+//> Form hypothesis edges parameters
+#define EPIP_TANGENCY_ORIENT_THRESH     (4)     //> in degrees
+#define EPIP_TANGENCY_DISPL_THRESH      (3)     //> in pixels
+
 //> Edge graph pruning parameters
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (0.5)
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (0.5)

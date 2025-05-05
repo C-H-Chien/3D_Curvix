@@ -63,15 +63,19 @@ figure;
 hold on;
 
 % Define a fixed set of 20 distinct colors that will repeat
-fixed_colors = jet(20);
+fixed_colors = jet(30);
 
 % Plot each curve
 for i = 1:num_curves
     curve_idx = curve_ids == unique_curves(i);
     points = curve_data(curve_idx, 1:3);
+
+    if size(points, 1) < 10
+        continue;
+    end
     
     % Use modulo to cycle through the 20 colors
-    color_idx = mod(i-1, 20) + 1;
+    color_idx = mod(i-1, 30) + 1;
     color = fixed_colors(color_idx, :);
     
     plot3(points(:, 1), points(:, 2), points(:, 3), '-', 'LineWidth', 2, 'Color', color);
