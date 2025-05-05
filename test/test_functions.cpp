@@ -45,6 +45,27 @@ void read_curvelets() {
 
 }
 
+std::pair<int, int> findConnectedEdges_test(std::vector<double> proj_neighbor) {
+    int left_idx = -1;
+    double min_positive = std::numeric_limits<double>::max();
+    
+    int right_idx = -1;
+    double max_negative = -std::numeric_limits<double>::max();
+    
+    for (size_t j = 0; j < proj_neighbor.size(); ++j) {
+        if (proj_neighbor[j] >= 0 && proj_neighbor[j] < min_positive) {
+            min_positive = proj_neighbor[j];
+            left_idx = j;
+        }
+        if (proj_neighbor[j] < 0 && proj_neighbor[j] > max_negative) {
+            max_negative = proj_neighbor[j];
+            right_idx = j;
+        }
+    }
+
+    return {left_idx, right_idx};
+}
+
 std::pair<int, int> findConnectedEdges(std::vector<double> proj_neighbor) {
     if (proj_neighbor.size() < 2) {
         return {-1, -1}; 
@@ -121,7 +142,8 @@ std::vector<std::pair<int, Eigen::Vector3d>> getConnectivityGraph(EdgeNode* node
 
         // std::cout << neighbor->location.transpose() << "\tline_latent_variable = " << line_latent_variable << std::endl;
     }
-    std::pair<int, int> connected_edge_index = findConnectedEdges( proj_neighbor );
+    // std::pair<int, int> connected_edge_index = findConnectedEdges( proj_neighbor );
+    std::pair<int, int> connected_edge_index = findConnectedEdges_test( proj_neighbor );
 
     //>**************************************************************************************************
     //> Write updated_neighbors to the file for testing

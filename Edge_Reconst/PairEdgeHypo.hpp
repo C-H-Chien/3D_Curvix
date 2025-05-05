@@ -12,7 +12,7 @@
 #include <string.h>
 #include <assert.h>
 #include <vector>
-#include <chrono>
+#include <memory>
 
 //> Eigen library
 #include <Eigen/Core>
@@ -20,6 +20,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "util.hpp"
 
 namespace PairEdgeHypothesis {
     
@@ -41,8 +43,10 @@ namespace PairEdgeHypothesis {
         Eigen::MatrixXd edgelsHYPO2correct_post_validation(Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw);
 
     private:
+        std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
         double reproj_dist_thresh;
         int circle_R;
+        
 
     };
 

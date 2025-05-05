@@ -29,7 +29,9 @@
 namespace PairEdgeHypothesis {
     
     pair_edge_hypothesis::pair_edge_hypothesis( double Reproj_Err_Thresh, int circle_R )
-    : reproj_dist_thresh(Reproj_Err_Thresh), circle_R(circle_R) { }
+    : reproj_dist_thresh(Reproj_Err_Thresh), circle_R(circle_R) {
+        util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+    }
 
     Eigen::MatrixXd pair_edge_hypothesis::getAp_Bp(Eigen::MatrixXd Edges_HYPO2, Eigen::Vector3d pt_edgel_HYPO1, Eigen::Matrix3d F ) {
         Eigen::Vector3d coeffs;
@@ -200,131 +202,39 @@ namespace PairEdgeHypothesis {
             double x_currH1 = (b2_line*c_edgeH1-b_edgeH1*c2_line)/(a2_line*b_edgeH1-a_edgeH1*b2_line);
             double y_currH1 = (c2_line*a_edgeH1-c_edgeH1*a2_line)/(a2_line*b_edgeH1-a_edgeH1*b2_line);
             double dist1    = sqrt((x_currH1 - edgel_HYPO1(0,0))*(x_currH1 - edgel_HYPO1(0,0))+(y_currH1 - edgel_HYPO1(0,1))*(y_currH1 - edgel_HYPO1(0,1)));
-            // if(dist1 < circle_R && dist2 < circle_R){
-            //     edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
-            //     edgels_HYPO2_corrected.row(idx_correct) << x_currH1, y_currH1, edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
-            //                                                x_currH2, y_currH2, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
-            //                                                HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-            //     idx_correct++;
-            // }
-            // if(dist1 < circle_R && dist2 < circle_R){
-                edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
-                edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
-                                                           edgels_HYPO2(idx_hypo2,0), edgels_HYPO2(idx_hypo2,1), edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
-                                                           HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-                idx_correct++;
-            // }
+
+            edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
+            edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+                                                        edgels_HYPO2(idx_hypo2,0), edgels_HYPO2(idx_hypo2,1), edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
+                                                        HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+            idx_correct++;
         }
         return edgels_HYPO2_corrected;
     }
 
-    // Eigen::MatrixXd pair_edge_hypothesis::edgelsHYPO2correct_post_validation(
-    //     Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, 
-    //     Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw)
-    // {
-    //     int max_possible_size = edgels_HYPO2.rows();  
-    //     Eigen::MatrixXd edgels_HYPO2_corrected(0, 10);  
 
-    //     ////////////// find cofficients for tangent and epipolar line for edge 2 //////////////
-    //     Eigen::MatrixXd xy1_H1;
-    //     xy1_H1.conservativeResize(1,3);
-    //     xy1_H1(0,0) = edgel_HYPO1(0,0);
-    //     xy1_H1(0,1) = edgel_HYPO1(0,1);
-    //     xy1_H1(0,2) = 1;
-    //     Eigen::MatrixXd coeffspt1T = F21 * xy1_H1.transpose();
-    //     Eigen::MatrixXd coeffspt1  = coeffspt1T.transpose();
-    //     Eigen::MatrixXd Apixel_1   = coeffspt1.col(0);
-    //     Eigen::MatrixXd Bpixel_1   = coeffspt1.col(1);
-    //     Eigen::MatrixXd Cpixel_1   = coeffspt1.col(2);
-    //     double a1_line  = -Apixel_1(0,0)/Bpixel_1(0,0);
-    //     double b1_line  = -1;
-    //     double c1_line  = -Cpixel_1(0,0)/Bpixel_1(0,0);
-    //     double idx_correct = 0;
-    //     ////////////// find cofficients for tangent and epipolar line for edge 2 //////////////
-        
-    //     for(int idx_hypo2 = 0; idx_hypo2 < edgels_HYPO2.rows(); idx_hypo2++){
-    //         // Parameters of the line passing through hypo2 along its angle
-    //         double a_edgeH2 = tan(edgels_HYPO2(idx_hypo2,2)); //tan(theta2)
-    //         double b_edgeH2 = -1;
-    //         double c_edgeH2 = -(a_edgeH2*edgels_HYPO2(idx_hypo2,0)-edgels_HYPO2(idx_hypo2,1)); //−(a⋅x2−y2)
-    //         // double x_intersection = ( (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,0) ) / 2;
-    //         // double y_intersection = ( (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,1) ) / 2;
-    //         double x_intersection = ( (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,0) ) / 2;
-    //         double y_intersection = ( (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,1) ) / 2;
-    //         double dist_diff_edg2    = sqrt((x_intersection - edgels_HYPO2(idx_hypo2,0))*(x_intersection - edgels_HYPO2(idx_hypo2,0))+(y_intersection -  edgels_HYPO2(idx_hypo2,1))*(y_intersection - edgels_HYPO2(idx_hypo2,1)));
-            
-
-    //         ////////////// fully correct edge 1 to half-corrected hyp2's epipolar line //////////////
-    //         Eigen::MatrixXd xy1_H2;
-    //         xy1_H2.conservativeResize(1,3);
-    //         xy1_H2(0,0) = x_intersection;
-    //         xy1_H2(0,1) = y_intersection;
-    //         xy1_H2(0,2) = 1;
-    //         Eigen::MatrixXd coeffspt2T = F12 * xy1_H2.transpose();
-    //         Eigen::MatrixXd coeffspt2  = coeffspt2T.transpose();
-    //         Eigen::MatrixXd Apixel_2   = coeffspt2.col(0);
-    //         Eigen::MatrixXd Bpixel_2   = coeffspt2.col(1);
-    //         Eigen::MatrixXd Cpixel_2   = coeffspt2.col(2);
-    //         double a2_line  = -Apixel_2(0,0)/Bpixel_2(0,0);
-    //         double b2_line  = -1;
-    //         double c2_line  = -Cpixel_2(0,0)/Bpixel_2(0,0);
-    //         double a_edgeH1 = tan(edgel_HYPO1(0,2)); //tan(theta2)
-    //         double b_edgeH1 = -1;
-    //         double c_edgeH1 = -(a_edgeH1*edgel_HYPO1(0,0)-edgel_HYPO1(0,1)); //−(a⋅x2−y2)
-    //         double x_intersection_1 = ( (b2_line * c_edgeH1 - b_edgeH1 * c2_line) / (a2_line * b_edgeH1 - a_edgeH1 * b2_line) + edgel_HYPO1(0,0) ) / 2;
-    //         double y_intersection_1 = ( (c2_line * a_edgeH1 - c_edgeH1 * a2_line) / (a2_line * b_edgeH1 - a_edgeH1 * b2_line) + edgel_HYPO1(0,1) ) / 2;
-    //         double dist_diff_edg1    = sqrt((x_intersection_1 - edgel_HYPO1(0,0))*(x_intersection_1 - edgel_HYPO1(0,0))+(y_intersection_1 - edgel_HYPO1(0,1))*(y_intersection_1 - edgel_HYPO1(0,1)));
-    //         ////////////// find cofficients for tangent and epipolar line for edge 1 //////////////
-            
-    //         if (x_intersection == 0 && y_intersection == 0) {
-    //             std::cout << "WARNING: Found (0,0) intersection! idx_hypo2: " << idx_hypo2 << std::endl;
-    //         }
-    //         if (x_intersection_1 == 0 && y_intersection_1 == 0) {
-    //             std::cout << "WARNING: Found (0,0) intersection!" << std::endl;
-    //         }
-
-    //         // check if H2 edge's tangent line is almost parallal to epipolar line
-    //         double angle_edgeH2 = edgels_HYPO2(idx_hypo2,2);  // Slope of tangent line at hyp2
-    //         double m_epipolar_edg2 = -a1_line / b1_line;            // Slope of epipolar line
-    //         double angle_diff_rad_edg2 = abs(angle_edgeH2 - atan(m_epipolar_edg2));
-    //         double angle_diff_deg_edg2 = angle_diff_rad_edg2 * (180.0 / M_PI);
-    //         if (angle_diff_deg_edg2 > 180){
-    //             angle_diff_deg_edg2 -= 180;
-    //         }
-
-    //         // check if H2 edge's tangent line is almost parallal to epipolar line
-    //         double angle_edgeH1 = edgel_HYPO1(0,2);  // Slope of tangent line at hyp2
-    //         double m_epipolar_edg1 = -a2_line / b2_line;            // Slope of epipolar line
-    //         double angle_diff_rad_edg1 = abs(angle_edgeH1 - atan(m_epipolar_edg1));
-    //         double angle_diff_deg_edg1 = angle_diff_rad_edg1 * (180.0 / M_PI);
-    //         if (angle_diff_deg_edg1 > 180){
-    //             angle_diff_deg_edg1 -= 180;
-    //         }
-
-
-    //         if (dist_diff_edg2 < 3 && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4 &&
-    //              dist_diff_edg1 < 3 && abs(angle_diff_deg_edg1 - 0) > 4 && abs(angle_diff_deg_edg1 - 180) > 4){
-    //             if (idx_correct == 0) {
-    //                 edgels_HYPO2_corrected = Eigen::MatrixXd(1, 10);
-    //             } else {
-    //                 edgels_HYPO2_corrected.conservativeResize(idx_correct+1, 10);
-    //             }
-                
-    //             if (idx_correct >= max_possible_size) {
-    //                 std::cout << "ERROR: Buffer size exceeded! Increase max_possible_size." << std::endl;
-    //                 break;
-    //             }
-    //             edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
-    //             edgels_HYPO2_corrected.row(idx_correct) << x_intersection_1, y_intersection_1, edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
-    //                                                 x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
-    //                                                 HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-    //             idx_correct++;
-    //         }
-    //     }
-
-    //     return edgels_HYPO2_corrected;
+    // ////////////// find cofficients for tangent and epipolar line for edge 1 //////////////
+    // double a_edgeH1 = tan(edgel_HYPO1(0,2)); //tan(theta2)
+    // double b_edgeH1 = -1;
+    // double c_edgeH1 = -(a_edgeH1*edgel_HYPO1(0,0)-edgel_HYPO1(0,1)); //−(a⋅x2−y2)
+    // double x_intersection_1 = ( (b2_line * c_edgeH1 - b_edgeH1 * c2_line) / (a2_line * b_edgeH1 - a_edgeH1 * b2_line) + edgel_HYPO1(0,0) ) / 2;
+    // double y_intersection_1 = ( (c2_line * a_edgeH1 - c_edgeH1 * a2_line) / (a2_line * b_edgeH1 - a_edgeH1 * b2_line) + edgel_HYPO1(0,1) ) / 2;
+    // double dist_diff_edg1    = sqrt((x_intersection_1 - edgel_HYPO1(0,0))*(x_intersection_1 - edgel_HYPO1(0,0))+(y_intersection_1 - edgel_HYPO1(0,1))*(y_intersection_1 - edgel_HYPO1(0,1)));
+    // if (x_intersection_1 == 0 && y_intersection_1 == 0) {
+    //     std::cout << "WARNING: Found (0,0) intersection!" << std::endl;
     // }
-
+    ////////////// find cofficients for tangent and epipolar line for edge 1 //////////////
+    // double x_intersection = ( (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,0) ) / 2;
+    // double y_intersection = ( (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,1) ) / 2;
+    // // check if H1 edge's tangent line is almost parallal to epipolar line
+    // double angle_edgeH1 = edgel_HYPO1(0,2);  // Slope of tangent line at hyp2
+    // double m_epipolar_edg1 = -a2_line / b2_line;            // Slope of epipolar line
+    // double angle_diff_rad_edg1 = abs(angle_edgeH1 - atan(m_epipolar_edg1));
+    // double angle_diff_deg_edg1 = angle_diff_rad_edg1 * (180.0 / M_PI);
+    // if (angle_diff_deg_edg1 > 180){
+    //     angle_diff_deg_edg1 -= 180;
+    // }
+   
     Eigen::MatrixXd pair_edge_hypothesis::edgelsHYPO2correct_post_validation(
         Eigen::MatrixXd edgels_HYPO2,  Eigen::MatrixXd edgel_HYPO1, 
         Eigen::Matrix3d F21, Eigen::Matrix3d F12, Eigen::MatrixXd HYPO2_idx_raw)
@@ -350,18 +260,7 @@ namespace PairEdgeHypothesis {
         ////////////// find cofficients for tangent and epipolar line for edge 2 //////////////
         
         for(int idx_hypo2 = 0; idx_hypo2 < edgels_HYPO2.rows(); idx_hypo2++){
-            // Parameters of the line passing through hypo2 along its angle
-            double a_edgeH2 = tan(edgels_HYPO2(idx_hypo2,2)); //tan(theta2)
-            double b_edgeH2 = -1;
-            double c_edgeH2 = -(a_edgeH2*edgels_HYPO2(idx_hypo2,0)-edgels_HYPO2(idx_hypo2,1)); //−(a⋅x2−y2)
-            // double x_intersection = ( (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,0) ) / 2;
-            // double y_intersection = ( (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line) + edgels_HYPO2(idx_hypo2,1) ) / 2;
-            double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-            double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-            double dist_diff_edg2    = sqrt((x_intersection - edgels_HYPO2(idx_hypo2,0))*(x_intersection - edgels_HYPO2(idx_hypo2,0))+(y_intersection -  edgels_HYPO2(idx_hypo2,1))*(y_intersection - edgels_HYPO2(idx_hypo2,1)));
-            
 
-            ////////////// find cofficients for tangent and epipolar line for edge 1 //////////////
             Eigen::MatrixXd xy1_H2;
             xy1_H2.conservativeResize(1,3);
             xy1_H2(0,0) = edgels_HYPO2(idx_hypo2,0);
@@ -375,70 +274,97 @@ namespace PairEdgeHypothesis {
             double a2_line  = -Apixel_2(0,0)/Bpixel_2(0,0);
             double b2_line  = -1;
             double c2_line  = -Cpixel_2(0,0)/Bpixel_2(0,0);
-            double a_edgeH1 = tan(edgel_HYPO1(0,2)); //tan(theta2)
-            double b_edgeH1 = -1;
-            double c_edgeH1 = -(a_edgeH1*edgel_HYPO1(0,0)-edgel_HYPO1(0,1)); //−(a⋅x2−y2)
-            double x_intersection_1 = ( (b2_line * c_edgeH1 - b_edgeH1 * c2_line) / (a2_line * b_edgeH1 - a_edgeH1 * b2_line) + edgel_HYPO1(0,0) ) / 2;
-            double y_intersection_1 = ( (c2_line * a_edgeH1 - c_edgeH1 * a2_line) / (a2_line * b_edgeH1 - a_edgeH1 * b2_line) + edgel_HYPO1(0,1) ) / 2;
-            double dist_diff_edg1    = sqrt((x_intersection_1 - edgel_HYPO1(0,0))*(x_intersection_1 - edgel_HYPO1(0,0))+(y_intersection_1 - edgel_HYPO1(0,1))*(y_intersection_1 - edgel_HYPO1(0,1)));
-            ////////////// find cofficients for tangent and epipolar line for edge 1 //////////////
+            double corrected_x, corrected_y;
+
+            ////////////// calculate normal distance between edge and epipolar line //////////////
+            double epiline_x = xy1_H2(0,0) - a1_line * (a1_line * xy1_H2(0,0) + b1_line *xy1_H2(0,1) + c1_line)/(pow(a1_line,2) + pow(b1_line,2));
+            double epiline_y = xy1_H2(0,1) - b1_line* (a1_line * xy1_H2(0,0) + b1_line * xy1_H2(0,1) + c1_line)/(pow(a1_line,2) + pow(b1_line,2));
+            double distance_epiline = sqrt(pow(xy1_H2(0,0) - epiline_x, 2) + pow(xy1_H2(0,1) - epiline_y, 2));
+            ////////////// calculate normal distance between edge and epipolar line //////////////
+
+            // double tangential_distance;
+            if (distance_epiline < 0.3){
+                // If normal distance is small, move directly to epipolar line
+                corrected_x = epiline_x;
+                corrected_y = epiline_y;
+            }
+            else {
+                //////////////// rotate the edge ////////////////
+                double theta = edgels_HYPO2(idx_hypo2,2);
+                double p_theta = a1_line * cos(theta) + b1_line * sin(theta);
+                double derivative_p_theta = -a1_line * sin(theta) + b1_line * cos(theta);
+                double theta_bar = 0.174533; //10 degrees
             
-            if (x_intersection == 0 && y_intersection == 0) {
-                std::cout << "WARNING: Found (0,0) intersection! idx_hypo2: " << idx_hypo2 << std::endl;
-            }
-            if (x_intersection_1 == 0 && y_intersection_1 == 0) {
-                std::cout << "WARNING: Found (0,0) intersection!" << std::endl;
-            }
-
-            // check if H2 edge's tangent line is almost parallal to epipolar line
-            double angle_edgeH2 = edgels_HYPO2(idx_hypo2,2);  // Slope of tangent line at hyp2
-            double m_epipolar_edg2 = -a1_line / b1_line;            // Slope of epipolar line
-            double angle_diff_rad_edg2 = abs(angle_edgeH2 - atan(m_epipolar_edg2));
-            double angle_diff_deg_edg2 = angle_diff_rad_edg2 * (180.0 / M_PI);
-            if (angle_diff_deg_edg2 > 180){
-                angle_diff_deg_edg2 -= 180;
-            }
-
-            // check if H2 edge's tangent line is almost parallal to epipolar line
-            double angle_edgeH1 = edgel_HYPO1(0,2);  // Slope of tangent line at hyp2
-            double m_epipolar_edg1 = -a2_line / b2_line;            // Slope of epipolar line
-            double angle_diff_rad_edg1 = abs(angle_edgeH1 - atan(m_epipolar_edg1));
-            double angle_diff_deg_edg1 = angle_diff_rad_edg1 * (180.0 / M_PI);
-            if (angle_diff_deg_edg1 > 180){
-                angle_diff_deg_edg1 -= 180;
-            }
-
-            // if (dist_diff_edg2 < 6 && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4 &&
-            //     dist_diff_edg1 < 6 && abs(angle_diff_deg_edg1 - 0) > 4 && abs(angle_diff_deg_edg1 - 180) > 4){
-            if (dist_diff_edg2 < 3 && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4){
-                if (idx_correct == 0) {
-                    edgels_HYPO2_corrected = Eigen::MatrixXd(1, 10);
-                } else {
-                    edgels_HYPO2_corrected.conservativeResize(idx_correct+1, 10);
+                if (p_theta * derivative_p_theta > 0){
+                    theta = theta - theta_bar;
+                }else{
+                    theta = theta + theta_bar;
                 }
+                //////////////// rotate the edge ////////////////
+
+                ////////////// calculate the intersection between the tangent and epipolar line //////////////
+                double a_edgeH2 = tan(theta); //tan(theta2)
+                double b_edgeH2 = -1;
+                double c_edgeH2 = -(a_edgeH2*edgels_HYPO2(idx_hypo2,0)-edgels_HYPO2(idx_hypo2,1)); //−(a⋅x2−y2)
+
+                double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+                double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+                double dist_diff_edg2 = sqrt((x_intersection - edgels_HYPO2(idx_hypo2,0))*(x_intersection - edgels_HYPO2(idx_hypo2,0))+(y_intersection -  edgels_HYPO2(idx_hypo2,1))*(y_intersection - edgels_HYPO2(idx_hypo2,1)));
+                if (x_intersection == 0 && y_intersection == 0) {
+                    std::string warning_msg = "Found (0,0) intersection! idx_hypo2: " + std::to_string(idx_hypo2);
+                    LOG_WARNING(warning_msg);
+                }
+                // check if H2 edge's tangent line is almost parallal to epipolar line
+                double m_epipolar_edg2 = -a1_line / b1_line;            // Slope of epipolar line
+                double angle_diff_rad_edg2 = abs(theta - atan(m_epipolar_edg2));
+                double angle_diff_deg_edg2 = angle_diff_rad_edg2 * (180.0 / M_PI);
+                if (angle_diff_deg_edg2 > 180){
+                    angle_diff_deg_edg2 -= 180;
+                }
+                double angle_diff_original = abs(edgels_HYPO2(idx_hypo2,2) - atan(m_epipolar_edg2))  * (180.0 / M_PI);
+                if (angle_diff_original > 180){
+                    angle_diff_original -= 180;
+                }
+                ////////////// calculate the intersection between the tangent and epipolar line //////////////
+                // tangential_distance = std::sqrt(std::pow(x_intersection - xy1_H2(0,0), 2) + std::pow(y_intersection - xy1_H2(0,1), 2));
                 
-                if (idx_correct >= max_possible_size) {
-                    std::cout << "ERROR: Buffer size exceeded! Increase max_possible_size." << std::endl;
-                    break;
+                if (abs(edgel_HYPO1(0,0)-531.497)<0.001  && abs(edgel_HYPO1(0,1)- 398.41)<0.001 && abs(xy1_H2(0,0)-420.637968191121)<0.001 && abs(xy1_H2(0,1)-377.670257834525)<0.001){
+                    std::cout << "epipolar line coefficients of (a, b, c) = (" << a1_line << ", " << b1_line << ", " << c1_line << ")" << std::endl;
+                    std::cout << "edge on HYPO2: (" << edgels_HYPO2(idx_hypo2,0) << ", " << edgels_HYPO2(idx_hypo2,1) << ")" << std::endl;
+                    std::cout << "theta (in degree) = " << util->rad_to_deg( theta ) << std::endl;
+                    std::cout<<"distance_epiline for target edge is: "<<distance_epiline<<std::endl;
+                    // std::cout<<"tengential distance to epipolar line is: "<<tangential_distance<<std::endl;
+                    std::cout<<"angle difference before is: "<<angle_diff_original<<std::endl;
+                    std::cout<<"angle difference after is: "<<angle_diff_deg_edg2<<std::endl;
+                    exit(0);
                 }
-                edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
-                edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
-                                                        x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
-                                                        HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-                // edgels_HYPO2_corrected.row(idx_correct) << x_intersection_1, y_intersection_1, edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
-                //                                     x_intersection, y_intersection, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
-                //                                     HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-                idx_correct++;
+
+                if (dist_diff_edg2 < 3){// && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4){
+                    corrected_x = x_intersection;
+                    corrected_y = y_intersection;
+                }else{
+                    continue;
+                }
+
+
             }
 
-            // if (abs(edgel_HYPO1(0,0)-342.542)<0.001  && abs(edgel_HYPO1(0,1)-511.939)<0.001 && abs(x_intersection-311.272)<0.001 && abs(y_intersection-491.301)<0.001){
-            //     std::cout<< "epipolar line is: "<< a1_line<<" " << b1_line <<" " <<c1_line <<std::endl;
-            //     std::cout<< "tangent line is: "<< a_edgeH2<<" " << b_edgeH2 <<" " <<c_edgeH2 <<" " <<std::endl;
-            //     std::cout<< "original point location is: " <<edgels_HYPO2(idx_hypo2,0)<< ", "<< edgels_HYPO2(idx_hypo2,1) <<std::endl;
-            //     std::cout<< "angle diff: " << angle_diff_deg << " degrees" <<std::endl;
-            //     std::cout<< "dist diff: " << dist_diff << " pixels" <<std::endl;
-            //     std::cout<< "angle_edgeH2: "<<angle_edgeH2*(180.0 / M_PI)<<std::endl;
-            //     std::cout<< "atan(m_epipolar): "<<atan(m_epipolar)*(180.0 / M_PI)<<std::endl;
+            edgels_HYPO2_corrected.conservativeResize(idx_correct+1,10);
+            edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+                                                    corrected_x, corrected_y, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
+                                                    HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+            idx_correct++;
+
+            // if (abs(edgel_HYPO1(0,0)-531.497)<0.001  && abs(edgel_HYPO1(0,1)-398.41)<0.001 && abs(xy1_H2(0,0)-420.637968191121)<0.001 && abs(xy1_H2(0,1)-377.670257834525)<0.001){
+            //     std::cout<<"distance_epiline for target edge is: "<<distance_epiline<<std::endl;
+            //     std::cout<<"tengential distance to epipolar line is: "<<tangential_distance<<std::endl;
+            //     // std::cout<< "epipolar line is: "<< a1_line<<" " << b1_line <<" " <<c1_line <<std::endl;
+            //     // std::cout<< "tangent line is: "<< a_edgeH2<<" " << b_edgeH2 <<" " <<c_edgeH2 <<" " <<std::endl;
+            //     // std::cout<< "corrected location is: " <<x_intersection<< ", "<< y_intersection <<std::endl;
+            //     // std::cout<< "angle diff: " << angle_diff_deg_edg2 << " degrees" <<std::endl;
+            //     // std::cout<< "dist diff: " << dist_diff_edg2 << " pixels" <<std::endl;
+            //     // std::cout<< "angle_edgeH2: "<<angle_edgeH2*(180.0 / M_PI)<<std::endl;
+            //     // std::cout<< "atan(m_epipolar): "<<atan(m_epipolar_edg1)*(180.0 / M_PI)<<std::endl;
             // }
         }
 
