@@ -78,6 +78,15 @@ namespace MultiviewGeometryUtil {
 
         std::vector<double> check_reproj_error(std::vector<Eigen::Vector2d> points_2D, Eigen::Vector3d point_3D, 
                                                std::vector<Eigen::Matrix3d> Rs, std::vector<Eigen::Vector3d> Ts, Eigen::Matrix3d K);
+
+        double rad_to_deg( double theta ) {
+            return theta * (180.0 / M_PI);
+        }
+
+        double deg_to_rad( double theta ) {
+            return theta * (M_PI / 180.0);
+        }
+
     private:
         
     };
