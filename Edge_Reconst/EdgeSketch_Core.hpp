@@ -44,6 +44,9 @@ public:
     std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
 
+    // For each edge index, store all other edge indices in the same cluster
+    std::unordered_map<int, std::vector<int>> hypo2_clusters;
+
     //> Constructor
     EdgeSketch_Core( YAML::Node );
     void Read_Camera_Data();
@@ -59,6 +62,11 @@ public:
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);
+
+    // Function to get all edges in the same cluster as a given edge
+    std::vector<int> get_edges_in_same_cluster(int edge_index);
+    // Function to reset clusters for a new hypo1-hypo2 iteration
+    void reset_hypo2_clusters();
 
     //> Destructor
     ~EdgeSketch_Core();

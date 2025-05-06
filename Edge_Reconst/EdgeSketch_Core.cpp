@@ -134,10 +134,32 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Camera() {
     history_hypothesis_views_index.push_back(hyp02_view_indx);
 }
 
+
+
+///////////////////////////// cluster related /////////////////////////////
 void EdgeSketch_Core::Read_Edgels_Data() {
     //> Read edgels detected at a specific threshold 
     Load_Data->read_All_Edgels( All_Edgels, thresh_EDG );
 }
+
+void EdgeSketch_Core::reset_hypo2_clusters() {
+    hypo2_clusters.clear();
+}
+
+
+std::vector<int> EdgeSketch_Core::get_edges_in_same_cluster(int edge_index) {
+    // Check if the edge exists in our mapping
+    auto it = hypo2_clusters.find(edge_index);
+    if (it != hypo2_clusters.end()) {
+        return it->second;
+    }
+    
+    // If not found in any cluster, return a vector containing only this edge
+    return {edge_index};
+}
+///////////////////////////// cluster related /////////////////////////////
+
+
 
 void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 
@@ -165,12 +187,18 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 void EdgeSketch_Core::Run_3D_Edge_Sketch() {
 
     itime = omp_get_wtime();
+    reset_hypo2_clusters();
+
     #pragma omp parallel
     {
+
         //> Local array stacking all supported indices
         std::vector<Eigen::MatrixXd> local_thread_supported_indices;
-        int H1_edge_idx;
+        // Thread-local clusters 
+        std::unordered_map<int, std::vector<int>> thread_local_clusters;
 
+        int H1_edge_idx;
+       
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< First loop: loop over all edgels from hypothesis view 1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
         //<<<<<<<<<<< Identify pairs of edge, correct the positions of the edges from Hypo2, and store the paired edges >>>>>>>>>>>>>>>>//
         #pragma omp for schedule(static, Num_Of_OMP_Threads)
@@ -272,6 +300,36 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             for (int i = 0; i < N; ++i) {
                 label_to_cluster[cluster_labels[i]].push_back(i);
             }
+            
+
+            //////////// push to clusters////////////
+            thread_local_clusters.clear(); // Clear for this H1 edge
+            
+            for (const auto& kv : label_to_cluster) {
+                std::vector<int> original_indices;
+                
+                for (int local_idx : kv.second) {
+                    if (local_idx >= 0 && local_idx < HYPO2_idx_raw.rows()) {
+                        int original_idx = static_cast<int>(HYPO2_idx_raw(local_idx));
+                        if (original_idx >= 0 && original_idx < Edges_HYPO2.rows()) {
+                            original_indices.push_back(original_idx);
+                        }
+                    }
+                }
+                
+                for (int original_idx : original_indices) {
+                    thread_local_clusters[original_idx] = original_indices;
+                }
+            }
+            
+            #pragma omp critical
+            {
+                for (const auto& kv : thread_local_clusters) {
+                    hypo2_clusters[kv.first] = kv.second;
+                }
+            }
+            //////////// push to clusters////////////
+
 
             std::vector<std::vector<int>> clusters;
             for (auto& kv : label_to_cluster) {
@@ -316,6 +374,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     //     std::cout << "After clustering index: " << edgels_HYPO2_corrected(closest_idx, 8) << std::endl;
                     // }
                 }
+
             }
 
             // if (abs(pt_H1(0) - 529) <0.001 && abs(pt_H1(1) - 398.495) <0.001){
@@ -891,6 +950,26 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         int hypo1_idx = int(paired_edge_final(pair_idx,0));
         int hypo2_idx = int(paired_edge_final(pair_idx,1));
 
+        /////////// get cluster member ///////////
+        std::vector<int> cluster_members = get_edges_in_same_cluster(hypo2_idx);
+        // Eigen::Vector2d hypo2_location = Edges_HYPO2.row(hypo2_idx).head<2>();
+        // std::cout << "Hypo2 edge " << hypo2_idx << " location: (" 
+        //           << hypo2_location(0) << ", " << hypo2_location(1) << ")" << std::endl;
+        
+        // std::cout << "Cluster members locations:" << std::endl;
+        // for (int member_idx : cluster_members) {
+        //     if (member_idx < 0 || member_idx >= Edges_HYPO2.rows()) {
+        //         std::cout << "  Member " << member_idx << ": Invalid index" << std::endl;
+        //         continue;
+        //     }
+            
+        //     Eigen::Vector2d member_location = Edges_HYPO2.row(member_idx).head<2>();
+        //     std::cout << "  Member " << member_idx << " location: (" 
+        //               << member_location(0) << ", " << member_location(1) << ")" << std::endl;
+        // }
+        // exit(0);
+        /////////// get cluster member ///////////
+
         Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
         //Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
 
@@ -961,6 +1040,19 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, tangents_3D_world, pt_H1, edge_uncorrected_hyp1, hyp01_view_indx, hypo1_idx, All_R[hyp01_view_indx], All_T[hyp01_view_indx]);
         edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, tangents_3D_world, pt_H2, edge_uncorrected_hyp2, hyp02_view_indx, hypo2_idx, All_R[hyp02_view_indx], All_T[hyp02_view_indx]);
 
+        ////////// include all cluster member in the edge mapping ///////////
+        for (int member_idx : cluster_members) {
+            if (member_idx < 0 || member_idx >= Edges_HYPO2.rows()) {
+                std::cout << "  Member " << member_idx << ": Invalid index" << std::endl;
+                continue;
+            }
+
+            Eigen::Vector3d member_location = Edges_HYPO2.row(member_idx).head<3>();
+
+            edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, tangents_3D_world, pt_H2, member_location, hyp02_view_indx, member_idx, All_R[hyp02_view_indx], All_T[hyp02_view_indx]);
+        }
+        ////////// include all cluster member in the edge mapping ///////////
+        
         ///////////////////////////////// Add support from validation views /////////////////////////////////
         std::vector<std::pair<int, Eigen::Vector2d>> validation_support_edges;
 
