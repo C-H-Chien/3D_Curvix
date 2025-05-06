@@ -140,7 +140,7 @@ namespace MultiviewGeometryUtil {
     }
 
     bool multiview_geometry_util::checkOrientationConsistency(Eigen::Vector3d source_tangent, Eigen::Vector3d target_tangent) {
-        return (fabs(source_tangent.dot(target_tangent) > 0)) ? (true) : (false);
+        return (source_tangent.dot(target_tangent) > 0) ? (true) : (false);
     }
 
     // MARK: get shortest aligne

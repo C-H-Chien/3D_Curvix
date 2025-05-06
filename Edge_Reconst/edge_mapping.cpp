@@ -706,7 +706,7 @@ EdgeMapping::ConnectivityGraph EdgeMapping::createConnectivityGraph(EdgeNodeList
                 double line_latent_variable = util->getLineVariable(node->location, node->orientation, neighbor->location);
                 proj_neighbor.push_back(line_latent_variable);
 
-                neighbor->has_orientation_fixed_in_connectivity_graph = true;
+                edge_nodes[neighbor_index]->has_orientation_fixed_in_connectivity_graph = true;
             }
             
             // Find left and right neighbors
