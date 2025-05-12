@@ -82,7 +82,7 @@ def f_score(precision, recall):
 
 
 def compute_precision_recall_IOU(
-    pred_sampled, gt_points, metrics, thresh_list=[0.02], edge_type="all"
+    pred_sampled, gt_points, metrics, thresh_list=[0.02]
 ):
     """
     Compute precision, recall, F-score, and IOU.
@@ -95,46 +95,30 @@ def compute_precision_recall_IOU(
     Returns:
         dict: Updated metrics.
     """
-    if edge_type == "all":
-        for thresh in thresh_list:
-            dists_a_to_b, _ = pcu.k_nearest_neighbors(
-                pred_sampled, gt_points, k=1
-            )  # k closest points (in pts_b) for each point in pts_a
-            correct_pred = np.sum(dists_a_to_b < thresh)
-            precision = correct_pred / len(dists_a_to_b)
-            metrics[f"precision_{thresh}"].append(precision)
+    for thresh in thresh_list:
+        dists_a_to_b, _ = pcu.k_nearest_neighbors(
+            pred_sampled, gt_points, k=1
+        )  # k closest points (in pts_b) for each point in pts_a
+        correct_pred = np.sum(dists_a_to_b < thresh)
+        precision = correct_pred / len(dists_a_to_b)
+        metrics[f"precision_{thresh}"].append(precision)
 
-            dists_b_to_a, _ = pcu.k_nearest_neighbors(gt_points, pred_sampled, k=1)
-            correct_gt = np.sum(dists_b_to_a < thresh)
-            recall = correct_gt / len(dists_b_to_a)
-            metrics[f"recall_{thresh}"].append(recall)
+        dists_b_to_a, _ = pcu.k_nearest_neighbors(gt_points, pred_sampled, k=1)
+        correct_gt = np.sum(dists_b_to_a < thresh)
+        recall = correct_gt / len(dists_b_to_a)
+        metrics[f"recall_{thresh}"].append(recall)
 
-            fscore = 2 * precision * recall / (precision + recall)
-            metrics[f"fscore_{thresh}"].append(fscore)
+        fscore = 2 * precision * recall / (precision + recall)
+        metrics[f"fscore_{thresh}"].append(fscore)
 
-            intersection = min(correct_pred, correct_gt)
-            union = (
-                len(dists_a_to_b) + len(dists_b_to_a) - max(correct_pred, correct_gt)
-            )
+        intersection = min(correct_pred, correct_gt)
+        union = (
+            len(dists_a_to_b) + len(dists_b_to_a) - max(correct_pred, correct_gt)
+        )
 
-            IOU = intersection / union
-            metrics[f"IOU_{thresh}"].append(IOU)
-        return metrics
-    else:
-        correct_gt_list = []
-        correct_pred_list = []
-        _, acc, comp = compute_chamfer_distance(pred_sampled, gt_points)
-        for thresh in thresh_list:
-            dists_b_to_a, _ = pcu.k_nearest_neighbors(gt_points, pred_sampled, k=1)
-            correct_gt = np.sum(dists_b_to_a < thresh)
-            num_gt = len(dists_b_to_a)
-            correct_gt_list.append(correct_gt)
-            dists_a_to_b, _ = pcu.k_nearest_neighbors(pred_sampled, gt_points, k=1)
-            correct_pred = np.sum(dists_a_to_b < thresh)
-            correct_pred_list.append(correct_pred)
-            num_pred = len(dists_a_to_b)
-
-        return correct_gt_list, num_gt, correct_pred_list, num_pred, acc, comp
+        IOU = intersection / union
+        metrics[f"IOU_{thresh}"].append(IOU)
+    return metrics
 
 
 # def get_gt_points(

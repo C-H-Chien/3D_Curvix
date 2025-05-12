@@ -98,21 +98,16 @@ def eval_3D_edges(obj_name, base_dir, output_name, GT_dir, metrics, totals):
         gt_points,
         metrics,
         thresh_list=[0.005, 0.01, 0.02],
-        edge_type="all",
     )
 
 
 def main(base_dir, GT_dir, exp_name):
-    eval_obj_name = "00004605"
+    eval_obj_name = "00000006"
     set_random_seeds()
     metrics = {
         "chamfer": [],
         "acc": [],
         "comp": [],
-        "comp_curve": [],
-        "comp_line": [],
-        "acc_curve": [],
-        "acc_line": [],
         "precision_0.01": [],
         "recall_0.01": [],
         "fscore_0.01": [],
@@ -157,6 +152,9 @@ def main(base_dir, GT_dir, exp_name):
     print("Summary:")
     print(f"  Accuracy: {metrics['acc']:.4f}")
     print(f"  Completeness: {metrics['comp']:.4f}")
+    print(f"  IOU @ 5 mm: {metrics['IOU_0.005']:.4f}")
+    print(f"  IOU @ 10 mm: {metrics['IOU_0.01']:.4f}")
+    print(f"  IOU @ 20 mm: {metrics['IOU_0.02']:.4f}")
     print(f"  Recall @ 5 mm: {metrics['recall_0.005']:.4f}")
     print(f"  Recall @ 10 mm: {metrics['recall_0.01']:.4f}")
     print(f"  Recall @ 20 mm: {metrics['recall_0.02']:.4f}")
