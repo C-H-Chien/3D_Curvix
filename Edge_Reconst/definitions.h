@@ -15,11 +15,11 @@
 #define EPIP_TANGENCY_DISPL_THRESH      (3)     //> in pixels
 
 //> Edge graph pruning parameters
-#define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (0.5)
-#define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (0.5)
-#define PRUNE_3D_EDGE_GRAPH_LAMBDA3     (0.5)
+#define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (1)
+#define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (1)
+#define PRUNE_3D_EDGE_GRAPH_LAMBDA3     (1)
 #define PRUNE_BY_PROJ_PROX_THRESH       (6)     //> in pixels
-#define PRUNE_BY_PROJ_ORIE_THRESH       (60)    //> in degrees
+#define PRUNE_BY_PROJ_ORIE_THRESH       (360)    //> in degrees
 
 //> Debugging purpose
 #define DEBUG                      (0)

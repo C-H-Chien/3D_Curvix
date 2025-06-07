@@ -98,6 +98,7 @@ public:
     //////////////////////////// mapping 2D edge to 3D ////////////////////////////
 
     struct EdgeNode {
+        int index;
         Eigen::Vector3d location;  
         Eigen::Vector3d orientation; 
         std::vector<std::pair<int, EdgeNode*>> neighbors;

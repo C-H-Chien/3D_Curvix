@@ -92,9 +92,9 @@ std::vector<EdgeCurvelet> EdgeMapping::read_curvelets(int thresh_EDG) {
     if (!file_reader_ptr) {
         // You'll need to provide appropriate parameters for your dataset
         std::string dataset_path = "/gpfs/data/bkimia/Datasets/";
-        std::string dataset_name = "ABC-NEF"; // Replace with your dataset name
-        std::string scene_name = "00000006";     // Replace with your scene name
-        int num_images = 50;                      // Replace with your number of images
+        std::string dataset_name = "ABC-NEF"; 
+        std::string scene_name = "00000006";  
+        int num_images = 50;  
         
         file_reader_ptr = std::make_shared<file_reader>(
             dataset_path, dataset_name, scene_name, num_images);
@@ -114,9 +114,9 @@ std::vector<Eigen::MatrixXd> EdgeMapping::read_edgels(int thresh_EDG) {
     if (!file_reader_ptr) {
         // You'll need to provide appropriate parameters for your dataset
         std::string dataset_path = "/gpfs/data/bkimia/Datasets/";
-        std::string dataset_name = "ABC-NEF"; // Replace with your dataset name
-        std::string scene_name = "00000006";     // Replace with your scene name
-        int num_images = 50;                      // Replace with your number of images
+        std::string dataset_name = "ABC-NEF"; 
+        std::string scene_name = "00000006";  
+        int num_images = 50;  
         
         file_reader_ptr = std::make_shared<file_reader>(
             dataset_path, dataset_name, scene_name, num_images);
@@ -140,6 +140,8 @@ std::vector<Eigen::MatrixXd> EdgeMapping::read_edgels(int thresh_EDG) {
     return all_edgels;
 }
 ////////////////////////////////////////////////// read curvelets and edgels //////////////////////////////////////////////////
+
+
 
 ///////////////////////// Create the 3D edge weight graph /////////////////////////
 std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>
@@ -208,6 +210,7 @@ EdgeMapping::build3DEdgeWeightedGraph(const std::unordered_map<EdgeMapping::Unco
 
         //std::cout<<"size of records_all is: "<<records_all.size()<<std::endl;
 
+        // for all 3d edges that have connected 2d edges
         for (int i = 0; i < records_all.size()-1; ++i) {
             for (int j = i+1; j < records_all.size(); ++j){
                 Eigen::Vector3d a = records_all[i].edge_3D;
@@ -220,7 +223,10 @@ EdgeMapping::build3DEdgeWeightedGraph(const std::unordered_map<EdgeMapping::Unco
                 }
 
                 std::pair<Eigen::Vector3d, Eigen::Vector3d> edge_pair = {a, b};
-                graph[edge_pair]++;
+                if (a.x()!=b.x() && a.y()!=b.y() && a.z()!=b.z()){
+                    graph[edge_pair]++;
+                }
+                
             }
         }
     }
@@ -293,7 +299,12 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std:
         Eigen::Vector3d t2 = it2->second.front().tangents_3D_world.normalized();
 
         //> Compute the orientation between the two (in degrees)
-        angles.push_back( std::acos(fabs(t1.dot(t2)))*180/PI );
+        //angles.push_back( std::acos(fabs(t1.dot(t2)))*180/PI );
+        double dot_product = fabs(t1.dot(t2));
+        // Clamp to [-1.0, 1.0] to avoid nan values
+        dot_product = std::min(1.0, std::max(-1.0, dot_product));
+        angles.push_back(std::acos(dot_product) * 180/PI);
+        //std::cout<<"angle is: "<<angles<<std::endl;
 
         //> compute the distance between the two
         //> (here I find the normal distance rather than the Euclidean distance)
@@ -312,8 +323,7 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std:
     auto mean_std = [](const std::vector<double>& values) -> std::pair<double, double> {
         if (values.empty()) return {0.0, 0.0};
         double mean = std::accumulate(values.begin(), values.end(), 0.0) / values.size();
-        double sq_sum = std::accumulate(values.begin(), values.end(), 0.0,
-                            [mean](double acc, double val) { return acc + (val - mean) * (val - mean); });
+        double sq_sum = std::accumulate(values.begin(), values.end(), 0.0, [mean](double acc, double val) { return acc + (val - mean) * (val - mean); });
         double stddev = std::sqrt(sq_sum / values.size());
         return {mean, stddev};
     };
@@ -346,7 +356,7 @@ EdgeMapping::pruneEdgeGraph_by_3DProximityAndOrientation(std::unordered_map<std:
         edge_link_counter++;
 
         if ((proximity_diff < mu1 + sigma1*PRUNE_3D_EDGE_GRAPH_LAMBDA1 && angle_diff < mu2 + sigma2*PRUNE_3D_EDGE_GRAPH_LAMBDA2 
-            && tangential_dist_fiff < mu3 + sigma3*PRUNE_3D_EDGE_GRAPH_LAMBDA3) || weight > 1) { //
+            && tangential_dist_fiff < mu3 + sigma3*PRUNE_3D_EDGE_GRAPH_LAMBDA3) || weight > 1) { 
             pruned_graph[pair]++;
         }
     }
@@ -378,7 +388,8 @@ EdgeMapping::pruneEdgeGraphbyProjections(std::unordered_map<std::pair<Eigen::Vec
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 
     std::cout << "Begin of edge graph pruning by projections ..." << std::endl;
-    Eigen::Vector3d target(0.892454, 0.232254, 0.356584);
+    Eigen::Vector3d target1(0.500376, 0.995801,  0.42812);
+    Eigen::Vector3d target2(0.499608,   1.0027, 0.429211);
 
     for (const auto& [pair, weight] : graph) {
 
@@ -402,7 +413,7 @@ EdgeMapping::pruneEdgeGraphbyProjections(std::unordered_map<std::pair<Eigen::Vec
         double ore_diff_threshold = cos(double(PRUNE_BY_PROJ_ORIE_THRESH)/180*PI);
         
         //> Project to all views 
-        for (unsigned vi = 0; vi < Num_Of_Total_Imgs; vi++) {
+        for (int vi = 0; vi < Num_Of_Total_Imgs; vi++) {
 
             //> Project 3D edge point to the 2D image
             Eigen::Vector3d proj_edge_1_location = K * (All_R[vi] * Edge3D_1_Location + All_T[vi]);
@@ -410,6 +421,14 @@ EdgeMapping::pruneEdgeGraphbyProjections(std::unordered_map<std::pair<Eigen::Vec
             proj_edge_1_location = util->getNormalizedProjectedPoint( proj_edge_1_location );
             proj_edge_2_location = util->getNormalizedProjectedPoint( proj_edge_2_location );
 
+            // if (vi == 21 && Edge3D_1_Location.isApprox(target1, 1e-6)){
+            //     std::cout << "[Image #" << vi << "] ";
+            //     std::cout<<"red curve projected locations: ("<<proj_edge_1_location(0) << ", " << proj_edge_1_location(1) << ", " << proj_edge_1_location(2) << ")\n"<<std::endl;
+            // }
+            // if (vi == 21 && Edge3D_1_Location.isApprox(target2, 1e-6)){
+            //     std::cout << "[Image #" << vi << "] ";
+            //     std::cout<<"blue curve projected locations: ("<<proj_edge_1_location(0) << ", " << proj_edge_1_location(1) << ", " << proj_edge_1_location(2) << ")\n"<<std::endl;
+            // }
             // std::cout << "[Image #" << vi << "] ";
             // std::cout << "Projected locations: (" << proj_edge_1_location(0) << ", " << proj_edge_1_location(1) << ", " << proj_edge_1_location(2) << "), (" \
             //           << proj_edge_2_location(0) << ", " << proj_edge_2_location(1) << ", " << proj_edge_2_location(2) << ")" << ", norm = " << (proj_edge_1_location - proj_edge_2_location).norm() << " ";
@@ -421,36 +440,16 @@ EdgeMapping::pruneEdgeGraphbyProjections(std::unordered_map<std::pair<Eigen::Vec
             //> Rule out if the distance between the projected 3D edge points are over a threshold
             //> TODO: make the threhold as a Macro
             prune_flag = ((proj_edge_1_location - proj_edge_2_location).norm() > PRUNE_BY_PROJ_PROX_THRESH) ? (true) : (false);
-            
-            if (Edge3D_1_Location.isApprox(target, 1e-6) && prune_flag) {
-                std::cout<<"location prune, neighbor: ("<<Edge3D_2_Location.transpose()<<") at image #"<<vi<<std::endl;
-                std::cout<<"proj_edge_1_location is "<<proj_edge_1_location.transpose()<<"; proj_edge_2_location is "<<proj_edge_2_location.transpose()<<std::endl;
-            }
 
             if (prune_flag) break;
 
-            // std::cout << "Projected tangents: (" << proj_tangent_1(0) << ", " << proj_tangent_1(1) << ", " << proj_tangent_1(2) << "), (" \
-            //           << proj_tangent_2(0) << ", " << proj_tangent_2(1) << ", " << proj_tangent_2(2) << ")" << std::endl;
-
-            //> Rule out if the orientation difference is over a threshold
-            //> TODO: make the threhold as a Macro
-            double abs_dot_prod = fabs(proj_tangent_1(0)*proj_tangent_2(0) + proj_tangent_1(1)*proj_tangent_2(1));
-            prune_flag = (abs_dot_prod < ore_diff_threshold) ? (true) : (false);
-
-            if (Edge3D_1_Location.isApprox(target, 1e-6) && prune_flag) {
-                std::cout<<"orientation prune, neighbor: ("<<Edge3D_2_Location.transpose()<<") at image #"<<vi<<std::endl;
-                std::cout<<"proj_edge_1_location is "<<proj_edge_1_location.transpose()<<"; proj_edge_2_location is "<<proj_edge_2_location.transpose()<<std::endl;
-                std::cout<<"proj_tangent_1 is "<<proj_tangent_1.transpose()<<"; proj_tangent_2 is "<<proj_tangent_2.transpose()<<std::endl;
-            }
-
-            if (prune_flag) break;
         }
 
         // std::cout << "prune_flag = " << prune_flag << std::endl;
 
         if (!prune_flag) 
             pruned_graph_by_proj[pair]++;
-        // }
+        //}
     }
 
     //> write the 3D edge graph after pruning by projection
@@ -486,6 +485,7 @@ EdgeMapping::EdgeNodeList EdgeMapping::buildEdgeNodeGraph(const std::unordered_m
             avg_tangent.normalize();
         }
         node->orientation = avg_tangent;
+        node->index = node_index;
 
         node_map[edge] = std::make_pair(node.get(), node_index);
         nodes.push_back(std::move(node));
@@ -507,27 +507,23 @@ EdgeMapping::EdgeNodeList EdgeMapping::buildEdgeNodeGraph(const std::unordered_m
         b->neighbors.push_back(std::make_pair(a_index, a));
     }
 
+
     return nodes;
 }
 ///////////////////////// build a map of 3d edges with its neighbors /////////////////////////
 
 
 
-///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
+///////////////////////// Smoothing 3d edges with its neighbors Gaussian/////////////////////////
 void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size_force, double step_size_torque) {
-
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 
     std::ofstream before_out("../../outputs/3D_edges_before_smoothing.txt");
 
-
     for (size_t i = 0; i < edge_nodes.size(); ++i) {
         const auto& node = edge_nodes[i];
         before_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
-        // if (target_indices.count(i)){
-        //     before_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
-        // }
     }
     std::cout << "\n";
     before_out.close();
@@ -535,6 +531,14 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int itera
     std::cout << "Start aligning edges..." << std::endl;
 
     for (int iter = 0; iter < iterations; ++iter) {
+
+        // if (iter > 0 && iter % 50 == 0 && step_size_force<1 && step_size_torque<1) {
+        //     step_size_force *= sqrt(2.0);
+        //     step_size_torque *= sqrt(2.0);
+        //     std::cout << "Iteration " << iter << ": Increased step sizes - Force: " 
+        //               << step_size_force << ", Torque: " << step_size_torque << std::endl;
+        // }
+
         std::vector<Eigen::Vector3d> new_locations(edge_nodes.size());
         std::vector<Eigen::Vector3d> new_orientations(edge_nodes.size());
 
@@ -546,37 +550,86 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int itera
                 continue;
             }
 
+            // Calculate distances to all neighbors for this node
+            std::vector<double> distances;
+            for (const auto& neighbor_pair : node->neighbors) {
+                const EdgeNode* neighbor = neighbor_pair.second;
+                const Eigen::Vector3d& p = neighbor->location;
+                const Eigen::Vector3d& B = node->location;
+                
+                // Calculate Euclidean distance between node and neighbor
+                double euclidean_distance = (p - B).norm();
+                distances.push_back(euclidean_distance);
+            }
+            
+            // Calculate mean and standard deviation of distances
+            double mean_distance = 0.0;
+            for (const auto& d : distances) {
+                mean_distance += d;
+            }
+            mean_distance /= distances.size();
+            
+            double variance = 0.0;
+            for (const auto& d : distances) {
+                variance += (d - mean_distance) * (d - mean_distance);
+            }
+            variance /= distances.size();
+            double std_dev = std::sqrt(variance);
+            
+            // If standard deviation is too small, set a minimum value to avoid division issues
+            double sigma = std::max(std_dev, 0.001);
+            
             //> Location aligning
             Eigen::Vector3d sum_force = Eigen::Vector3d::Zero();
-            for (const auto& neighbor_pair : node->neighbors) {
+            //> Orientation aligning
+            Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
+            
+            // Total weight for normalization
+            double total_weight_force = 0.0;
+            double total_weight_torque = 0.0;
+
+            for (size_t j = 0; j < node->neighbors.size(); ++j) {
+                const auto& neighbor_pair = node->neighbors[j];
                 const EdgeNode* neighbor = neighbor_pair.second;
                 const Eigen::Vector3d& p = neighbor->location;
                 const Eigen::Vector3d& t_neighbor = neighbor->orientation;
                 const Eigen::Vector3d& B = node->location;
-
+                
+                // Calculate force component (tangential distance)
                 Eigen::Vector3d tangential_dist = util->findClosestVectorFromPointToLine(p, t_neighbor, B);
-                sum_force += tangential_dist;
+                
+                // Calculate euler angles for orientation alignment
+                Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
+                
+                // Calculate weight using Gaussian function based on distance
+                double euclidean_distance = distances[j];
+                double gaussian_weight = std::exp(-0.5 * std::pow((euclidean_distance - mean_distance) / sigma, 2));
+                
+                // Apply weighted force and torque
+                sum_force += gaussian_weight * tangential_dist;
+                sum_euler_angles += gaussian_weight * euler_angles;
+                
+                // Accumulate weights for normalization
+                total_weight_force += gaussian_weight;
+                total_weight_torque += gaussian_weight;
             }
-            sum_force /= static_cast<double>(node->neighbors.size());
+            
+            // Normalize by total weight if it's not zero
+            if (total_weight_force > 0) {
+                sum_force /= total_weight_force;
+            }
+            if (total_weight_torque > 0) {
+                sum_euler_angles /= total_weight_torque;
+            }
             
             //> Update edge location
             new_locations[i] = node->location + step_size_force * sum_force;
 
-            //> Orientation aligning
-            Eigen::Vector3d sum_tangent = Eigen::Vector3d::Zero();
-            Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
-            for (const auto& neighbor_pair : node->neighbors) {
-                const EdgeNode* neighbor = neighbor_pair.second;
-                Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
-                sum_euler_angles += euler_angles;
-            }
-            sum_euler_angles /= static_cast<double>(node->neighbors.size());
+            //> Update edge orientation
             sum_euler_angles *= step_size_torque;
             //> convert from degrees to radians
             sum_euler_angles = sum_euler_angles * M_PI / 180.0;
             Eigen::Matrix3d R_align = util->euler_to_rotation_matrix(sum_euler_angles(0), sum_euler_angles(1), sum_euler_angles(2));
-
-            //> Update edge orientation
             new_orientations[i] = R_align * node->orientation;
         }
 
@@ -588,43 +641,274 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int itera
 
             if(iter == iterations-1){
                 after_out << node->location.transpose() << " " << node->orientation.transpose() << "\n";
-                // if (target_indices.count(i)){
-                //     //after_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
-                //     //std::cout << node->location.transpose()<<" "<<node->orientation.transpose()<< "; "<<std::endl;
-                // }
             }
         }
-        //std::cout << "\n";
     }
 
-    ///////////////////// find neighbor connection //////////////////////////////////
-    std::ofstream neighbor_file_after("../../outputs/target_indices_neighbors_after.txt");
-    // Eigen::Vector3d target_after_1(0.350545, 0.0919067, 0.34939);
-    // Eigen::Vector3d target_after_2(0.349817, 0.0923272, 0.349419);
-    // for (auto i : target_indices) {
-    //     if (i >= static_cast<int>(edge_nodes.size())) continue; 
-    //     const auto& node = edge_nodes[i];
-    //     if (node->location.isApprox(target_after_1)) {
-    //         std::cout << "aligned index for 1 is: " << i << std::endl;
-    //     }
-    //     if (node->location.isApprox(target_after_2)) {
-    //         std::cout << "aligned index for 2 is: " << i << std::endl;
-    //     }
-    //     // std::cout << "neighbors of " << node->location.transpose() << " after alignment are: " << std::endl;
-    //     // for (const auto& neighbor_pair : node->neighbors) {
-    //     //     int neighbor_idx = neighbor_pair.first;
-    //     //     const EdgeNode* neighbor = neighbor_pair.second;
-    //     //     std::cout << neighbor->location.transpose() << " (Index: " << neighbor_idx << ")" << std::endl;
-    //     // }
-    // }
-    neighbor_file_after.close();
-    ///////////////////// find neighbor connection //////////////////////////////////
+    // Write edge-neighbor pairs to pruned_graph_aligned.txt
+    std::ofstream pruned_graph_aligned("../../outputs/pruned_graph_aligned.txt");
+    if (!pruned_graph_aligned.is_open()) {
+        LOG_ERROR("Could not open pruned_graph_aligned.txt file!");
+        return;
+    }
+    std::ofstream orientation_aligned("../../outputs/aligned_orientation.txt");
+    if (!orientation_aligned.is_open()) {
+        LOG_ERROR("Could not open aligned_orientation.txt file!");
+        return;
+    }
+    for (size_t i = 0; i < edge_nodes.size(); ++i) {
+        const auto& node = edge_nodes[i];
+       
+        // Skip nodes with no neighbors
+        if (node->neighbors.empty()) {
+            continue;
+        }
+       
+        // Record all neighbors for this node
+        for (const auto& neighbor_pair : node->neighbors) {
+            orientation_aligned <<"0\t0\t"<<node->location.transpose()<<node->orientation.transpose()<<std::endl;
+            const EdgeNode* neighbor = neighbor_pair.second;
+            pruned_graph_aligned << node->location(0) << "\t" << node->location(1) << "\t" << node->location(2) << "\t";
+            pruned_graph_aligned << neighbor->location(0) << "\t" << neighbor->location(1) << "\t" << neighbor->location(2) << "\t";
+            pruned_graph_aligned << node->orientation(0) << "\t" << node->orientation(1) << "\t" << node->orientation(2) << "\t";
+            pruned_graph_aligned << neighbor->orientation(0) << "\t" << neighbor->orientation(1) << "\t" << neighbor->orientation(2) << "\t\n";
+        }
+    }
+    pruned_graph_aligned.close();
+    std::cout << "Wrote all edge-neighbor pairs to pruned_graph_aligned.txt" << std::endl;
 
-    //after_out.close();
-    std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(iterations) + " iterations with force step size " + std::to_string(step_size_force) + " and torque step size " + std::to_string(step_size_torque); 
+    std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(iterations) + " iterations with force step size " + std::to_string(step_size_force) + " and torque step size " + std::to_string(step_size_torque);
     LOG_GEN_MESG(msg);
 }
 ///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
+
+
+
+// ///////////////////////// Smoothing 3d edges with its neighbors Log /////////////////////////
+// void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size_force, double step_size_torque) {
+
+//     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
+//     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+
+//     std::ofstream before_out("../../outputs/3D_edges_before_smoothing.txt");
+
+//     for (size_t i = 0; i < edge_nodes.size(); ++i) {
+//         const auto& node = edge_nodes[i];
+//         before_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
+//         // if (target_indices.count(i)){
+//         //     before_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
+//         // }
+//     }
+//     std::cout << "\n";
+//     before_out.close();
+//     std::ofstream after_out("../../outputs/3D_edges_after_smoothing.txt");
+//     std::cout << "Start aligning edges..." << std::endl;
+//     Eigen::Vector3d target_edge(0.725574,  0.54634, 0.350898);
+
+//     for (int iter = 0; iter < iterations; ++iter) {
+
+//         //increase force and torque every 50 iterations
+//         // if(iter % 200 == 0){
+//         //     step_size_force = step_size_force * sqrt(2);
+//         //     step_size_torque = step_size_torque * sqrt(2);
+//         // }
+
+//         std::vector<Eigen::Vector3d> new_locations(edge_nodes.size());
+//         std::vector<Eigen::Vector3d> new_orientations(edge_nodes.size());
+
+//         for (size_t i = 0; i < edge_nodes.size(); ++i) {
+//             const auto& node = edge_nodes[i];
+//             //std::cout<<"node index is: "<<node->index<<std::endl;
+//             if (node->neighbors.empty()) {
+//                 new_locations[i] = node->location;
+//                 new_orientations[i] = node->orientation;
+//                 continue;
+//             }
+
+//             const Eigen::Vector3d& B = node->location;
+
+//             // // Calculate distances to all neighbors for this node
+//             // std::vector<double> distances;
+//             // for (const auto& neighbor_pair : node->neighbors) {
+//             //     const EdgeNode* neighbor = neighbor_pair.second;
+//             //     const Eigen::Vector3d& p = neighbor->location;
+                
+//             //     // Calculate Euclidean distance between node and neighbor
+//             //     double euclidean_distance = (p - B).norm();
+//             //     distances.push_back(euclidean_distance);
+//             // }
+
+//             // // Calculate mean and standard deviation of distances
+//             // double mean_distance = 0.0;
+//             // for (const auto& d : distances) {
+//             //     mean_distance += d;
+//             // }
+//             // mean_distance /= distances.size();
+//             // double variance = 0.0;
+//             // for (const auto& d : distances) {
+//             //     variance += (d - mean_distance) * (d - mean_distance);
+//             // }
+//             // variance /= distances.size();
+//             // double sigma =  std::max(std::sqrt(variance), 0.0001);
+
+//             // //> Location aligning
+//             // Eigen::Vector3d sum_force = Eigen::Vector3d::Zero();
+//             // //> Orientation aligning
+//             // Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
+
+//             // // Total weight for normalization
+//             // double total_weight_force = 0.0;
+//             // double total_weight_torque = 0.0;
+
+//             // for (size_t j = 0; j < node->neighbors.size(); ++j){
+//             //     const auto& neighbor_pair = node->neighbors[j];
+//             //     const EdgeNode* neighbor = neighbor_pair.second;
+//             //     const Eigen::Vector3d& p = neighbor->location;
+//             //     const Eigen::Vector3d& t_neighbor = neighbor->orientation;
+                
+//             //     Eigen::Vector3d tangential_dist = util->findClosestVectorFromPointToLine(p, t_neighbor, B);
+//             //     Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
+
+//             //     // Calculate weight using Gaussian function based on distance
+//             //     double euclidean_distance = distances[j];
+//             //     double gaussian_weight = std::exp(-0.5 * std::pow((euclidean_distance - mean_distance) / sigma, 2));
+                
+//             //     // Apply weighted force and torque
+//             //     sum_force += gaussian_weight * tangential_dist;
+//             //     sum_euler_angles += gaussian_weight * euler_angles;
+
+//             //     // Accumulate weights for normalization
+//             //     total_weight_force += gaussian_weight;
+//             //     total_weight_torque += gaussian_weight;
+//             // }
+
+//             // // Normalize by total weight if it's not zero
+//             // if (total_weight_force > 0) {
+//             //     sum_force /= total_weight_force;
+//             // }
+//             // if (total_weight_torque > 0) {
+//             //     sum_euler_angles /= total_weight_torque;
+//             // }
+//             //> Location aligning
+//             Eigen::Vector3d sum_force = Eigen::Vector3d::Zero();
+//             for (const auto& neighbor_pair : node->neighbors) {
+//                 const EdgeNode* neighbor = neighbor_pair.second;
+//                 const Eigen::Vector3d& p = neighbor->location;
+//                 const Eigen::Vector3d& t_neighbor = neighbor->orientation;
+//                 const Eigen::Vector3d& B = node->location;
+
+//                 double euclidean_distance = (p - B).norm();
+//                 double epsilon = 1e-10;
+//                 double force_magnitude = 1;//std::log10(1.0 / (euclidean_distance + epsilon));
+
+//                 Eigen::Vector3d tangential_dist = util->findClosestVectorFromPointToLine(p, t_neighbor, B);
+//                 sum_force += force_magnitude*tangential_dist;
+//             }
+//             sum_force /= static_cast<double>(node->neighbors.size());
+            
+//             //> Update edge location
+//             new_locations[i] = node->location + step_size_force * sum_force;
+
+//             //> Orientation aligning
+//             Eigen::Vector3d sum_tangent = Eigen::Vector3d::Zero();
+//             Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
+//             for (const auto& neighbor_pair : node->neighbors) {
+//                 const EdgeNode* neighbor = neighbor_pair.second;
+//                 const Eigen::Vector3d& p = neighbor->location;
+//                 Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
+
+//                 double euclidean_distance = (p - B).norm();
+//                 double epsilon = 1e-10;
+//                 double force_magnitude = 1;//std::log10(1.0 / (euclidean_distance + epsilon));
+//                 sum_euler_angles += force_magnitude*euler_angles;
+
+//             }
+//             sum_euler_angles /= static_cast<double>(node->neighbors.size());
+//             sum_euler_angles *= step_size_torque;
+//             //> convert from degrees to radians
+//             sum_euler_angles = sum_euler_angles * M_PI / 180.0;
+//             Eigen::Matrix3d R_align = util->euler_to_rotation_matrix(sum_euler_angles(0), sum_euler_angles(1), sum_euler_angles(2));
+
+//             //> Update edge orientation
+//             new_orientations[i] = R_align * node->orientation;
+//         }
+
+//         //> Update all edge locations and orientations
+//         for (size_t i = 0; i < edge_nodes.size(); ++i) {
+//             edge_nodes[i]->location = new_locations[i];
+//             edge_nodes[i]->orientation = new_orientations[i];
+//             const auto& node = edge_nodes[i];
+
+//             if(iter == iterations-1){
+//                 after_out << node->location.transpose() << " " << node->orientation.transpose() << "\n";
+//                 // if (target_indices.count(i)){
+//                 //     //after_out << node->location.transpose() << " " << node->orientation.transpose()<<"\n";
+//                 //     //std::cout << node->location.transpose()<<" "<<node->orientation.transpose()<< "; "<<std::endl;
+//                 // }
+//             }
+//         }
+//         //std::cout << "\n";
+//     }
+
+//     ///////////////////// find neighbor connection //////////////////////////////////
+//     std::ofstream neighbor_file_after("../../outputs/target_indices_neighbors_after.txt");
+//     // Eigen::Vector3d target_after_1(0.350545, 0.0919067, 0.34939);
+//     // Eigen::Vector3d target_after_2(0.349817, 0.0923272, 0.349419);
+//     // for (auto i : target_indices) {
+//     //     if (i >= static_cast<int>(edge_nodes.size())) continue;
+//     //     const auto& node = edge_nodes[i];
+//     //     if (node->location.isApprox(target_after_1)) {
+//     //         std::cout << "aligned index for 1 is: " << i << std::endl;
+//     //     }
+//     //     if (node->location.isApprox(target_after_2)) {
+//     //         std::cout << "aligned index for 2 is: " << i << std::endl;
+//     //     }
+//     //     // std::cout << "neighbors of " << node->location.transpose() << " after alignment are: " << std::endl;
+//     //     // for (const auto& neighbor_pair : node->neighbors) {
+//     //     //     int neighbor_idx = neighbor_pair.first;
+//     //     //     const EdgeNode* neighbor = neighbor_pair.second;
+//     //     //     std::cout << neighbor->location.transpose() << " (Index: " << neighbor_idx << ")" << std::endl;
+//     //     // }
+//     // }
+//     neighbor_file_after.close();
+//     ///////////////////// find neighbor connection //////////////////////////////////
+//     // Write edge-neighbor pairs to pruned_graph_aligned.txt
+//     std::ofstream pruned_graph_aligned("../../outputs/pruned_graph_aligned.txt");
+//     if (!pruned_graph_aligned.is_open()) {
+//         LOG_ERROR("Could not open pruned_graph_aligned.txt file!");
+//         return;
+//     }
+//     std::ofstream orientation_aligned("../../outputs/aligned_orientation.txt");
+//     if (!orientation_aligned.is_open()) {
+//         LOG_ERROR("Could not open aligned_orientation.txt file!");
+//         return;
+//     }
+//     for (size_t i = 0; i < edge_nodes.size(); ++i) {
+//         const auto& node = edge_nodes[i];
+       
+//         // Skip nodes with no neighbors
+//         if (node->neighbors.empty()) {
+//             continue;
+//         }
+       
+//         // Record all neighbors for this node
+//         for (const auto& neighbor_pair : node->neighbors) {
+//             orientation_aligned <<"0\t0\t"<<node->location.transpose()<<node->orientation.transpose()<<std::endl;
+//             const EdgeNode* neighbor = neighbor_pair.second;
+//             pruned_graph_aligned << node->location(0) << "\t" << node->location(1) << "\t" << node->location(2) << "\t";
+//             pruned_graph_aligned << neighbor->location(0) << "\t" << neighbor->location(1) << "\t" << neighbor->location(2) << "\t";
+//             pruned_graph_aligned << node->orientation(0) << "\t" << node->orientation(1) << "\t" << node->orientation(2) << "\t";
+//             pruned_graph_aligned << neighbor->orientation(0) << "\t" << neighbor->orientation(1) << "\t" << neighbor->orientation(2) << "\t\n";
+//         }
+//     }
+//     pruned_graph_aligned.close();
+//     std::cout << "Wrote all edge-neighbor pairs to pruned_graph_aligned.txt" << std::endl;
+
+//     //after_out.close();
+//     std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(iterations) + " iterations with force step size " + std::to_string(step_size_force) + " and torque step size " + std::to_string(step_size_torque);
+//     LOG_GEN_MESG(msg);
+// }
+// ///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
 
 
 ////////////////// test //////////////////
@@ -656,12 +940,13 @@ EdgeMapping::ConnectivityGraph EdgeMapping::createConnectivityGraph(EdgeNodeList
 
     if (!util) {util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());}
     
-    std::cout<<"Creating connectivity graph for " + std::to_string(edge_nodes.size()) + " edge nodes..."<<std::endl;
+    //std::cout<<"Creating connectivity graph for " + std::to_string(edge_nodes.size()) + " edge nodes..."<<std::endl;
 
-    Eigen::Vector3d target1(0.355401, 0.0890953, 0.349353);
-    Eigen::Vector3d target2(0.354278, 0.0897453, 0.349358);
-    Eigen::Vector3d target3(0.35297, 0.0905021, 0.349363); //11681
-    
+    Eigen::Vector3d target1(0.0675822,   0.69912,  0.352804);
+    Eigen::Vector3d target2(0.0674756,  0.699101,  0.353034);
+    Eigen::Vector3d target3(0.467804, 0.732292, 0.645433);
+    Eigen::Vector3d target4(0.932355, 0.357309, 0.616943);
+
     // for each node in the graph
     for (size_t i = 0; i < edge_nodes.size(); ++i) {
         EdgeNode* node = edge_nodes[i].get();
@@ -672,9 +957,10 @@ EdgeMapping::ConnectivityGraph EdgeMapping::createConnectivityGraph(EdgeNodeList
         graph_node.left_neighbor = std::make_pair(-1, Eigen::Vector3d::Zero());  // Default: no left neighbor
         graph_node.right_neighbor = std::make_pair(-1, Eigen::Vector3d::Zero()); // Default: no right neighbor
 
-        bool is_target1 = node->location.isApprox(target1, 1e-6);
-        bool is_target2 = node->location.isApprox(target2, 1e-6);
-        bool is_target3 = node->location.isApprox(target3, 1e-6);
+        bool is_target1 = node->location.isApprox(target1, 1e-4);
+        bool is_target2 = node->location.isApprox(target2, 1e-4);
+        bool is_target3 = node->location.isApprox(target3, 1e-4);
+        bool is_target4 = node->location.isApprox(target4, 1e-4);
         
         if (!node->neighbors.empty()) {
             std::vector<std::pair<int, Eigen::Vector3d>> updated_neighbors;
@@ -758,44 +1044,45 @@ EdgeMapping::ConnectivityGraph EdgeMapping::createConnectivityGraph(EdgeNodeList
                 }
             }
 
-            if (is_target1 || is_target2 || is_target3) {
+        //     if (is_target1 || is_target2) {
 
-                if(is_target1){std::cout << "Found target1: " << target1.transpose() << " at node index " << i << std::endl;}
-                if(is_target2){std::cout << "Found target2: " << target2.transpose() << " at node index " << i << std::endl;}
-                if(is_target3){std::cout << "Found target3: " << target3.transpose() << " at node index " << i << std::endl;}
+        //         if(is_target1){std::cout << "Found target1: " << target1.transpose() << " at node index " << i << std::endl;}
+        //         if(is_target2){std::cout << "Found target2: " << target2.transpose() << " at node index " << i << std::endl;}
+        //         // if(is_target3){std::cout << "Found target3: " << target3.transpose() << " at node index " << i << std::endl;}
+        //         // if(is_target4){std::cout << "Found target4: " << target4.transpose() << " at node index " << i << std::endl;}
 
-                std::cout<<"orientation is: "<<(graph_node.orientation).transpose()<<std::endl;
-                std::cout<<"neighbors location and orientations:  are: "<<std::endl;
-                for (const auto& neighbor_pair : node->neighbors) {
-                    const int neighbor_index = neighbor_pair.first;
-                    const EdgeNode* neighbor = neighbor_pair.second;
+        //         std::cout<<"orientation is: "<<(graph_node.orientation).transpose()<<std::endl;
+        //         std::cout<<"neighbors location and orientations:  are: "<<std::endl;
+        //         for (const auto& neighbor_pair : node->neighbors) {
+        //             const int neighbor_index = neighbor_pair.first;
+        //             const EdgeNode* neighbor = neighbor_pair.second;
                     
-                    std::cout<< (edge_nodes[neighbor_index]->location).transpose()<<" ; " <<(edge_nodes[neighbor_index]->orientation).transpose()<<std::endl;
-                }
+        //             std::cout<< (edge_nodes[neighbor_index]->location).transpose()<<" ; " <<(edge_nodes[neighbor_index]->orientation).transpose()<<std::endl;
+        //         }
                     
                 
-                // Print left neighbor info
-                if (graph_node.left_neighbor.first >= 0) {
-                    int left_idx = graph_node.left_neighbor.first;
-                    Eigen::Vector3d left_loc = edge_nodes[left_idx]->location;
-                    std::cout << "  Left neighbor (index " << left_idx << "): " 
-                              << left_loc.x() << ", " << left_loc.y() << ", " << left_loc.z() << std::endl;
-                } else {
-                    std::cout << "  No left neighbor" << std::endl;
-                }
+        //         // Print left neighbor info
+        //         if (graph_node.left_neighbor.first >= 0) {
+        //             int left_idx = graph_node.left_neighbor.first;
+        //             Eigen::Vector3d left_loc = edge_nodes[left_idx]->location;
+        //             std::cout << "  Left neighbor (index " << left_idx << "): " 
+        //                       << left_loc.x() << ", " << left_loc.y() << ", " << left_loc.z() << std::endl;
+        //         } else {
+        //             std::cout << "  No left neighbor" << std::endl;
+        //         }
                 
-                // Print right neighbor info
-                if (graph_node.right_neighbor.first >= 0) {
-                    int right_idx = graph_node.right_neighbor.first;
-                    Eigen::Vector3d right_loc = edge_nodes[right_idx]->location;
-                    std::cout << "  Right neighbor (index " << right_idx << "): " 
-                              << right_loc.x() << ", " << right_loc.y() << ", " << right_loc.z() << std::endl;
-                } else {
-                    std::cout << "  No right neighbor" << std::endl;
-                }
+        //         // Print right neighbor info
+        //         if (graph_node.right_neighbor.first >= 0) {
+        //             int right_idx = graph_node.right_neighbor.first;
+        //             Eigen::Vector3d right_loc = edge_nodes[right_idx]->location;
+        //             std::cout << "  Right neighbor (index " << right_idx << "): " 
+        //                       << right_loc.x() << ", " << right_loc.y() << ", " << right_loc.z() << std::endl;
+        //         } else {
+        //             std::cout << "  No right neighbor" << std::endl;
+        //         }
                 
-                std::cout << "------------------------" << std::endl;
-            }
+        //         std::cout << "------------------------" << std::endl;
+        //     }
         }
         
         // Add the node to the connectivity graph
@@ -827,7 +1114,7 @@ void EdgeMapping::writeConnectivityGraphToFile(const ConnectivityGraph& graph, c
         
         outfile << node_index << " "
                 << node.location.x() << " " << node.location.y() << " " << node.location.z() << " ;"
-                //<< node.orientation.x() << " " << node.orientation.y() << " " << node.orientation.z() << " "
+                << node.orientation.x() << " " << node.orientation.y() << " " << node.orientation.z() << " "
                 << node.left_neighbor.first << " ";
         
         if (node.left_neighbor.first >= 0) {
@@ -876,9 +1163,7 @@ void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves,
             const auto& node = connectivity_graph.at(node_index);
             
             if (b_write_curve_info) {
-                outfile << curve_id << " " << node_index << " "
-                        << node.location.x() << " " << node.location.y() << " " << node.location.z() << " "
-                        << node.orientation.x() << " " << node.orientation.y() << " " << node.orientation.z() << "\n";
+                outfile << curve_id << " " << node_index << " "<< node.location.transpose() << " "<< node.orientation.transpose() << "\n";
             }
             else {
                 outfile << node.location.x() << " " << node.location.y() << " " << node.location.z() << "\n";
@@ -913,12 +1198,12 @@ std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph(co
         assigned_edges.insert(node_index);
 
         //bool target_in_curve = (node_index == target1_index || node_index == target2_index);
-        if (node_index == target1_index) {
-            std::cout << "Starting curve with Target1 (node index " << target1_index << ")" << std::endl;
-        }
-        if (node_index == target2_index) {
-            std::cout << "Starting curve with Target2 (node index " << target2_index << ")" << std::endl;
-        }
+        // if (node_index == target1_index) {
+        //     std::cout << "Starting curve with Target1 (node index " << target1_index << ")" << std::endl;
+        // }
+        // if (node_index == target2_index) {
+        //     std::cout << "Starting curve with Target2 (node index " << target2_index << ")" << std::endl;
+        // }
         
         // Forward step: follow right neighbors until we can't go further
         int current_index = node_index;
@@ -926,12 +1211,12 @@ std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph(co
             const auto& current_node = connectivity_graph.at(current_index);
             int right_neighbor_index = current_node.right_neighbor.first;
             
-            if (current_index == target1_index) {
-                std::cout << " Target 1,  Right neighbor index: " << right_neighbor_index << std::endl;
-            }
-            if (current_index == target2_index) {
-                std::cout << " Target 2,  Right neighbor index: " << right_neighbor_index << std::endl;
-            }
+            // if (current_index == target1_index) {
+            //     std::cout << " Target 1,  Right neighbor index: " << right_neighbor_index << std::endl;
+            // }
+            // if (current_index == target2_index) {
+            //     std::cout << " Target 2,  Right neighbor index: " << right_neighbor_index << std::endl;
+            // }
 
             // Stop if no right neighbor or already assigned
             if (right_neighbor_index < 0 || 
@@ -965,13 +1250,13 @@ std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph(co
             const auto& current_node = connectivity_graph.at(current_index);
             int left_neighbor_index = current_node.left_neighbor.first;
 
-            if (current_index == target1_index) {
-                std::cout << " target 98,  Left neighbor index: " << left_neighbor_index << std::endl;
+            // if (current_index == target1_index) {
+            //     std::cout << " target 98,  Left neighbor index: " << left_neighbor_index << std::endl;
 
-            }
-            if (current_index == target2_index) {
-                std::cout << " target 3148  Left neighbor index: " << left_neighbor_index << std::endl;
-            }
+            // }
+            // if (current_index == target2_index) {
+            //     std::cout << " target 3148  Left neighbor index: " << left_neighbor_index << std::endl;
+            // }
             
             // Stop if no left neighbor or already assigned
             if (left_neighbor_index < 0 || 
@@ -1002,12 +1287,13 @@ std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph(co
         }
         
         //if (curve.edge_indices.size() >= 10){
-        curves.push_back(curve);
+            curves.push_back(curve);
         //}
     }
     
     return curves;
 }
+
 
 std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
                                                                                                 const std::vector<Eigen::Vector3d> all_T,
@@ -1016,7 +1302,7 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
 
     int num_iteration = 1000;
     double step_size_force = 0.01;
-    double step_size_torque = 0.1;
+    double step_size_torque = 0.01;
 
     // convert 3D-> 2D relationship to 2D->3D relationship
     auto uncorrected_map = map_Uncorrected2DEdge_To_SupportingData();
@@ -1024,6 +1310,7 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
     
     std::vector<EdgeCurvelet> all_curvelets = read_curvelets(1);
     std::vector<Eigen::MatrixXd> all_edgels = read_edgels(1);
+    //std::vector<EdgeCurvelet> all_curvelets;
 
     auto graph = build3DEdgeWeightedGraph(uncorrected_map, all_edgels, all_curvelets, all_R, all_T);//change datapath used in this function is not using object 0006
     auto pruned_graph = pruneEdgeGraph_by_3DProximityAndOrientation(graph);
@@ -1031,6 +1318,49 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
 
     // crate 3d -> its neighbor data structure
     auto neighbor_map = buildEdgeNodeGraph(pruned_graph_by_projection);
+
+
+    std::string file_junction = "../../outputs/test_junction.txt";
+    std::ofstream outfile_junction(file_junction);
+
+    //output neighbor's index and neighbor's neighbor's index
+    Eigen::Vector3d target_junction(0.07119, 0.719125, 0.351704);
+    for (size_t i = 0; i < neighbor_map.size(); ++i) {
+        const auto& target_node = neighbor_map[i];
+
+        if(target_node->location.isApprox(target_junction, 1e-6)){
+            outfile_junction<<"target: "<<target_node->index<<"\t;\t"<<target_node->location.transpose()<<"\t;\t"<<target_node->orientation.transpose()<<std::endl;
+            for (const auto& neighbor_pair : target_node->neighbors) {
+                const EdgeNode* neighbor = neighbor_pair.second;
+                outfile_junction<<"neighbor: "<<neighbor->index<<"\t;\t"<<neighbor->location.transpose()<<"\t;\t"<<neighbor->orientation.transpose()<<std::endl;
+                for (const auto& second_neighbor : neighbor->neighbors) {
+                    const EdgeNode* neighbor_neighbor = second_neighbor.second;
+                    outfile_junction<<"neighbor's neighbor: "<<neighbor_neighbor->index<<std::endl;
+                }
+            }
+        }
+    }
+
+    // std::string file_circle = "../../outputs/test_circle.txt";
+    // std::ofstream outfile_circle(file_circle);
+    // Eigen::Vector3d target_circle(0.725574,  0.54634, 0.350898);
+    // for (size_t i = 0; i < neighbor_map.size(); ++i) {
+    //     const auto& target_node = neighbor_map[i];
+
+    //     if(target_node->location.isApprox(target_circle, 1e-6)){
+    //         outfile_circle<<"target: "<<target_node->index<<"\t;\t"<<target_node->location.transpose()<<"\t;\t"<<target_node->orientation.transpose()<<std::endl;
+    //         for (const auto& neighbor_pair : target_node->neighbors) {
+    //             const EdgeNode* neighbor = neighbor_pair.second;
+    //             outfile_circle<<"neighbor: "<<neighbor->index<<"\t;\t"<<neighbor->location.transpose()<<"\t;\t"<<neighbor->orientation.transpose()<<std::endl;
+    //             for (const auto& second_neighbor : neighbor->neighbors) {
+    //                 const EdgeNode* neighbor_neighbor = second_neighbor.second;
+    //                 outfile_circle<<"neighbor's neighbor: "<<neighbor_neighbor->index<<std::endl;
+    //             }
+    //         }
+    //     }
+    // }
+    // exit(0);
+
     align3DEdgesUsingEdgeNodes(neighbor_map, num_iteration, step_size_force, step_size_torque); //call it align
     auto connectivity_graph = createConnectivityGraph(neighbor_map);
     auto curves = buildCurvesFromConnectivityGraph(connectivity_graph);
@@ -1067,8 +1397,8 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
     //     return merged_groups;
     // }
 
-    Eigen::Vector3d target1(0.356127, 0.0903582,  0.350045);
-    Eigen::Vector3d target2(0.354024, 0.089324,  0.34985);
+    Eigen::Vector3d target1(0.07119, 0.719125, 0.351704);
+    Eigen::Vector3d target2(0.499608,   1.0027, 0.429211);
     // Eigen::Vector3d target3(0.704316, 0.884627,  0.35257);
 
     // Set to collect neighbors of target1 and target2
@@ -1134,13 +1464,9 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
     //         }
     //    }
     // }
-    //     std::cout<<"neighbors of target 1 are: "<<std::endl;
+    // std::cout<<"neighbors of target 1 are: "<<std::endl;
     // for (auto& n1 : neighbors_of_target1) {
-    //     //for (const auto& n2 : neighbors_of_target2) {
-    //     //    if (n1.isApprox(n2, 1e-6)) {
-    //     std::cout << n1.location.transpose() << ";\n";
-    //     //    }
-    //    // }
+    //     std::cout << n1.location.transpose() << "\n";
     // }
     // std::cout<<"neighbors of target 2 are: "<<std::endl;
     // for (auto& n1 : neighbors_of_target2) {

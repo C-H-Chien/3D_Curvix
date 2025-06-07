@@ -43,9 +43,19 @@ class EdgeSketch_Core {
 public:
     std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
+    // Custom hash function for std::pair<int, int>
+    struct PairHash {
+      template <class T1, class T2>
+      size_t operator()(const std::pair<T1, T2>& p) const {
+      size_t h1 = std::hash<T1>{}(p.first);
+      size_t h2 = std::hash<T2>{}(p.second);
+      return h1 ^ (h2 << 1);
+      }
+    };
+
 
     // For each edge index, store all other edge indices in the same cluster
-    std::unordered_map<int, std::vector<int>> hypo2_clusters;
+    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters; //<H1 edge index, H2 edge index>, cluster of H2 edges
 
     //> Constructor
     EdgeSketch_Core( YAML::Node );
@@ -57,14 +67,14 @@ public:
     void Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_ptr<EdgeMapping> edgeMapping);
     void Clear_Data();
     void Stack_3D_Edges();
-    void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    void Calculate_Edge_Support_Ratios_And_Select_Next_Views(std::shared_ptr<EdgeMapping> edgeMapping);
 
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);
 
     // Function to get all edges in the same cluster as a given edge
-    std::vector<int> get_edges_in_same_cluster(int edge_index);
+    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge);
     // Function to reset clusters for a new hypo1-hypo2 iteration
     void reset_hypo2_clusters();
 
@@ -73,12 +83,20 @@ public:
     
     bool Skip_this_Edge( const int edge_idx ) {
       //> Edge Boundary Check: not too close to boundary
-      if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10)
+      if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10){
+        if(edge_idx == 2454){
+          std::cout<<"too close to boundary!"<<std::endl;
+        }
         return true;
+      }
       
       //> Paired Edge Check: not yet been paired
-      if ( paired_edge(edge_idx,0) != -2 )
+      if ( paired_edge(50 *(edge_idx-1),0) != -2 ){
+        if(edge_idx == 2454){
+          std::cout<<"not yet been paired!"<<std::endl;
+        }
         return true;
+      }
       return false;
     }
 
@@ -150,12 +168,7 @@ private:
     std::shared_ptr<GetReprojectedEdgel::get_Reprojected_Edgel> getReprojEdgel = nullptr;
     std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels> getSupport = nullptr;
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
-    //std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
 
-    Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
-
-    
-    int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
       std::pair<int, int> &next_hypothesis_views, std::vector<int> history_hypothesis_views_index

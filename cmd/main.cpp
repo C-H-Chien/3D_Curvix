@@ -117,14 +117,12 @@ int main(int argc, char **argv) {
 
     //> Finalize hypothesis edge pairs for a two-view triangulation
     MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(edgeMapping);
-    //std::cout << "EdgeMapping in main: " << edgeMapping.get() << std::endl;
-
     
     //> Stack all 3D edges located in the world coordinate
     MWV_Edge_Rec.Stack_3D_Edges();
 
     //> Find the next hypothesis view pairs, if any
-    MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    MWV_Edge_Rec.Calculate_Edge_Support_Ratios_And_Select_Next_Views(edgeMapping);
     MWV_Edge_Rec.Clear_Data();
 
     edge_sketch_pass_count++;
@@ -132,9 +130,6 @@ int main(int argc, char **argv) {
     if (MWV_Edge_Rec.enable_aborting_3D_edge_sketch)
       break;
   
-    // if (MWV_Edge_Rec.hyp01_view_indx == 7 || MWV_Edge_Rec.hyp01_view_indx==9){
-    //   continue;
-    // }
   }
 
   std::cout << "Start to merge edges from 3D-2D edge links and 2D-2D edge links ..." << std::endl;
