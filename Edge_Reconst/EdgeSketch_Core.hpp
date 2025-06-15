@@ -43,14 +43,24 @@ class EdgeSketch_Core {
 public:
     std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
+    //> Custom hash function for std::pair<int, int>
+    struct PairHash {
+      template <class T1, class T2>
+      size_t operator()(const std::pair<T1, T2>& p) const {
+      size_t h1 = std::hash<T1>{}(p.first);
+      size_t h2 = std::hash<T2>{}(p.second);
+      return h1 ^ (h2 << 1);
+      }
+    };
+
 
     // For each edge index, store all other edge indices in the same cluster
-    std::unordered_map<int, std::vector<int>> hypo2_clusters;
+    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters; //<H1 edge index, H2 edge index>, cluster of H2 edges
 
     //> Constructor
     EdgeSketch_Core( YAML::Node );
     void Read_Camera_Data();
-    void Read_Edgels_Data();
+    // void Read_Edgels_Data();
     void Set_Hypothesis_Views_Camera();
     void Set_Hypothesis_Views_Edgels();
     void Run_3D_Edge_Sketch();
@@ -58,18 +68,24 @@ public:
     void Clear_Data();
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    void Calculate_Edge_Support_Ratios_And_Select_Next_Views(std::shared_ptr<EdgeMapping> edgeMapping);
 
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);
 
     // Function to get all edges in the same cluster as a given edge
-    std::vector<int> get_edges_in_same_cluster(int edge_index);
+    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge);
     // Function to reset clusters for a new hypo1-hypo2 iteration
     void reset_hypo2_clusters();
 
     //> Destructor
     ~EdgeSketch_Core();
+
+    void Read_Edgels_Data() {
+        //> Read edgels detected at a specific threshold 
+        Load_Data->read_All_Edgels( All_Edgels, thresh_EDG );
+    }
     
     bool Skip_this_Edge( const int edge_idx ) {
       //> Edge Boundary Check: not too close to boundary
@@ -82,7 +98,11 @@ public:
       return false;
     }
 
-    bool is_Epipolar_Wedges_in_Parallel(double thresh_ore31_1, double thresh_ore31_2, double thresh_ore32_1, double thresh_ore32_2, int idx_pair, Eigen::VectorXd &isparallel, Eigen::MatrixXd &supported_indice_current) {
+    bool is_Epipolar_Wedges_in_Parallel(std::pair<double, double> epip_angle_range_from_H1, std::pair<double, double> epip_angle_range_from_H2, int idx_pair, Eigen::VectorXd &isparallel, Eigen::MatrixXd &supported_indice_current) {
+      double thresh_ore31_1 = epip_angle_range_from_H1.first;
+      double thresh_ore31_2 = epip_angle_range_from_H1.second;
+      double thresh_ore32_1 = epip_angle_range_from_H2.first;
+      double thresh_ore32_2 = epip_angle_range_from_H2.second;
       Eigen::MatrixXd anglediff(4,1);
       anglediff << fabs(thresh_ore31_1 - thresh_ore32_1), fabs(thresh_ore31_1 - thresh_ore32_2), \
                    fabs(thresh_ore31_2 - thresh_ore32_1), fabs(thresh_ore31_2 - thresh_ore32_2);
@@ -150,11 +170,32 @@ private:
     std::shared_ptr<GetReprojectedEdgel::get_Reprojected_Edgel> getReprojEdgel = nullptr;
     std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels> getSupport = nullptr;
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
-    //std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
+
+    // /////// Helper function to get current cluster size (as a lambda) ///////
+    // std::function<int(int, int)> getClusterSize = [&cluster_labels](int label, int N) -> int {
+    //     int size = 0;
+    //     for (int i = 0; i < N; ++i) {
+    //         if (cluster_labels[i] == label) size++;
+    //     }
+    //     return size;
+    // };
+    // /////// Helper function to get current cluster size (as a lambda) ///////
+
+    // // Store all pairs and their distances
+    // struct EdgePair {
+    //     int idx1;
+    //     int idx2;
+    //     double distance;
+        
+    //     EdgePair(int i, int j, double d) : idx1(i), idx2(j), distance(d) {}
+        
+    //     bool operator<(const EdgePair& other) const {
+    //         return distance < other.distance;
+    //     }
+    // };
 
     Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
 
-    
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
@@ -197,6 +238,10 @@ private:
         if (VALID_INDX == hyp01_view_indx || VALID_INDX == hyp02_view_indx) continue;
         valid_view_index.push_back(VALID_INDX);
       }
+    }
+
+    bool any_H2_Edge_Surviving_Epipolar_Corrected(Eigen::MatrixXd Edges_HYPO2_final) {
+      return (Edges_HYPO2_final.rows() == 0) ? (false) : (true);
     }
     
 
@@ -242,6 +287,15 @@ private:
 
     //> a list of validation view indices
     std::vector<int> valid_view_index;
+
+
+    template<typename T>
+    T Uniform_Random_Number_Generator(T range_from, T range_to) {
+        std::random_device                                          rand_dev;
+        std::mt19937                                                rng(rand_dev());
+        std::uniform_int_distribution<std::mt19937::result_type>    distr(range_from, range_to);
+        return distr(rng);
+    }
 };
 
 

@@ -39,7 +39,7 @@ void loadRTMatrices(const std::string& R_file_path, const std::string& T_file_pa
 std::vector<std::vector<EdgeData>> parseFile(const std::string& filePath);
 std::vector<Eigen::Vector3d> readTangentFile(const std::string& tangentFilePath);
 void writeTangentFile(const std::string& outputTangentFilePath, const std::vector<Eigen::Vector3d>& tangents);
-Eigen::MatrixXd mvt(int hyp1, int hyp2, std::string Scene_Name, int init_toed_thresh, int final_toed_thresh);
+Eigen::MatrixXd mvt(int hyp1, int hyp2, std::string Scene_Name, int init_toed_thresh, int final_toed_thresh, int max_valid_supports);
 void grouped_mvt(const std::vector<std::vector<EdgeMapping::SupportingEdgeData>>& all_groups, const std::string& outputFilePath, const std::string& tangentOutputFilePath);
 
 } // namespace NViewsTrian

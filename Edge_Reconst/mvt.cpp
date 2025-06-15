@@ -304,22 +304,22 @@ void writeTangentFile(const std::string& outputTangentFilePath, const std::vecto
 /////////////////////////////////// 3D RECONSTRUCTION ///////////////////////////////////////////////////////
 
 
-Eigen::MatrixXd mvt(int hyp1, int hyp2, std::string Scene_Name, int init_toed_thresh, int final_toed_thresh) {
+Eigen::MatrixXd mvt(int hyp1, int hyp2, std::string Scene_Name, int init_toed_thresh, int final_toed_thresh, int max_valid_supports) {
 
     std::string basePath = "../../outputs/";
     std::string filePath = basePath + "paired_edges_final_" + std::to_string(hyp1) + "_" + std::to_string(hyp2) + ".txt";
     std::string outputFilePath = basePath + "triangulated_3D_edges_ABC-NEF_" + Scene_Name + "_hypo1_" + 
                                 std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
                                 "_t" + std::to_string(init_toed_thresh) + "to" + std::to_string(final_toed_thresh) 
-                                + "_delta03_theta15.000000_N4.txt";
+                                + "_delta03_theta15.000000_N" + std::to_string(max_valid_supports) + ".txt";
     std::string points3DFile = basePath + "3D_edges_ABC-NEF_" + Scene_Name + "_hypo1_" + 
                             std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
                             "_t" + std::to_string(init_toed_thresh) + "to" + std::to_string(final_toed_thresh) 
-                            + "_delta03_theta15.000000_N4.txt";
+                            + "_delta03_theta15.000000_N" + std::to_string(max_valid_supports) + ".txt";
     std::string tangentFilePath = basePath + "3D_tangents_ABC-NEF_" + Scene_Name + "_hypo1_" + 
                             std::to_string(hyp1) + "_hypo2_" + std::to_string(hyp2) + 
                             "_t" + std::to_string(init_toed_thresh) + "to" + std::to_string(final_toed_thresh) 
-                            + "_delta03_theta15.000000_N4.txt";
+                            + "_delta03_theta15.000000_N" + std::to_string(max_valid_supports) + ".txt";
     std::string outputTangentFilePath = "../../outputs/updated_tangents.txt"; 
     std::vector<Eigen::Vector3d> points3D;
 

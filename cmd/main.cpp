@@ -117,30 +117,25 @@ int main(int argc, char **argv) {
 
     //> Finalize hypothesis edge pairs for a two-view triangulation
     MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(edgeMapping);
-    //std::cout << "EdgeMapping in main: " << edgeMapping.get() << std::endl;
-
     
     //> Stack all 3D edges located in the world coordinate
     MWV_Edge_Rec.Stack_3D_Edges();
 
     //> Find the next hypothesis view pairs, if any
     MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    // MWV_Edge_Rec.Calculate_Edge_Support_Ratios_And_Select_Next_Views(edgeMapping);
     MWV_Edge_Rec.Clear_Data();
 
     edge_sketch_pass_count++;
 
     if (MWV_Edge_Rec.enable_aborting_3D_edge_sketch)
       break;
-  
-    // if (MWV_Edge_Rec.hyp01_view_indx == 7 || MWV_Edge_Rec.hyp01_view_indx==9){
-    //   continue;
-    // }
   }
 
   std::cout << "Start to merge edges from 3D-2D edge links and 2D-2D edge links ..." << std::endl;
-  //////////////////// Merge edges ////////////////////
-  //std::cout << "main size of edge_3D_to_supporting_edges: " << edgeMapping->edge_3D_to_supporting_edges.size() << std::endl;
-  // edgeMapping->printFirst10Edges();
+
+  edgeMapping->Setup_Data_Parameters( Edge_Sketch_Settings_Map );
+  
   std::cout << "====================================================================" << std::endl;
 
   std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
@@ -148,8 +143,6 @@ int main(int argc, char **argv) {
   // std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
   // NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);
   // std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
-
-  //////////////////// Merge edges ////////////////////
 
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;
   std::string out_time_str = "Total computation time: " + std::to_string(total_time) + " (s)";

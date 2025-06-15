@@ -84,8 +84,10 @@ namespace PairEdgeHypothesis {
         return edgels_HYPO2;
     }
 
-    //find edges in Hypothesis whose orientations fall within thresh_ore21_1 and thresh_ore21_2
-    Eigen::MatrixXd pair_edge_hypothesis::getHYPO2_idx_Ore(Eigen::MatrixXd OreListdegree, double thresh_ore21_1, double thresh_ore21_2) {
+    //> Find edges in the view whose epipolar angle fall within the epipolar angle range epip_angle_range = [thresh_ore21_1, thresh_ore21_2]
+    Eigen::MatrixXd pair_edge_hypothesis::getHYPO2_idx_Ore(Eigen::MatrixXd OreListdegree, std::pair<double,double> epip_angle_range) {
+        double thresh_ore21_1 = epip_angle_range.first;
+        double thresh_ore21_2 = epip_angle_range.second;
         int idx_hypopair = 0;
         Eigen::MatrixXd HYPO2_idx;
         std::vector<double> Ore_List1Bar(OreListdegree.data(), OreListdegree.data() + OreListdegree.rows());
@@ -99,7 +101,9 @@ namespace PairEdgeHypothesis {
         return HYPO2_idx;
     }
 
-    Eigen::MatrixXd pair_edge_hypothesis::getedgels_HYPO2_Ore(Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd OreListdegree, double thresh_ore21_1, double thresh_ore21_2) {
+    Eigen::MatrixXd pair_edge_hypothesis::getedgels_HYPO2_Ore(Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd OreListdegree, std::pair<double,double> epip_angle_range) {
+        double thresh_ore21_1 = epip_angle_range.first;
+        double thresh_ore21_2 = epip_angle_range.second;
         int idx_hypopair = 0;
         Eigen::MatrixXd edgels_HYPO2;
         std::vector<double> Ore_List1Bar(OreListdegree.data(), OreListdegree.data() + OreListdegree.rows());
@@ -114,7 +118,9 @@ namespace PairEdgeHypothesis {
         return edgels_HYPO2;
     }
 
-    Eigen::MatrixXd pair_edge_hypothesis::getHYPO2_idx_Ore_sted(Eigen::MatrixXd OreListdegree, double thresh_ore21_1, double thresh_ore21_2) {
+    Eigen::MatrixXd pair_edge_hypothesis::getHYPO2_idx_Ore_sted(Eigen::MatrixXd OreListdegree, std::pair<double,double> epip_angle_range) {
+        double thresh_ore21_1 = epip_angle_range.first;
+        double thresh_ore21_2 = epip_angle_range.second;
         Eigen::MatrixXd HYPO2_idx;
         HYPO2_idx.conservativeResize(2,1);
         std::vector<double> Ore_List1Bar(OreListdegree.data(), OreListdegree.data() + OreListdegree.rows());
@@ -126,7 +132,9 @@ namespace PairEdgeHypothesis {
         return HYPO2_idx;
     }
 
-    Eigen::MatrixXd pair_edge_hypothesis::getHYPO2_idx_Ore_fixed(Eigen::MatrixXd OreListdegree, double thresh_ore21_1, double thresh_ore21_2) {
+    Eigen::MatrixXd pair_edge_hypothesis::getHYPO2_idx_Ore_fixed(Eigen::MatrixXd OreListdegree, std::pair<double,double> epip_angle_range) {
+        double thresh_ore21_1 = epip_angle_range.first;
+        double thresh_ore21_2 = epip_angle_range.second;
         Eigen::MatrixXd HYPO2_idx;
         HYPO2_idx.conservativeResize(20,1);
         std::vector<double> Ore_List1Bar(OreListdegree.data(), OreListdegree.data() + OreListdegree.rows());
@@ -141,7 +149,9 @@ namespace PairEdgeHypothesis {
         return HYPO2_idx;
     }
 
-    Eigen::MatrixXd pair_edge_hypothesis::getedgels_HYPO2_Ore_fixed(Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd OreListdegree, double thresh_ore21_1, double thresh_ore21_2) {
+    Eigen::MatrixXd pair_edge_hypothesis::getedgels_HYPO2_Ore_fixed(Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd OreListdegree, std::pair<double,double> epip_angle_range) {
+        double thresh_ore21_1 = epip_angle_range.first;
+        double thresh_ore21_2 = epip_angle_range.second;
         Eigen::MatrixXd edgels_HYPO2;
         edgels_HYPO2.conservativeResize(20,4);
         std::vector<double> Ore_List1Bar(OreListdegree.data(), OreListdegree.data() + OreListdegree.rows());
@@ -289,7 +299,7 @@ namespace PairEdgeHypothesis {
                 corrected_y = epiline_y;
             }
             else {
-                //////////////// rotate the edge ////////////////
+                //////////////// rotate the edge to minimize the epipolar shift ////////////////
                 double theta = edgels_HYPO2(idx_hypo2,2);
                 double p_theta = a1_line * cos(theta) + b1_line * sin(theta);
                 double derivative_p_theta = -a1_line * sin(theta) + b1_line * cos(theta);
@@ -339,10 +349,10 @@ namespace PairEdgeHypothesis {
                     exit(0);
                 }
 
-                if (dist_diff_edg2 < 3){// && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4){
+                if (dist_diff_edg2 < EPIP_TANGENCY_DISPL_THRESH) {
                     corrected_x = x_intersection;
                     corrected_y = y_intersection;
-                }else{
+                } else{
                     continue;
                 }
 

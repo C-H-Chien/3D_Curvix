@@ -25,6 +25,14 @@
 #include <Eigen/Dense>
 
 namespace MultiviewGeometryUtil {
+
+    struct CompareVector3d {
+        bool operator()(const Eigen::Vector3d& a, const Eigen::Vector3d& b) const {
+            if (a.x() != b.x()) return a.x() < b.x();
+            if (a.y() != b.y()) return a.y() < b.y();
+            return a.z() < b.z();
+        }
+    };
     
     class multiview_geometry_util {
 
