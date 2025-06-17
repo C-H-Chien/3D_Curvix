@@ -31,31 +31,37 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
-#include "../Edge_Reconst/mvt.hpp"
+#include "mvt.hpp"
+#include "EdgeClusterer.hpp"
 
 //> mutual best support
 #include <unordered_map>
 #include <utility>
 
-    
+
+
 class EdgeSketch_Core {
 
 public:
     std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
-    //> Custom hash function for std::pair<int, int>
-    struct PairHash {
-      template <class T1, class T2>
-      size_t operator()(const std::pair<T1, T2>& p) const {
-      size_t h1 = std::hash<T1>{}(p.first);
-      size_t h2 = std::hash<T2>{}(p.second);
-      return h1 ^ (h2 << 1);
-      }
-    };
 
+    // //> Custom hash function for std::pair<int, int>
+    // struct PairHash {
+    //   template <class T1, class T2>
+    //   size_t operator()(const std::pair<T1, T2>& p) const {
+    //   size_t h1 = std::hash<T1>{}(p.first);
+    //   size_t h2 = std::hash<T2>{}(p.second);
+    //   return h1 ^ (h2 << 1);
+    //   }
+    // };
 
     // For each edge index, store all other edge indices in the same cluster
-    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters; //<H1 edge index, H2 edge index>, cluster of H2 edges
+    std::vector< std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> > local_hypo2_clusters;
+    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters;
+
+
+    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters_CH;
 
     //> Constructor
     EdgeSketch_Core( YAML::Node );
@@ -89,12 +95,14 @@ public:
     
     bool Skip_this_Edge( const int edge_idx ) {
       //> Edge Boundary Check: not too close to boundary
-      if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10)
+      if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10){
         return true;
+      }
       
       //> Paired Edge Check: not yet been paired
-      if ( paired_edge(edge_idx,0) != -2 )
+      if ( paired_edge(50 *(edge_idx-1),0) != -2 ){
         return true;
+      }
       return false;
     }
 
@@ -145,6 +153,7 @@ public:
     double cx;
     double cy;
     std::string Delta_FileName_Str;
+    std::string Post_File_Name_Str;
 
     std::vector< Eigen::MatrixXd > all_supported_indices;
     Eigen::MatrixXd Gamma1s;
@@ -170,6 +179,7 @@ private:
     std::shared_ptr<GetReprojectedEdgel::get_Reprojected_Edgel> getReprojEdgel = nullptr;
     std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels> getSupport = nullptr;
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
+    std::shared_ptr<EdgeClusterer> edge_cluster_ = nullptr;
 
     // /////// Helper function to get current cluster size (as a lambda) ///////
     // std::function<int(int, int)> getClusterSize = [&cluster_labels](int label, int N) -> int {

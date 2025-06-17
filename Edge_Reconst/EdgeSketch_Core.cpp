@@ -53,19 +53,22 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     Max_3D_Edge_Sketch_Passes                       = Edge_Sketch_Setting_YAML_File["Max_Num_Of_3D_Edge_Sketch_Passes"].as<int>();
     circleR                                         = Edge_Sketch_Setting_YAML_File["circleR"].as<double>(); //> Unknown setting
     //> (2) Dataset Settings
-    Dataset_Path                        = Edge_Sketch_Setting_YAML_File["Dataset_Path"].as<std::string>();
-    Dataset_Name                        = Edge_Sketch_Setting_YAML_File["Dataset_Name"].as<std::string>();
-    Scene_Name                          = Edge_Sketch_Setting_YAML_File["Scene_Name"].as<std::string>();
-    Num_Of_Total_Imgs                   = Edge_Sketch_Setting_YAML_File["Total_Num_Of_Images"].as<int>();
-    Img_Rows                            = Edge_Sketch_Setting_YAML_File["Image_Rows"].as<int>();
-    Img_Cols                            = Edge_Sketch_Setting_YAML_File["Image_Cols"].as<int>();
-    Use_Multiple_K                      = Edge_Sketch_Setting_YAML_File["Use_Multiple_K"].as<bool>();
-    fx                                  = Edge_Sketch_Setting_YAML_File["fx"].as<double>();
-    fy                                  = Edge_Sketch_Setting_YAML_File["fy"].as<double>();
-    cx                                  = Edge_Sketch_Setting_YAML_File["cx"].as<double>();
-    cy                                  = Edge_Sketch_Setting_YAML_File["cy"].as<double>();
-    //> (3) Other Settings
-    Delta_FileName_Str                  = Edge_Sketch_Setting_YAML_File["deltastr"].as<std::string>();
+    Dataset_Path                                    = Edge_Sketch_Setting_YAML_File["Dataset_Path"].as<std::string>();
+    Dataset_Name                                    = Edge_Sketch_Setting_YAML_File["Dataset_Name"].as<std::string>();
+    Scene_Name                                      = Edge_Sketch_Setting_YAML_File["Scene_Name"].as<std::string>();
+    Num_Of_Total_Imgs                               = Edge_Sketch_Setting_YAML_File["Total_Num_Of_Images"].as<int>();
+    Img_Rows                                        = Edge_Sketch_Setting_YAML_File["Image_Rows"].as<int>();
+    Img_Cols                                        = Edge_Sketch_Setting_YAML_File["Image_Cols"].as<int>();
+    Use_Multiple_K                                  = Edge_Sketch_Setting_YAML_File["Use_Multiple_K"].as<bool>();
+    fx                                              = Edge_Sketch_Setting_YAML_File["fx"].as<double>();
+    fy                                              = Edge_Sketch_Setting_YAML_File["fy"].as<double>();
+    cx                                              = Edge_Sketch_Setting_YAML_File["cx"].as<double>();
+    cy                                              = Edge_Sketch_Setting_YAML_File["cy"].as<double>();
+
+    //> Define post file name for files to which 3D edge locations and tangents are written
+    Post_File_Name_Str = Dataset_Name + "_" + Scene_Name + "_hypo1_" + std::to_string(hyp01_view_indx) + "_hypo2_" + std::to_string(hyp02_view_indx) \
+                        + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" + std::to_string(Edge_Detection_Final_Thresh) + "_theta" \
+                        + std::to_string(Orien_Thresh) + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
 
     //> Initialization
     edge_sketch_time = 0.0;
@@ -86,7 +89,10 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
 
     //> Set up OpenMP threads
     omp_set_num_threads(Num_Of_OMP_Threads);
-    // int ID = omp_get_thread_num();
+
+    // local_hypo2_clusters.resize(Num_Of_OMP_Threads);
+
+
 #if SHOW_OMP_NUM_OF_THREADS
     std::cout << "Using " << Num_Of_OMP_Threads << " threads for OpenMP parallelization." << std::endl;
 #endif
@@ -169,7 +175,7 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
     Edges_HYPO2     = All_Edgels[hyp02_view_indx];
 
     //> Initialize a list of paired edges between HYPO1 and HYPO2
-    paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows(), Num_Of_Total_Imgs, -2);
+    paired_edge         = Eigen::MatrixXd::Constant(Edges_HYPO1.rows()*Num_Of_Total_Imgs, Num_Of_Total_Imgs, -2);
     
     //> Compute epipolar wedge angles between HYPO1 and HYPO2 and valid angle range in HYPO1 for fast indexing from edges of HYPO2
     OreListdegree       = getOre->getOreList(hyp01_view_indx, hyp02_view_indx, Edges_HYPO2, All_R, All_T, K_HYPO1, K_HYPO2);
@@ -191,6 +197,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         std::vector<Eigen::MatrixXd> local_thread_supported_indices;
         // TODO:DOCUMENT THIS: Thread-local clusters 
         std::unordered_map<int, std::vector<int>> thread_local_clusters;
+
+        int thread_id = omp_get_thread_num();
 
         int H1_edge_idx;
        
@@ -242,14 +250,16 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             // }
 
             ////////////////////////////////////// cluster hypothesis 2's edges //////////////////////////////////////
-            //> TODO MACROS: 
-            double cluster_threshold = 1;
-            double orientation_threshold = 20.0;
-            int max_cluster_size = 10;
-            double gaussian_sigma = 2.0; 
-            double max_reliable_shift = 5.0; 
 
             int Num_Of_Epipolar_Corrected_H2_Edges = Edges_HYPO2_final.rows();
+
+            //> =================================================== CH'S MIDIFICATION ==============================================================
+            // edge_cluster_ = std::shared_ptr<EdgeClusterer>(new EdgeClusterer(Num_Of_Epipolar_Corrected_H2_Edges, Edges_HYPO2_final, H1_edge_idx));
+            // edge_cluster_->performClustering( HYPO2_idx_raw, Edges_HYPO2, edgels_HYPO2_corrected );
+            // // Edges_HYPO2_final_CH = edge_cluster_->Epip_Correct_H2_Edges;
+            // // Eigen::MatrixXd HYPO2_idx_CH = edge_cluster_->HYPO2_idx;
+            // local_hypo2_clusters[thread_id] = edge_cluster_->H2_Clusters;
+            //> =================================================== CH'S MIDIFICATION ==============================================================
 
             //> Initialize each H2 edge as a single cluster. The cluster label of edge i is i-1, i.e., cluster_labels[i] = i-1
             std::vector<int> cluster_labels(Num_Of_Epipolar_Corrected_H2_Edges);
@@ -261,16 +271,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 cluster_avg_orientations[i] = Edges_HYPO2_final(i, 2) * (180.0 / M_PI);
             }
 
-            //////////////////////////// Helper functions ////////////////////////////
-            //> TODO: CLEAN OUT HERE
-            // Store original positions before correction for distance calculation
-            Eigen::MatrixXd original_positions(edgels_HYPO2.rows(), 2);
-            for (int i = 0; i < edgels_HYPO2.rows(); ++i) {
-                original_positions(i, 0) = edgels_HYPO2(i, 0);
-                original_positions(i, 1) = edgels_HYPO2(i, 1);
-            }
-
-            //> CH: ??
+            ////////////////////////// Helper functions ////////////////////////////
+            
             //get cluster size
             std::function<int(int, int)> getClusterSize = [&cluster_labels](int label, int N) -> int {
                 int size = 0;
@@ -281,13 +283,13 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             };
 
             //> Check if two orientations are within threshold in degrees
-            std::function<bool(double, double)> areSimilarOrientations = [orientation_threshold](double orient1_deg, double orient2_deg) -> bool {
+            std::function<bool(double, double)> areSimilarOrientations = [](double orient1_deg, double orient2_deg) -> bool {
                 double diff = std::fabs(orient1_deg - orient2_deg);
-                return diff < orientation_threshold;
+                return diff < CLUSTER_ORIENT_THRESH;
             };
 
             //> Update cluster average orientation with gaussian distribution
-            std::function<double(int, int)> updateAvgOrientation = [&cluster_labels, &cluster_avg_orientations, &Edges_HYPO2_final, &original_positions, gaussian_sigma, Num_Of_Epipolar_Corrected_H2_Edges](int label1, int label2) -> double {
+            std::function<double(int, int)> updateAvgOrientation = [&cluster_labels, &cluster_avg_orientations, &Edges_HYPO2_final, Num_Of_Epipolar_Corrected_H2_Edges](int label1, int label2) -> double {
 
                 //> CH DOCUMENT:
                 //> Given two clusters, find the corresponding H2 edges (with epipolar shifted).
@@ -333,7 +335,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         double dx = Edges_HYPO2_final(i, 0) - centroid_x;
                         double dy = Edges_HYPO2_final(i, 1) - centroid_y;
                         double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
-                        double weight = std::exp(-0.5 * std::pow((distance_from_centroid - mean_shift_from_centroid) / gaussian_sigma, 2));
+                        double weight = std::exp(-0.5 * std::pow((distance_from_centroid - mean_shift_from_centroid) / CLUSTER_ORIENT_GAUSS_SIGMA, 2));
 
                         sum_weighted_orin += weight * orientation_deg;
                     }
@@ -342,7 +344,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 return sum_weighted_orin / count;
             };
 
-            //////////////////////////// Helper functions ////////////////////////////
+            ////////////////////////// Helper functions ////////////////////////////
 
             // Merge clusters starting from closest pairs
             bool merged = true;
@@ -360,7 +362,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                             double dist = (Edges_HYPO2_final.row(i).head<2>() - Edges_HYPO2_final.row(j).head<2>()).norm();
                             double orient_i = cluster_avg_orientations[cluster_labels[i]];
                             double orient_j = cluster_avg_orientations[cluster_labels[j]];
-                            if (dist < min_dist && dist < cluster_threshold && areSimilarOrientations(orient_i, orient_j)) {
+                            if (dist < min_dist && dist < CLUSTER_DIST_THRESH && areSimilarOrientations(orient_i, orient_j)) {
                                 min_dist = dist;
                                 nearest = j;
                             }
@@ -372,7 +374,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         int new_label = cluster_labels[i];
                         int size_old = getClusterSize(old_label, Num_Of_Epipolar_Corrected_H2_Edges);
                         int size_new = getClusterSize(new_label, Num_Of_Epipolar_Corrected_H2_Edges);
-                        if (size_old + size_new <= max_cluster_size) {
+                        if (size_old + size_new <= MAX_CLUSTER_SIZE) {
 
                             // Calculate new average orientation for the merged cluster
                             double merged_avg_orientation = updateAvgOrientation(old_label, new_label);
@@ -436,7 +438,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 }
             }
 
-            //> CH: Yet to understand hypo2_clusters
+            //> CH: Yet to understand hypo2_clusters.
             #pragma omp critical
             {
                 std::unordered_map<int, std::vector<int> >::iterator kv_it;
@@ -459,6 +461,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             // For each cluster, compute the average edge and update all edges in the cluster
             for (size_t c = 0; c < clusters.size(); ++c) {
                 const std::vector<int>& cluster = clusters[c];
+                if (cluster.empty()) continue;
 
                 // Compute average position and orientation
                 Eigen::RowVector4d cluster_avg = Eigen::RowVector4d::Zero();
@@ -494,7 +497,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             }
             ////////////////////////////////////// cluster hypothesis 2's edges //////////////////////////////////////
 
-
+            
 
             
             int valid_view_counter = 0;
@@ -685,7 +688,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     valid_pairs.push_back(i);
                 }
             }
-            if (valid_pairs.empty()) {continue;}
+            if (valid_pairs.empty()) continue;
             for (int valid_idx : valid_pairs) {
                 int finalpair = int(indices_stack_unique[valid_idx]);
             
@@ -707,7 +710,18 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         //> A critical session to stack all local supported indices
         #pragma omp critical
         all_supported_indices.insert(all_supported_indices.end(), local_thread_supported_indices.begin(), local_thread_supported_indices.end());
-    }
+    } //> end of #pragma omp parallel
+
+    // //> Merge thread-local maps into a single final map (sequentially)
+    // for (const auto& thread_map : local_hypo2_clusters) {
+    //     for (const auto& pair : thread_map) {
+    //         hypo2_clusters_CH[pair.first] = pair.second; // Merge elements
+    //     }
+    // }
+
+    // if (hypo2_clusters_CH == hypo2_clusters) { LOG_INFOR_MESG("YAH! The hypo2 clusteres are equal!"); }
+    // else { LOG_INFOR_MESG("SADLY! The hypo2 clusteres are NOT equal!"); }
+
     pair_edges_time += omp_get_wtime() - itime;
 }
 
@@ -1060,7 +1074,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
             }
 
             Eigen::Vector3d member_location = Edges_HYPO2.row(member_idx).head<3>();
-            //std::cout<<"cluster member location is: "<<member_location.transpose()<<std::endl;
 
             edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, tangents_3D_world, pt_H2, member_location, hyp02_view_indx, member_idx, All_R[hyp02_view_indx], All_T[hyp02_view_indx]);
         }
@@ -1153,27 +1166,21 @@ void EdgeSketch_Core::Stack_3D_Edges() {
 
 #if WRITE_3D_EDGES
     std::ofstream myfile2;
-    std::string Output_File_Path2 = "../../outputs/3D_edges_" + Dataset_Name + "_" + Scene_Name + "_hypo1_" + std::to_string(hyp01_view_indx) \
-                                    + "_hypo2_" + std::to_string(hyp02_view_indx) + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" \
-                                    + std::to_string(Edge_Detection_Final_Thresh) + "_delta" + Delta_FileName_Str + "_theta" + std::to_string(Orien_Thresh) \
-                                    + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
+    std::string Output_File_Path2 = "../../outputs/3D_edges_" + Post_File_Name_Str;
     std::cout << "Writing 3D edge locations to: " << Output_File_Path2 << std::endl;
     myfile2.open (Output_File_Path2);
     myfile2 << Gamma1s_world;
     myfile2.close();
 
     std::ofstream tangents_file;
-    std::string tangents_output_path = "../../outputs/3D_tangents_" + Dataset_Name + "_" + Scene_Name + "_hypo1_" + std::to_string(hyp01_view_indx) \
-                                       + "_hypo2_" + std::to_string(hyp02_view_indx) + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" \
-                                       + std::to_string(Edge_Detection_Final_Thresh) + "_delta" + Delta_FileName_Str + "_theta" + std::to_string(Orien_Thresh) \
-                                       + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
+    std::string tangents_output_path = "../../outputs/3D_tangents_" + Post_File_Name_Str;
     std::cout << "Writing 3D edge tangents to: " << tangents_output_path << std::endl;
     tangents_file.open(tangents_output_path);
     tangents_file << tangent3Ds;
     tangents_file.close();
 #endif
 
-    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt(hyp01_view_indx, hyp02_view_indx, Scene_Name, Edge_Detection_Init_Thresh, Edge_Detection_Final_Thresh, Max_Num_Of_Support_Views);
+    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt( hyp01_view_indx, hyp02_view_indx, Post_File_Name_Str );
 
     //> Concatenate reconstructed 3D edges
     if (all_3D_Edges.rows() == 0) {

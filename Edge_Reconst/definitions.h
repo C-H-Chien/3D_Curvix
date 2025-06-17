@@ -12,16 +12,17 @@
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
 //> Form hypothesis edges parameters
-#define EPIP_TANGENCY_DISPL_THRESH      (3)         //> in pixels
-#define MAX_CLUSTER_SIZE                (5)         //> number of edges per cluster
-#define CLUSTER_DIST_THRESH             (0.5)       //> τc, in pixels
+#define EPIP_TANGENCY_DISPL_THRESH      (4)         //> in pixels
+#define CLUSTER_DIST_THRESH             (1)         //> τc, in pixels
+#define CLUSTER_ORIENT_THRESH           (20.0)      //> in degrees
+#define MAX_CLUSTER_SIZE                (10)        //> max number of edges per cluster
+#define CLUSTER_ORIENT_GAUSS_SIGMA      (2.0)
 
 //> Edge graph pruning parameters
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (1)
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (1)
 #define PRUNE_3D_EDGE_GRAPH_LAMBDA3     (1)
 #define PRUNE_BY_PROJ_PROX_THRESH       (6)     //> in pixels
-// #define PRUNE_BY_PROJ_ORIE_THRESH       (60)    //> in degrees
 
 //> Edge graph alignment parameters
 #define NUM_OF_ITERATIONS               (1000)
