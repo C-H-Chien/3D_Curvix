@@ -11,10 +11,13 @@
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
-//> Form hypothesis edges parameters
-#define EPIP_TANGENCY_DISPL_THRESH      (4)         //> in pixels
+//> hypotheses formation settings
+#define EPIP_TANGENCY_DISPL_THRESH      (3)         //> in pixels
+#define LOCATION_PERTURBATION           (0.3)         //> in pixels
+#define ORIENT_PERTURBATION             (0.174533)  //> in radians. 0.174533 is 10 degrees
 #define CLUSTER_DIST_THRESH             (1)         //> τc, in pixels
 #define CLUSTER_ORIENT_THRESH           (20.0)      //> in degrees
+#define CLUSTER_ORIENT_THRESH_RAD       (CLUSTER_ORIENT_THRESH * (M_PI / 180.0))
 #define MAX_CLUSTER_SIZE                (10)        //> max number of edges per cluster
 #define CLUSTER_ORIENT_GAUSS_SIGMA      (2.0)
 

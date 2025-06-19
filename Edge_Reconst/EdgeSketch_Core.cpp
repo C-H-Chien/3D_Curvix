@@ -230,8 +230,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Edges_HYPO1_final << edgels_HYPO2_corrected.col(0), edgels_HYPO2_corrected.col(1), edgels_HYPO2_corrected.col(2), edgels_HYPO2_corrected.col(3);
             Eigen::MatrixXd Edges_HYPO2_final(edgels_HYPO2_corrected.rows(), 4);
             Edges_HYPO2_final << edgels_HYPO2_corrected.col(4), edgels_HYPO2_corrected.col(5), edgels_HYPO2_corrected.col(6), edgels_HYPO2_corrected.col(7);
-
-            // if (Edges_HYPO2_final.rows() == 0) continue;
             if ( !any_H2_Edge_Surviving_Epipolar_Corrected(Edges_HYPO2_final) ) continue;
 
             //> Store the Hypo2 Indices
@@ -268,83 +266,24 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> Track average orientations for each cluster in degrees
             std::unordered_map<int, double> cluster_avg_orientations;
             for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                cluster_avg_orientations[i] = Edges_HYPO2_final(i, 2) * (180.0 / M_PI);
+                //cluster_avg_orientations[i] = Edges_HYPO2_final(i, 2);
+                double normalized_orient = normalizeOrientation(Edges_HYPO2_final(i, 2));
+                Edges_HYPO2_final(i, 2) = normalized_orient;
+                cluster_avg_orientations[i] = normalized_orient;
+
+                // if(normalized_orient != Edges_HYPO2_final(i, 2)){
+                //     std::cout<<"normalize orientation from "<<Edges_HYPO2_final(i, 2) * (180.0 / M_PI) <<" degrees to: "<<normalized_orient * (180.0 / M_PI)<<" degrees"<<std::endl;
+                //     std::cout<<"hypo 1 is: "<<Edges_HYPO1.row(H1_edge_idx)<<std::endl;
+                //     exit(0);
+                // }
             }
 
-            ////////////////////////// Helper functions ////////////////////////////
-            
-            //get cluster size
-            std::function<int(int, int)> getClusterSize = [&cluster_labels](int label, int N) -> int {
-                int size = 0;
-                for (int i = 0; i < N; ++i) {
-                    if (cluster_labels[i] == label) size++;
-                }
-                return size;
-            };
-
-            //> Check if two orientations are within threshold in degrees
-            std::function<bool(double, double)> areSimilarOrientations = [](double orient1_deg, double orient2_deg) -> bool {
-                double diff = std::fabs(orient1_deg - orient2_deg);
-                return diff < CLUSTER_ORIENT_THRESH;
-            };
-
-            //> Update cluster average orientation with gaussian distribution
-            std::function<double(int, int)> updateAvgOrientation = [&cluster_labels, &cluster_avg_orientations, &Edges_HYPO2_final, Num_Of_Epipolar_Corrected_H2_Edges](int label1, int label2) -> double {
-
-                //> CH DOCUMENT:
-                //> Given two clusters, find the corresponding H2 edges (with epipolar shifted).
-                //  Then consider the two as a single cluster, calculate the centroid edge location and the distance of each edge member to the centroid edge location
-                //  Finally, use the distance from the centroid edge location, calculate weighted average of the orientations from all the edge member
-                //  The returned weighted average orientation is in degree
-
-                // calculate the mean of the merged cluster
-                double sum_x = 0, sum_y = 0;
-                int count = 0;
-                
-                for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                    if (cluster_labels[i] == label1 || cluster_labels[i] == label2) {
-                        sum_x += Edges_HYPO2_final(i, 0);
-                        sum_y += Edges_HYPO2_final(i, 1);
-                        count++;
-                    }
-                }
-                
-                if (count == 0) return 0.0;
-                
-                double centroid_x = sum_x / count;
-                double centroid_y = sum_y / count;
-                
-                // Calculate mean shift distance from centroid for this cluster
-                double total_shift_from_centroid = 0.0;
-                for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                    if (cluster_labels[i] == label1 || cluster_labels[i] == label2) {
-                        double dx = Edges_HYPO2_final(i, 0) - centroid_x;
-                        double dy = Edges_HYPO2_final(i, 1) - centroid_y;
-                        double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
-                        total_shift_from_centroid += distance_from_centroid;
-                    }
-                }
-                double mean_shift_from_centroid = total_shift_from_centroid / count;
-                
-                // calculate weighted average orientation using Gaussian weights
-                double sum_weighted_orin = 0;
-                
-                for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                    if (cluster_labels[i] == label1 || cluster_labels[i] == label2) {
-                        double orientation_deg = Edges_HYPO2_final(i, 2) * (180.0 / M_PI);
-                        double dx = Edges_HYPO2_final(i, 0) - centroid_x;
-                        double dy = Edges_HYPO2_final(i, 1) - centroid_y;
-                        double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
-                        double weight = std::exp(-0.5 * std::pow((distance_from_centroid - mean_shift_from_centroid) / CLUSTER_ORIENT_GAUSS_SIGMA, 2));
-
-                        sum_weighted_orin += weight * orientation_deg;
-                    }
-                }
-
-                return sum_weighted_orin / count;
-            };
-
-            ////////////////////////// Helper functions ////////////////////////////
+            // Store original positions before correction for distance calculation
+            Eigen::MatrixXd original_positions(edgels_HYPO2.rows(), 2);
+            for (int i = 0; i < edgels_HYPO2.rows(); ++i) {
+                original_positions(i, 0) = edgels_HYPO2(i, 0);
+                original_positions(i, 1) = edgels_HYPO2(i, 1);
+            }
 
             // Merge clusters starting from closest pairs
             bool merged = true;
@@ -356,13 +295,14 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     double min_dist = std::numeric_limits<double>::max();
                     int nearest = -1;
                     
-                    // Find the nearest edge index "nearest" of the current edge (indexed by i)
+                    // Find the nearest edge to the current edge
                     for (int j = 0; j < Num_Of_Epipolar_Corrected_H2_Edges; ++j) {
                         if (cluster_labels[i] != cluster_labels[j]) {
                             double dist = (Edges_HYPO2_final.row(i).head<2>() - Edges_HYPO2_final.row(j).head<2>()).norm();
+                            // orient_i and orient_j are both in degrees
                             double orient_i = cluster_avg_orientations[cluster_labels[i]];
                             double orient_j = cluster_avg_orientations[cluster_labels[j]];
-                            if (dist < min_dist && dist < CLUSTER_DIST_THRESH && areSimilarOrientations(orient_i, orient_j)) {
+                            if (dist < min_dist && dist < CLUSTER_DIST_THRESH && std::abs(orient_i - orient_j) < CLUSTER_ORIENT_THRESH_RAD) {
                                 min_dist = dist;
                                 nearest = j;
                             }
@@ -372,14 +312,25 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     if (nearest != -1) {
                         int old_label = cluster_labels[nearest];
                         int new_label = cluster_labels[i];
-                        int size_old = getClusterSize(old_label, Num_Of_Epipolar_Corrected_H2_Edges);
-                        int size_new = getClusterSize(new_label, Num_Of_Epipolar_Corrected_H2_Edges);
+                        int size_old = getClusterSize(old_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
+                        int size_new = getClusterSize(new_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
                         if (size_old + size_new <= MAX_CLUSTER_SIZE) {
-
                             // Calculate new average orientation for the merged cluster
-                            double merged_avg_orientation = updateAvgOrientation(old_label, new_label);
+                            std::tuple<double, double, double> result = computeGaussianAverage(
+                                                                            old_label, 
+                                                                            cluster_labels, 
+                                                                            cluster_avg_orientations, 
+                                                                            Edges_HYPO2_final, 
+                                                                            original_positions, 
+                                                                            Num_Of_Epipolar_Corrected_H2_Edges, 
+                                                                            new_label
+                                                                        );
+                            double merged_orientation = std::get<2>(result);
+                            // Update the average orientation of the merged cluster
+                            //cluster_avg_orientations[new_label] = merged_orientation;
 
-                            //std::cout<<"merged orientation is: "<<merged_avg_orientation <<std::endl;
+                            double normalized_merged_orient = normalizeOrientation(merged_orientation);
+                            cluster_avg_orientations[new_label] = normalized_merged_orient;
 
                             // Update all points in the smaller cluster
                             for (int k = 0; k < Num_Of_Epipolar_Corrected_H2_Edges; ++k) {
@@ -387,10 +338,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                                     cluster_labels[k] = new_label;
                                 }
                             }
-                            // Update the average orientation of the merged cluster
-                            cluster_avg_orientations[new_label] = merged_avg_orientation;
 
-                            //> Once the two clusters are merged, return to the beginning of the while loop
                             merged = true;
                             break;
                         }
@@ -457,26 +405,35 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             
             Eigen::MatrixXd HYPO2_idx(Num_Of_Epipolar_Corrected_H2_Edges, 1);
 
-            //> CH TODO: In this part, the orientation is not weighted averaged!
-            // For each cluster, compute the average edge and update all edges in the cluster
+            // For each cluster, compute the Gaussian-weighted average edge and update all edges in the cluster
             for (size_t c = 0; c < clusters.size(); ++c) {
                 const std::vector<int>& cluster = clusters[c];
                 if (cluster.empty()) continue;
-
-                // Compute average position and orientation
-                Eigen::RowVector4d cluster_avg = Eigen::RowVector4d::Zero();
-                for (size_t i = 0; i < cluster.size(); ++i) {
-                    int idx = cluster[i];
-                    cluster_avg += Edges_HYPO2_final.row(idx);
-                }
-                cluster_avg /= static_cast<double>(cluster.size());
+ 
+                int cluster_label = cluster_labels[cluster[0]];
+                std::tuple<double, double, double> result = computeGaussianAverage(
+                                                                    cluster_label, 
+                                                                    cluster_labels, 
+                                                                    cluster_avg_orientations, 
+                                                                    Edges_HYPO2_final, 
+                                                                    original_positions, 
+                                                                    Num_Of_Epipolar_Corrected_H2_Edges,
+                                                                    -1
+                                                                );
+                double gaussian_average_x = std::get<0>(result);
+                double gaussian_average_y = std::get<1>(result);
+                double gaussian_average_orientation = std::get<2>(result);
                 
-                // Find the edge closest to the average 
+                // Create the Gaussian-weighted average edge
+                Eigen::RowVector4d gaussian_weighted_avg;
+                gaussian_weighted_avg << gaussian_average_x, gaussian_average_y, gaussian_average_orientation, Edges_HYPO2_final(cluster[0], 3);
+                
+                // Find the edge closest to the Gaussian-weighted average to use as the representative
                 double min_dist = std::numeric_limits<double>::max();
                 int closest_idx = -1;
                 for (size_t i = 0; i < cluster.size(); ++i) {
                     int idx = cluster[i];
-                    double dist = (Edges_HYPO2_final.row(idx).head<2>() - cluster_avg.head<2>()).norm();
+                    double dist = (Edges_HYPO2_final.row(idx).head<2>() - gaussian_weighted_avg.head<2>()).norm();
                     if (dist < min_dist) {
                         min_dist = dist;
                         closest_idx = idx;
@@ -486,7 +443,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 // Update all edges in the cluster with the average edge
                 for (size_t i = 0; i < cluster.size(); ++i) {
                     int idx = cluster[i];
-                    Edges_HYPO2_final.row(idx) = cluster_avg;
+                    Edges_HYPO2_final.row(idx) = gaussian_weighted_avg;
+                    
                     // Preserve the original index for reference
                     if (edgels_HYPO2_corrected.cols() > 8) {
                         HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);

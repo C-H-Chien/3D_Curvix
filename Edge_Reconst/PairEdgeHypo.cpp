@@ -294,11 +294,12 @@ namespace PairEdgeHypothesis {
             ////////////// calculate normal distance between edge and epipolar line //////////////
 
             // double tangential_distance;
-            if (distance_epiline < 0.3){
+            if (distance_epiline < LOCATION_PERTURBATION){
                 // If normal distance is small, move directly to epipolar line
                 corrected_x = epiline_x;
                 corrected_y = epiline_y;
-            }else {
+            }
+            else {
                 ////////////// calculate the intersection between the tangent and epipolar line //////////////
                 double theta = edgels_HYPO2(idx_hypo2,2);
                 double a_edgeH2 = tan(theta); //tan(theta2)
@@ -308,19 +309,25 @@ namespace PairEdgeHypothesis {
                 double x_intersection = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
                 double y_intersection = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
                 double dist_diff_edg2 = sqrt((x_intersection - edgels_HYPO2(idx_hypo2,0))*(x_intersection - edgels_HYPO2(idx_hypo2,0))+(y_intersection -  edgels_HYPO2(idx_hypo2,1))*(y_intersection - edgels_HYPO2(idx_hypo2,1)));
-                if (dist_diff_edg2 < 3){// && abs(angle_diff_deg_edg2 - 0) > 4 && abs(angle_diff_deg_edg2 - 180) > 4){
+                
+                //> Inner two cases: 
+                if (dist_diff_edg2 < EPIP_TANGENCY_DISPL_THRESH) {
+                    //> (i) if the displacement after epipolar shift is less than EPIP_TANGENCY_DISPL_THRESH, then feel free to shift it along its direction vector
                     corrected_x = x_intersection;
                     corrected_y = y_intersection;
-                }else{
+                }
+                else {
+                    //> (ii) if not, then perturb the edge orientation first before shifting the edge along its direction vector
+
                     //////////////// rotate the edge ////////////////
                     double p_theta = a1_line * cos(theta) + b1_line * sin(theta);
                     double derivative_p_theta = -a1_line * sin(theta) + b1_line * cos(theta);
-                    double theta_bar = 0.174533; //10 degrees
+                    // double theta_bar = 0.174533; //10 degrees
                 
                     if (p_theta * derivative_p_theta > 0){
-                        theta = theta - theta_bar;
+                        theta = theta - ORIENT_PERTURBATION;
                     }else{
-                        theta = theta + theta_bar;
+                        theta = theta + ORIENT_PERTURBATION;
                     }
                     //////////////// rotate the edge ////////////////
 
@@ -344,7 +351,7 @@ namespace PairEdgeHypothesis {
                     if (angle_diff_original > 180){
                         angle_diff_original -= 180;
                     }
-                    if (dist_diff_edg2 < 3) {
+                    if (dist_diff_edg2 < EPIP_TANGENCY_DISPL_THRESH) {
                         corrected_x = x_intersection;
                         corrected_y = y_intersection;
                     } 
