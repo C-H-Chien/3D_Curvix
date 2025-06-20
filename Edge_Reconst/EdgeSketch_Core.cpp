@@ -87,10 +87,11 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     getOre          = std::shared_ptr<GetOrientationList::get_OrientationList>(new GetOrientationList::get_OrientationList( Edge_Loc_Pertubation, Img_Rows, Img_Cols ));
     edgeMapping     = std::shared_ptr<EdgeMapping>(new EdgeMapping());
 
-    //> Set up OpenMP threads
+    //> Set up OpenMP threads. Reset it if the upper bound of threads is lower than what is set.
+    Num_Of_OMP_Threads = (Num_Of_OMP_Threads > omp_get_max_threads()) ? omp_get_max_threads() : Num_Of_OMP_Threads;
     omp_set_num_threads(Num_Of_OMP_Threads);
 
-    // local_hypo2_clusters.resize(Num_Of_OMP_Threads);
+    local_hypo2_clusters.resize(Num_Of_OMP_Threads);
 
 
 #if SHOW_OMP_NUM_OF_THREADS
@@ -197,14 +198,13 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         std::vector<Eigen::MatrixXd> local_thread_supported_indices;
         // TODO:DOCUMENT THIS: Thread-local clusters 
         std::unordered_map<int, std::vector<int>> thread_local_clusters;
-
-        int thread_id = omp_get_thread_num();
-
         int H1_edge_idx;
        
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< First loop: loop over all edgels from hypothesis view 1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
         #pragma omp for schedule(static, Num_Of_OMP_Threads)
         for (H1_edge_idx = 0; H1_edge_idx < Edges_HYPO1.rows() ; H1_edge_idx++) {
+
+            int thread_id = omp_get_thread_num();
 
             //> Check if the H1 edge is not close to the image boundary or if it has been visited before
             if ( Skip_this_Edge( H1_edge_idx ) ) continue;
@@ -252,210 +252,198 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             int Num_Of_Epipolar_Corrected_H2_Edges = Edges_HYPO2_final.rows();
 
             //> =================================================== CH'S MIDIFICATION ==============================================================
-            // edge_cluster_ = std::shared_ptr<EdgeClusterer>(new EdgeClusterer(Num_Of_Epipolar_Corrected_H2_Edges, Edges_HYPO2_final, H1_edge_idx));
-            // edge_cluster_->performClustering( HYPO2_idx_raw, Edges_HYPO2, edgels_HYPO2_corrected );
-            // // Edges_HYPO2_final_CH = edge_cluster_->Epip_Correct_H2_Edges;
-            // // Eigen::MatrixXd HYPO2_idx_CH = edge_cluster_->HYPO2_idx;
-            // local_hypo2_clusters[thread_id] = edge_cluster_->H2_Clusters;
+            EdgeClusterer edge_cluster_engine(Num_Of_Epipolar_Corrected_H2_Edges, Edges_HYPO2_final, H1_edge_idx);
+            Eigen::MatrixXd HYPO2_idx = edge_cluster_engine.performClustering( HYPO2_idx_raw, Edges_HYPO2, edgels_HYPO2_corrected );
+
+            Edges_HYPO2_final = edge_cluster_engine.Epip_Correct_H2_Edges;
+            local_hypo2_clusters[thread_id].push_back(edge_cluster_engine.H2_Clusters);
             //> =================================================== CH'S MIDIFICATION ==============================================================
 
-            //> Initialize each H2 edge as a single cluster. The cluster label of edge i is i-1, i.e., cluster_labels[i] = i-1
-            std::vector<int> cluster_labels(Num_Of_Epipolar_Corrected_H2_Edges);
-            std::iota(cluster_labels.begin(), cluster_labels.end(), 0); // Each point starts in its own cluster
+            // //> Initialize each H2 edge as a single cluster. The cluster label of edge i is i-1, i.e., cluster_labels[i] = i-1
+            // std::vector<int> cluster_labels(Num_Of_Epipolar_Corrected_H2_Edges);
+            // std::iota(cluster_labels.begin(), cluster_labels.end(), 0); // Each point starts in its own cluster
 
-            //> Track average orientations for each cluster in degrees
-            std::unordered_map<int, double> cluster_avg_orientations;
-            for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                //cluster_avg_orientations[i] = Edges_HYPO2_final(i, 2);
-                double normalized_orient = normalizeOrientation(Edges_HYPO2_final(i, 2));
-                Edges_HYPO2_final(i, 2) = normalized_orient;
-                cluster_avg_orientations[i] = normalized_orient;
+            // //> Track average orientations for each cluster in degrees
+            // std::unordered_map<int, double> cluster_avg_orientations;
+            // for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
+            //     double normalized_orient = normalizeOrientation(Edges_HYPO2_final(i, 2));
+            //     Edges_HYPO2_final(i, 2) = normalized_orient;
+            //     cluster_avg_orientations[i] = normalized_orient;
+            // }
 
-                // if(normalized_orient != Edges_HYPO2_final(i, 2)){
-                //     std::cout<<"normalize orientation from "<<Edges_HYPO2_final(i, 2) * (180.0 / M_PI) <<" degrees to: "<<normalized_orient * (180.0 / M_PI)<<" degrees"<<std::endl;
-                //     std::cout<<"hypo 1 is: "<<Edges_HYPO1.row(H1_edge_idx)<<std::endl;
-                //     exit(0);
-                // }
-            }
+            // // Store original positions before correction for distance calculation
+            // // Eigen::MatrixXd original_positions(edgels_HYPO2.rows(), 2);
+            // // for (int i = 0; i < edgels_HYPO2.rows(); ++i) {
+            // //     original_positions(i, 0) = edgels_HYPO2(i, 0);
+            // //     original_positions(i, 1) = edgels_HYPO2(i, 1);
+            // // }
 
-            // Store original positions before correction for distance calculation
-            Eigen::MatrixXd original_positions(edgels_HYPO2.rows(), 2);
-            for (int i = 0; i < edgels_HYPO2.rows(); ++i) {
-                original_positions(i, 0) = edgels_HYPO2(i, 0);
-                original_positions(i, 1) = edgels_HYPO2(i, 1);
-            }
+            // // Merge clusters starting from closest pairs
+            // bool merged = true;
+            // while (merged) {
+            //     merged = false;
 
-            // Merge clusters starting from closest pairs
-            bool merged = true;
-            while (merged) {
-                merged = false;
-
-                // For each point, find its nearest neighbor and merge if within threshold
-                for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                    double min_dist = std::numeric_limits<double>::max();
-                    int nearest = -1;
+            //     // For each point, find its nearest neighbor and merge if within threshold
+            //     for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
+            //         double min_dist = std::numeric_limits<double>::max();
+            //         int nearest = -1;
                     
-                    // Find the nearest edge to the current edge
-                    for (int j = 0; j < Num_Of_Epipolar_Corrected_H2_Edges; ++j) {
-                        if (cluster_labels[i] != cluster_labels[j]) {
-                            double dist = (Edges_HYPO2_final.row(i).head<2>() - Edges_HYPO2_final.row(j).head<2>()).norm();
-                            // orient_i and orient_j are both in degrees
-                            double orient_i = cluster_avg_orientations[cluster_labels[i]];
-                            double orient_j = cluster_avg_orientations[cluster_labels[j]];
-                            if (dist < min_dist && dist < CLUSTER_DIST_THRESH && std::abs(orient_i - orient_j) < CLUSTER_ORIENT_THRESH_RAD) {
-                                min_dist = dist;
-                                nearest = j;
-                            }
-                        }
-                    }
-                    // If found a nearest edge within threshold, merge clusters
-                    if (nearest != -1) {
-                        int old_label = cluster_labels[nearest];
-                        int new_label = cluster_labels[i];
-                        int size_old = getClusterSize(old_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
-                        int size_new = getClusterSize(new_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
-                        if (size_old + size_new <= MAX_CLUSTER_SIZE) {
-                            // Calculate new average orientation for the merged cluster
-                            std::tuple<double, double, double> result = computeGaussianAverage(
-                                                                            old_label, 
-                                                                            cluster_labels, 
-                                                                            cluster_avg_orientations, 
-                                                                            Edges_HYPO2_final, 
-                                                                            original_positions, 
-                                                                            Num_Of_Epipolar_Corrected_H2_Edges, 
-                                                                            new_label
-                                                                        );
-                            double merged_orientation = std::get<2>(result);
-                            // Update the average orientation of the merged cluster
-                            //cluster_avg_orientations[new_label] = merged_orientation;
+            //         // Find the nearest edge to the current edge
+            //         for (int j = 0; j < Num_Of_Epipolar_Corrected_H2_Edges; ++j) {
+            //             if (cluster_labels[i] != cluster_labels[j]) {
+            //                 double dist = (Edges_HYPO2_final.row(i).head<2>() - Edges_HYPO2_final.row(j).head<2>()).norm();
+            //                 // orient_i and orient_j are both in degrees
+            //                 double orient_i = cluster_avg_orientations[cluster_labels[i]];
+            //                 double orient_j = cluster_avg_orientations[cluster_labels[j]];
+            //                 if (dist < min_dist && dist < CLUSTER_DIST_THRESH && std::abs(orient_i - orient_j) < CLUSTER_ORIENT_THRESH_RAD) {
+            //                     min_dist = dist;
+            //                     nearest = j;
+            //                 }
+            //             }
+            //         }
+            //         // If found a nearest edge within threshold, merge clusters
+            //         if (nearest != -1) {
+            //             int old_label = cluster_labels[nearest];
+            //             int new_label = cluster_labels[i];
+            //             int size_old = getClusterSize(old_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
+            //             int size_new = getClusterSize(new_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
+            //             if (size_old + size_new <= MAX_CLUSTER_SIZE) {
+            //                 // Calculate new average orientation for the merged cluster
+            //                 std::tuple<double, double, double> result = computeGaussianAverage(
+            //                                                                 old_label, 
+            //                                                                 cluster_labels, 
+            //                                                                 cluster_avg_orientations, 
+            //                                                                 Edges_HYPO2_final, 
+            //                                                                 Num_Of_Epipolar_Corrected_H2_Edges, 
+            //                                                                 new_label
+            //                                                             );
+            //                 double merged_orientation = std::get<2>(result);
+            //                 // Update the average orientation of the merged cluster
+            //                 //cluster_avg_orientations[new_label] = merged_orientation;
 
-                            double normalized_merged_orient = normalizeOrientation(merged_orientation);
-                            cluster_avg_orientations[new_label] = normalized_merged_orient;
+            //                 double normalized_merged_orient = normalizeOrientation(merged_orientation);
+            //                 cluster_avg_orientations[new_label] = normalized_merged_orient;
 
-                            // Update all points in the smaller cluster
-                            for (int k = 0; k < Num_Of_Epipolar_Corrected_H2_Edges; ++k) {
-                                if (cluster_labels[k] == old_label) {
-                                    cluster_labels[k] = new_label;
-                                }
-                            }
+            //                 // Update all points in the smaller cluster
+            //                 for (int k = 0; k < Num_Of_Epipolar_Corrected_H2_Edges; ++k) {
+            //                     if (cluster_labels[k] == old_label) {
+            //                         cluster_labels[k] = new_label;
+            //                     }
+            //                 }
 
-                            merged = true;
-                            break;
-                        }
-                    }
-                }
-            }
+            //                 merged = true;
+            //                 break;
+            //             }
+            //         }
+            //     }
+            // }
 
-            // Group hypothesis edge indices by their cluster label
-            // example: cluster_labels = [0, 0, 1, 2, 1]
-            // result: cluster 0: edge 0 and 1; cluster 1: edge 2 and 4; cluster 2: edge 3
-            std::map<int, std::vector<int> > label_to_cluster;
-            for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-                label_to_cluster[cluster_labels[i]].push_back(i); 
-            }
+            // // Group hypothesis edge indices by their cluster label
+            // // example: cluster_labels = [0, 0, 1, 2, 1]
+            // // result: cluster 0: edge 0 and 1; cluster 1: edge 2 and 4; cluster 2: edge 3
+            // std::map<int, std::vector<int> > label_to_cluster;
+            // for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
+            //     label_to_cluster[cluster_labels[i]].push_back(i); 
+            // }
 
-            //////////// push to clusters////////////
+            // //////////// push to clusters////////////
             
-            thread_local_clusters.clear(); // Clears the thread-local cluster storage for the current hypothesis 1 edge
+            // thread_local_clusters.clear(); // Clears the thread-local cluster storage for the current hypothesis 1 edge
 
-            std::map<int, std::vector<int> >::iterator kv_it;
+            // std::map<int, std::vector<int> >::iterator kv_it;
 
-            //label_to_cluster contains cluster labels as keys and vectors of local edge indices as values
-            //example: {0: [0,1], 1: [2,4], 2: [3]} 
-            for (kv_it = label_to_cluster.begin(); kv_it != label_to_cluster.end(); ++kv_it) {
-                std::vector<int> original_indices;
+            // //label_to_cluster contains cluster labels as keys and vectors of local edge indices as values
+            // //example: {0: [0,1], 1: [2,4], 2: [3]} 
+            // for (kv_it = label_to_cluster.begin(); kv_it != label_to_cluster.end(); ++kv_it) {
+            //     std::vector<int> original_indices;
                 
-                //> CH: In each cluster the H2 edges are epipolar corrected edges,
-                //  but here we use HYPO2_idx_raw which comes from the original H2 edges.
-                //  
-                // Use HYPO2_idx_raw as a lookup table to convert local indices back to original edge indices in Edges_HYPO2 
-                for (size_t i = 0; i < kv_it->second.size(); ++i) {
-                    int local_idx = kv_it->second[i];
-                    if (local_idx >= 0 && local_idx < HYPO2_idx_raw.rows()) {
-                        int original_idx = static_cast<int>(HYPO2_idx_raw(local_idx));
-                        if (original_idx >= 0 && original_idx < Edges_HYPO2.rows()) {
-                            original_indices.push_back(original_idx);
-                        }
-                    }
-                }
+            //     //> CH: In each cluster the H2 edges are epipolar corrected edges,
+            //     //  but here we use HYPO2_idx_raw which comes from the original H2 edges.
+            //     //  
+            //     // Use HYPO2_idx_raw as a lookup table to convert local indices back to original edge indices in Edges_HYPO2 
+            //     for (size_t i = 0; i < kv_it->second.size(); ++i) {
+            //         int local_idx = kv_it->second[i];
+            //         if (local_idx >= 0 && local_idx < HYPO2_idx_raw.rows()) {
+            //             int original_idx = static_cast<int>(HYPO2_idx_raw(local_idx));
+            //             if (original_idx >= 0 && original_idx < Edges_HYPO2.rows()) {
+            //                 original_indices.push_back(original_idx);
+            //             }
+            //         }
+            //     }
                 
-                // For each edge in the cluster, it stores all edges in that cluster
-                for (size_t i = 0; i < original_indices.size(); ++i) {
-                    int original_idx = original_indices[i];
-                    thread_local_clusters[original_idx] = original_indices;
-                }
-            }
+            //     // For each edge in the cluster, it stores all edges in that cluster
+            //     for (size_t i = 0; i < original_indices.size(); ++i) {
+            //         int original_idx = original_indices[i];
+            //         thread_local_clusters[original_idx] = original_indices;
+            //     }
+            // }
 
-            //> CH: Yet to understand hypo2_clusters.
-            #pragma omp critical
-            {
-                std::unordered_map<int, std::vector<int> >::iterator kv_it;
-                for (kv_it = thread_local_clusters.begin(); kv_it != thread_local_clusters.end(); ++kv_it) {
-                    hypo2_clusters[std::make_pair(H1_edge_idx, kv_it->first)] = kv_it->second;
-                }
-            }
-            //////////// push to clusters////////////
+            // //> CH: Yet to understand hypo2_clusters.
+            // #pragma omp critical
+            // {
+            //     std::unordered_map<int, std::vector<int> >::iterator kv_it;
+            //     for (kv_it = thread_local_clusters.begin(); kv_it != thread_local_clusters.end(); ++kv_it) {
+            //         hypo2_clusters[std::make_pair(H1_edge_idx, kv_it->first)] = kv_it->second;
+            //     }
+            // }
+            // //////////// push to clusters////////////
 
-            std::vector<std::vector<int> > clusters;
-            std::map<int, std::vector<int> >::iterator it;
-            for (it = label_to_cluster.begin(); it != label_to_cluster.end(); ++it) {
-                clusters.push_back(it->second);
-            }
+            // std::vector<std::vector<int> > clusters;
+            // std::map<int, std::vector<int> >::iterator it;
+            // for (it = label_to_cluster.begin(); it != label_to_cluster.end(); ++it) {
+            //     clusters.push_back(it->second);
+            // }
 
             
-            Eigen::MatrixXd HYPO2_idx(Num_Of_Epipolar_Corrected_H2_Edges, 1);
+            // Eigen::MatrixXd HYPO2_idx(Num_Of_Epipolar_Corrected_H2_Edges, 1);
 
-            // For each cluster, compute the Gaussian-weighted average edge and update all edges in the cluster
-            for (size_t c = 0; c < clusters.size(); ++c) {
-                const std::vector<int>& cluster = clusters[c];
-                if (cluster.empty()) continue;
+            // // For each cluster, compute the Gaussian-weighted average edge and update all edges in the cluster
+            // for (size_t c = 0; c < clusters.size(); ++c) {
+            //     const std::vector<int>& cluster = clusters[c];
+            //     if (cluster.empty()) continue;
  
-                int cluster_label = cluster_labels[cluster[0]];
-                std::tuple<double, double, double> result = computeGaussianAverage(
-                                                                    cluster_label, 
-                                                                    cluster_labels, 
-                                                                    cluster_avg_orientations, 
-                                                                    Edges_HYPO2_final, 
-                                                                    original_positions, 
-                                                                    Num_Of_Epipolar_Corrected_H2_Edges,
-                                                                    -1
-                                                                );
-                double gaussian_average_x = std::get<0>(result);
-                double gaussian_average_y = std::get<1>(result);
-                double gaussian_average_orientation = std::get<2>(result);
+            //     int cluster_label = cluster_labels[cluster[0]];
+            //     std::tuple<double, double, double> result = computeGaussianAverage(
+            //                                                         cluster_label, 
+            //                                                         cluster_labels, 
+            //                                                         cluster_avg_orientations, 
+            //                                                         Edges_HYPO2_final, 
+            //                                                         Num_Of_Epipolar_Corrected_H2_Edges
+            //                                                     );
+            //     double gaussian_average_x = std::get<0>(result);
+            //     double gaussian_average_y = std::get<1>(result);
+            //     double gaussian_average_orientation = std::get<2>(result);
                 
-                // Create the Gaussian-weighted average edge
-                Eigen::RowVector4d gaussian_weighted_avg;
-                gaussian_weighted_avg << gaussian_average_x, gaussian_average_y, gaussian_average_orientation, Edges_HYPO2_final(cluster[0], 3);
+            //     // Create the Gaussian-weighted average edge
+            //     Eigen::RowVector4d gaussian_weighted_avg;
+            //     gaussian_weighted_avg << gaussian_average_x, gaussian_average_y, gaussian_average_orientation, Edges_HYPO2_final(cluster[0], 3);
                 
-                // Find the edge closest to the Gaussian-weighted average to use as the representative
-                double min_dist = std::numeric_limits<double>::max();
-                int closest_idx = -1;
-                for (size_t i = 0; i < cluster.size(); ++i) {
-                    int idx = cluster[i];
-                    double dist = (Edges_HYPO2_final.row(idx).head<2>() - gaussian_weighted_avg.head<2>()).norm();
-                    if (dist < min_dist) {
-                        min_dist = dist;
-                        closest_idx = idx;
-                    }
-                }
+            //     // Find the edge closest to the Gaussian-weighted average to use as the representative
+            //     double min_dist = std::numeric_limits<double>::max();
+            //     int closest_idx = -1;
+            //     for (size_t i = 0; i < cluster.size(); ++i) {
+            //         int idx = cluster[i];
+            //         double dist = (Edges_HYPO2_final.row(idx).head<2>() - gaussian_weighted_avg.head<2>()).norm();
+            //         if (dist < min_dist) {
+            //             min_dist = dist;
+            //             closest_idx = idx;
+            //         }
+            //     }
                 
-                // Update all edges in the cluster with the average edge
-                for (size_t i = 0; i < cluster.size(); ++i) {
-                    int idx = cluster[i];
-                    Edges_HYPO2_final.row(idx) = gaussian_weighted_avg;
+            //     // Update all edges in the cluster with the average edge
+            //     for (size_t i = 0; i < cluster.size(); ++i) {
+            //         int idx = cluster[i];
+            //         Edges_HYPO2_final.row(idx) = gaussian_weighted_avg;
                     
-                    // Preserve the original index for reference
-                    if (edgels_HYPO2_corrected.cols() > 8) {
-                        HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);
-                    } else {
-                        HYPO2_idx(idx, 0) = -2;
-                    }
-                }
-            }
-            ////////////////////////////////////// cluster hypothesis 2's edges //////////////////////////////////////
-
-            
+            //         // Preserve the original index for reference
+            //         if (edgels_HYPO2_corrected.cols() > 8) {
+            //             HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);
+            //         } else {
+            //             HYPO2_idx(idx, 0) = -2;
+            //         }
+            //     }
+            // }
+            // ////////////////////////////////////// cluster hypothesis 2's edges //////////////////////////////////////
 
             
             int valid_view_counter = 0;
@@ -548,57 +536,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     //>   >> if not, return -2
                     int supported_link_indx = getSupport->getSupportIdx(edgels_tgt_reproj, Tangents_VALID, inliner);
 
-
-                    /////////////////////////////////////////// check if validation edge can be corrected properly //////////////////////////////
-                    // if (supported_link_indx != -2) {
-                    //     Eigen::Matrix3d Rot_HYPO1_val       = All_R[hyp01_view_indx];
-                    //     Eigen::Matrix3d Rot_HYPO3       = All_R[VALID_INDX];
-                    //     Eigen::Vector3d Transl_HYPO1_val    = All_T[hyp01_view_indx];
-                    //     Eigen::Vector3d Transl_HYPO3    = All_T[VALID_INDX];
-                    //     Eigen::Matrix3d R13;
-                    //     Eigen::Vector3d T13;
-  
-                    //     //> Relative pose between hypothesis view 1 and validation view
-                    //     Eigen::Matrix3d R31 = util->getRelativePose_R21(Rot_HYPO1, Rot_HYPO3);
-                    //     Eigen::Vector3d T31 = util->getRelativePose_T21(Rot_HYPO1, Rot_HYPO3, Transl_HYPO1, Transl_HYPO3);
-
-
-                    //     util->getRelativePoses(Rot_HYPO1_val, Transl_HYPO1_val, Rot_HYPO3, Transl_HYPO3, R31, T31, R13, T13);
-                    //     Eigen::Matrix3d F31 = util->getFundamentalMatrix(K_HYPO1.inverse(), K_HYPO2.inverse(), R31, T31); 
-                    //     Eigen::Matrix3d F13 = util->getFundamentalMatrix(K_HYPO2.inverse(), K_HYPO1.inverse(), R13, T13);
-
-                    //     Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct_post_validation(All_Edgels[VALID_INDX].row(supported_link_indx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
-                    //     //Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct(All_Edgels[VALID_INDX].row(supported_link_indx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
-                    //     if (corrected_validation_edge.rows() == 0) {
-                    //         supported_link_indx = -2;
-                    //     }
-                    // }
-
-                    // if (abs(Edges_HYPO1(H1_edge_idx,0) - 529) < 0.001 && abs(Edges_HYPO1(H1_edge_idx,1) - 398.495) < 0.001 &&
-                    //     abs(Edges_HYPO2_final(idx_pair,0) - 422.715) < 0.001 && abs(Edges_HYPO2_final(idx_pair,1) - 376.059) < 0.001) {
-                        
-                    //     if (VALID_INDX == 30) {
-                    //         std::cout<<"------------------------------------"<<std::endl;
-                    //         std::cout << "Validation View Index: " << VALID_INDX << "\n";
-                    //         std::cout << "Epipole 1: " << epipole1.transpose() << "\n";
-                    //         std::cout << "Angle Range Hypothesis 1: [" << thresh_ore31_1 << ", " << thresh_ore31_2 << "]\n";
-                    //         std::cout << "Epipole 2: " << epipole2.transpose() << "\n";
-                    //         std::cout << "Angle Range Hypothesis 2: [" << thresh_ore32_1 << ", " << thresh_ore32_2 << "]\n";
-                            
-                    //         std::cout << "reprojection: "<<VALID_INDX << " " << edge_loc_tgt_gamma3(idx_pair, 0) << " " << edge_loc_tgt_gamma3(idx_pair, 1) << " " << edge_loc_tgt_gamma3(idx_pair, 2) << ";" << std::endl;
-                    //         std::cout << "Validation edge location and orientation:" << std::endl;
-                    //         for (int idx_inline = 0; idx_inline < inliner.rows(); idx_inline++) {
-                    //             // Check if edge coordinates are non-zero
-                    //             if (abs(TO_Edges_VALID(inliner(idx_inline), 0)) > 1e-6 || 
-                    //                 abs(TO_Edges_VALID(inliner(idx_inline), 1)) > 1e-6) {
-                                    
-                    //                 std::cout << VALID_INDX << " " << TO_Edges_VALID(inliner(idx_inline), 0) << " " << TO_Edges_VALID(inliner(idx_inline), 1) << " " << TO_Edges_VALID(inliner(idx_inline), 2)<< ";"  << std::endl;
-                    //             }
-                    //         }
-                    //     }
-                    // }
-                    /////////////////////////////////////////// check if validation edge can be corrected properly //////////////////////////////
-                   
                     //> Get the supporting edge index from this validation view
                     supported_indice_current.row(idx_pair) << supported_link_indx;
 
@@ -670,12 +607,16 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         all_supported_indices.insert(all_supported_indices.end(), local_thread_supported_indices.begin(), local_thread_supported_indices.end());
     } //> end of #pragma omp parallel
 
-    // //> Merge thread-local maps into a single final map (sequentially)
-    // for (const auto& thread_map : local_hypo2_clusters) {
-    //     for (const auto& pair : thread_map) {
-    //         hypo2_clusters_CH[pair.first] = pair.second; // Merge elements
-    //     }
-    // }
+    //> Merge thread-local maps into a single final map (sequentially)
+    for (const auto& map_per_thread : local_hypo2_clusters) {
+        for (const auto& thread_map : map_per_thread) {
+            for (const auto& pair : thread_map) {
+                //> Merge elements
+                // hypo2_clusters_CH[pair.first] = pair.second;
+                hypo2_clusters[pair.first] = pair.second;
+            }
+        }
+    }
 
     // if (hypo2_clusters_CH == hypo2_clusters) { LOG_INFOR_MESG("YAH! The hypo2 clusteres are equal!"); }
     // else { LOG_INFOR_MESG("SADLY! The hypo2 clusteres are NOT equal!"); }

@@ -38,26 +38,14 @@
 #include <unordered_map>
 #include <utility>
 
-
-
 class EdgeSketch_Core {
 
 public:
     std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
 
-    // //> Custom hash function for std::pair<int, int>
-    // struct PairHash {
-    //   template <class T1, class T2>
-    //   size_t operator()(const std::pair<T1, T2>& p) const {
-    //   size_t h1 = std::hash<T1>{}(p.first);
-    //   size_t h2 = std::hash<T2>{}(p.second);
-    //   return h1 ^ (h2 << 1);
-    //   }
-    // };
-
     // For each edge index, store all other edge indices in the same cluster
-    std::vector< std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> > local_hypo2_clusters;
+    std::vector< std::vector< std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> > > local_hypo2_clusters;
     std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters;
 
 
@@ -186,7 +174,7 @@ private:
     std::shared_ptr<GetReprojectedEdgel::get_Reprojected_Edgel> getReprojEdgel = nullptr;
     std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels> getSupport = nullptr;
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
-    std::shared_ptr<EdgeClusterer> edge_cluster_ = nullptr;
+    // std::shared_ptr<EdgeClusterer> edge_cluster_ = nullptr;
 
     // If orientation is less than -90 + threshold/2, add 180 degrees
     double normalizeOrientation(double orientation) {
@@ -218,13 +206,11 @@ private:
       const std::vector<int>& cluster_labels,
       const std::unordered_map<int, double>& cluster_avg_orientations,
       const Eigen::MatrixXd& Edges_HYPO2_Final,
-      const Eigen::MatrixXd& original_positions,
       int N,
-      int label2) 
+      int label2 = -1) 
     {
-    
-      // If label2 is -1, compute for single cluster (label1 only)
-      // If label2 is provided, compute for merged cluster (label1 + label2)
+      //> If label2 is -1 by default, compute for single cluster (label1 only)
+      //> Otherwise, compute for merged cluster (label1 + label2)
       
       // Calculate the geometric mean of the cluster(s)
       double sum_x = 0, sum_y = 0;
