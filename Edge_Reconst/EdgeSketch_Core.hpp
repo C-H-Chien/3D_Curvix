@@ -73,29 +73,25 @@ public:
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);
 
-    // Function to get all edges in the same cluster as a given edge
-    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge);
-    // Function to reset clusters for a new hypo1-hypo2 iteration
-    void reset_hypo2_clusters();
-
     //> Destructor
     ~EdgeSketch_Core();
     
     bool Skip_this_Edge( const int edge_idx ) {
       //> Edge Boundary Check: not too close to boundary
       if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10){
-        if(edge_idx == 2454){
-          std::cout<<"too close to boundary!"<<std::endl;
-        }
         return true;
       }
+
+      int paired_edge_row = edge_idx * Num_Of_Total_Imgs;
       
       //> Paired Edge Check: not yet been paired
-      if ( paired_edge(50 *(edge_idx-1),0) != -2 ){
-        if(edge_idx == 2454){
-          std::cout<<"not yet been paired!"<<std::endl;
-        }
-        return true;
+      if (paired_edge_row >= paired_edge.rows()) {
+          std::cout << "Error: paired_edge index out of bounds: " << paired_edge_row << " >= " << paired_edge.rows() << std::endl;
+          return true;
+      }
+      
+      if ( paired_edge(paired_edge_row, 0) != -2 ){
+          return true;
       }
       return false;
     }
@@ -161,6 +157,7 @@ public:
     double find_next_hypothesis_view_time;
     
 private:
+
     //> sharing the classes
     std::shared_ptr<file_reader> Load_Data = nullptr;
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
@@ -169,10 +166,30 @@ private:
     std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels> getSupport = nullptr;
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
 
+    ///////////////////////////// Clustering helping functions /////////////////////////////
+    // Function to get all edges in the same cluster as a given edge
+    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge);
+    // Function to reset clusters for a new hypo1-hypo2 iteration
+    void reset_hypo2_clusters();
+    int getClusterSize(int label, int N, const std::vector<int>& cluster_labels);
+    double normalizeOrientation(double orientation, double threshold_deg);
+    std::tuple<double, double, double> computeGaussianAverage(
+        int label1, 
+        const std::vector<int>& cluster_labels,
+        const std::unordered_map<int, double>& cluster_avg_orientations,
+        const Eigen::MatrixXd& Edges_HYPO2_final,
+        const Eigen::MatrixXd& original_positions,
+        int N,
+        int label2 = -1
+    );
+    ///////////////////////////// Clustering helping functions /////////////////////////////
+
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
       std::pair<int, int> &next_hypothesis_views, std::vector<int> history_hypothesis_views_index
     );
+
+    
 
     bool get_H2_edge_indices_passing_dist2EL_thresh(
       std::vector<int> &H2_edge_indices_passing_dist2EL_thresh, std::vector<double> indices_stack_unique,

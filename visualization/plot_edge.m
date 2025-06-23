@@ -2,7 +2,7 @@ clear;
 close all;
 
 % === Settings ===
-validation_view_index = 28;
+validation_view_index = 48;
 Dataset_Path = "/gpfs/data/bkimia/Datasets/ABC-NEF/";
 Object_Name = "00000006/";
 Image_Path = fullfile(Dataset_Path, Object_Name, "train_img/");

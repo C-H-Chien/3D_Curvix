@@ -21,6 +21,9 @@
 #define PRUNE_BY_PROJ_PROX_THRESH       (6)     //> in pixels
 #define PRUNE_BY_PROJ_ORIE_THRESH       (360)    //> in degrees
 
+//> Gaussian averaging variables
+#define GAUSSIAN_SIGMA                  (2)
+
 //> Debugging purpose
 #define DEBUG                      (0)
 #define DEBUG_READ_FILES           (false)

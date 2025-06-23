@@ -103,9 +103,9 @@ int main(int argc, char **argv) {
 
       std::cout << "- Edge Threshold = " << edge_thresh << std::endl;
       MWV_Edge_Rec.thresh_EDG = edge_thresh;
-
       //> Load edges with specific third-order edge threshold
       MWV_Edge_Rec.Read_Edgels_Data();
+
       MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
 
       //> Hypothesis-Validation process

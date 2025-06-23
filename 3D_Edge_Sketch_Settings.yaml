@@ -1,9 +1,9 @@
 # %YAML:1.0
 
 #> 3D Edge Sketch Settings
-Num_Of_OMP_Threads: 32                #> Number of CPU cores to run 3D Edge Sketch in parallel
+Num_Of_OMP_Threads: 1                #> Number of CPU cores to run 3D Edge Sketch in parallel
 Init_Hypo1_View_Index: 28             #> Initial hypothesis view 1 index
-Init_Hypo2_View_Index: 2             #> Initial hypothesis view 2 index
+Init_Hypo2_View_Index: 48             #> Initial hypothesis view 2 index
 delta: 0.3                            #> edge location perturbation
 delta_theta: 15                       #> \Delta \theta: orientation threshold
 Max_Num_Of_Support_Views: 4           #> N: minimal number of validation views supporting a hypothesis edge pair
@@ -12,7 +12,7 @@ Multi_Thresh_Final_Thresh: 1          #> third-order edge threshold for last rou
 Parallel_Epipolar_Line_Angle: 15      #> decide if the picked hypothesis view should be abandoned by the angle between two epipolar lines
 Reproj_Dist_Thresh: 2                 #> distance threshold between observed edge and reprojected edge on the validation view (probably not in use)
 Ratio_Of_Claimed_Edges_to_Stop: 0.65   #> stopping 3D Edge Sketch by what ratio of the projected edges claimed by the observed edges
-Max_Num_Of_3D_Edge_Sketch_Passes: 1
+Max_Num_Of_3D_Edge_Sketch_Passes: 10
 circleR: 55                           #> threshold determining whether the distance between edges in hypothesis view 1 and 2 is small enough for them to be considered a match
 
 #> Dataset Settings

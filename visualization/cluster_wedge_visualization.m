@@ -8,54 +8,31 @@ hypothesis2_edge_1 = [
 
 
 edges_before_correction_1 = [
-319.024   316.045 -0.485799    64.066
-  319.618   315.726 -0.479939   63.6614
-  319.425   315.857 -0.483381   63.8713
-  320.016    315.53 -0.473807   64.0271
-  320.097    320.69 -0.459942   11.4695
-  319.905   320.818 -0.470069   11.4579
-  320.504   320.509 -0.439517   11.5429
-  321.102   320.219  -0.42651   11.5691
-  320.919   320.331  -0.42905   11.5527
-  357.888   510.672  0.576586   74.1444
-  358.097    510.85  0.576725   74.2027
-  358.464   511.056  0.573958   74.4344
-  359.036   511.444  0.564635   74.5455
+359.15    279.02   1.35685   7.69039
+  359.218   279.517  -1.55337   7.51379
+  359.194   280.012   -1.4987   7.49168
+  359.154   280.509  -1.48486   7.52296
+
 
 ];
 
 edges_after_correction_1 = [
-319.584    315.75 -0.485799    64.066
-   319.58   315.733 -0.479939   63.6614
-  319.598   315.823 -0.483381   63.8713
-  319.584   315.752 -0.473807   64.0271
-  320.524   320.478 -0.459942   11.4695
-  320.528   320.502 -0.470069   11.4579
-  320.529   320.504 -0.439517   11.5429
-  320.524   320.482  -0.42651   11.5691
-   320.53   320.509  -0.42905   11.5527
-  358.395   511.001  0.576586   74.1444
-  358.355   510.799  0.576725   74.2027
-  358.408   511.067  0.573958   74.4344
-  358.403   511.043  0.564635   74.5455
+354.101   304.327 -0.794065   8.82734
+  359.631   274.748 -0.502888   70.0245
+  358.979   278.235   1.35685   7.69039
+  359.267   276.695  -1.55337   7.51379
+
 ];
 
 cluster_avg_1 = [
-319.587   315.764 -0.480731   63.9065
-  319.587   315.764 -0.480731   63.9065
-  319.587   315.764 -0.480731   63.9065
-  319.587   315.764 -0.480731   63.9065
-320.527   320.495 -0.445017   11.5184
-  320.527   320.495 -0.445017   11.5184
-320.527   320.495 -0.445017   11.5184
-  320.527   320.495 -0.445017   11.5184
-   358.39   510.978  0.572976   74.3317
-   358.39   510.978  0.572976   74.3317
-   358.39   510.978  0.572976   74.3317
-   358.39   510.978  0.572976   74.3317
+  354.039   304.659   -0.8037   8.84477
+  359.619   274.812 -0.394145   70.0245
+  358.979   278.235   1.35685   7.69039
+  359.267   276.695   1.58822   7.51379
+
 ];
-epipoles_hypo2_1 = [600.799 1730.49 1];
-angle_ranges_hypo2_1 = [78.7278 78.7872];
+epipoles_hypo2_1 = [-6931.8, 39276.8, 1];
+angle_ranges_hypo2_1 = [100.588, 100.59];
 
 
 hypothesis2_edge_2 = [];
@@ -81,7 +58,7 @@ mag = 0.5;
 image_width = 800;
 image_height = 800;
 figure;
-img_file = "/gpfs/data/bkimia/Datasets/ABC-NEF/00000006/train_img/28_colors.png";
+img_file = "/gpfs/data/bkimia/Datasets/ABC-NEF/00000006/train_img/48_colors.png";
 imshow(img_file);
 img2 = imread(img_file);
 hold on;
@@ -138,7 +115,7 @@ plot_handles_1 = [plot_handles_1, h9];
 % 
 % legend([h1, h4, h5, h6, h7, h8, h9, h10, h11, h12], {'Edge 1 epipolar wedge from hypothesis 1', 'Third-order edges', 'Third-order edge direction', 'Shifted third-order edge', 'Shifted third-order edge orientation', 'Cluster centroid', 'Cluster centroid orientation', 'Matched hypothesis 2 edge', 'Matched hypothesis 2 edge orientation', 'Edge 2 epipolar wedge from hypothesis 1'}, 'Location', 'northwest');
 
-%legend([h1, h4, h5, h6, h7, h8, h9, h10, h11], {'Edge 1 epipolar wedge from hypothesis 1', 'Third-order edges', 'Third-order edge direction', 'Shifted third-order edge', 'Shifted third-order edge orientation', 'Cluster centroid', 'Cluster centroid orientation', 'Matched hypothesis 2 edge', 'Matched hypothesis 2 edge orientation'}, 'Location', 'northwest');
+% legend([h1, h4, h5, h6, h7, h8, h9, h10, h11], {'Edge 1 epipolar wedge from hypothesis 1', 'Third-order edges', 'Third-order edge direction', 'Shifted third-order edge', 'Shifted third-order edge orientation', 'Cluster centroid', 'Cluster centroid orientation', 'Matched hypothesis 2 edge', 'Matched hypothesis 2 edge orientation'}, 'Location', 'northwest');
 legend([h1, h4, h5, h6, h7, h8, h9], {'Edge 1 epipolar wedge from hypothesis 1', 'Third-order edges', 'Third-order edge direction', 'Shifted third-order edge', 'Shifted third-order edge orientation', 'Cluster centroid', 'Cluster centroid orientation'}, 'Location', 'northwest');
 
 % Update the plotting functions to return handles
