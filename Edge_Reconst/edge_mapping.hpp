@@ -9,6 +9,9 @@
 #include <numeric>
 #include <memory>
 
+//> YAML file data reader
+#include <yaml-cpp/yaml.h>
+
 #include "util.hpp"
 #include "file_reader.hpp"
 #include "definitions.h"
@@ -98,6 +101,7 @@ public:
     //////////////////////////// mapping 2D edge to 3D ////////////////////////////
 
     struct EdgeNode {
+        int index;
         Eigen::Vector3d location;  
         Eigen::Vector3d orientation; 
         std::vector<std::pair<int, EdgeNode*>> neighbors;
@@ -111,10 +115,10 @@ public:
         std::pair<int, Eigen::Vector3d> right_neighbor; 
     };
 
+    // Define a Curve as a sequence of edge node indices
     struct Curve {
         std::vector<int> edge_indices;
     };
-
 
     using PointerNeighborMap = std::unordered_map<const Eigen::Vector3d*, std::vector<std::pair<const Eigen::Vector3d*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>>;
     using ConnectivityGraph = std::unordered_map<int, ConnectivityGraphNode>;
@@ -158,8 +162,7 @@ public:
                              const Eigen::Vector2d& supporting_edge, 
                              int frame);
 
-    void printFirst10Edges();
-    // void write_edge_linking_to_file();
+    void Setup_Data_Parameters( YAML::Node Edge_Sketch_Setting_File );
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
 
@@ -182,7 +185,9 @@ public:
     EdgeNodeList buildEdgeNodeGraph(const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
                                 HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
 
-    void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes, int iterations, double step_size_force, double step_size_torque);
+    void isolate_edges(EdgeNodeList& edge_nodes);
+
+    void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes);
 
     ConnectivityGraph createConnectivityGraph(EdgeNodeList& edge_nodes);
 
@@ -198,13 +203,20 @@ public:
                                                                                                                                                     const Eigen::Matrix3d K,
                                                                                                                                                     const int Num_Of_Total_Imgs
                                                                                                                                                     );
-    std::vector<EdgeCurvelet> read_curvelets(int thresh_EDG = 1);
-    std::vector<Eigen::MatrixXd> read_edgels(int thresh_EDG = 1);
+    std::vector<EdgeCurvelet> read_curvelets();
+    std::vector<Eigen::MatrixXd> read_edgels();
 private:
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
     std::shared_ptr<file_reader> file_reader_ptr = nullptr;
+
     void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
 
+    //> Dataset configurations
+    std::string Dataset_Path;
+    std::string Dataset_Name;
+    std::string Scene_Name;
+    int Num_Of_Images;
+    int thresh_EDG;
 };
 
 #endif  // EDGE_MAPPING_HPP

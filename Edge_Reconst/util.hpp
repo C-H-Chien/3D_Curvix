@@ -25,6 +25,14 @@
 #include <Eigen/Dense>
 
 namespace MultiviewGeometryUtil {
+
+    struct CompareVector3d {
+        bool operator()(const Eigen::Vector3d& a, const Eigen::Vector3d& b) const {
+            if (a.x() != b.x()) return a.x() < b.x();
+            if (a.y() != b.y()) return a.y() < b.y();
+            return a.z() < b.z();
+        }
+    };
     
     class multiview_geometry_util {
 
@@ -34,7 +42,14 @@ namespace MultiviewGeometryUtil {
         Eigen::Matrix3d getSkewSymmetric( Eigen::Vector3d T );
         Eigen::Matrix3d getEssentialMatrix( Eigen::Matrix3d R21, Eigen::Vector3d T21 );
         Eigen::Matrix3d getFundamentalMatrix(Eigen::Matrix3d inverse_K1, Eigen::Matrix3d inverse_K2, Eigen::Matrix3d R21, Eigen::Vector3d T21);
-        
+        Eigen::Vector3d getEpipolarLineCoeffs( Eigen::Vector3d point_in_pixel, Eigen::Matrix3d F );
+        Eigen::Vector3d getEpipolarLineCoeffs( Eigen::MatrixXd edges_in_pixel, int index, Eigen::Matrix3d F );
+
+        double getNormalDistance2EpipolarLine( Eigen::Vector3d Epip_Line_Coeffs, Eigen::Vector3d edge, double &epiline_x, double &epiline_y );
+        double getNormalDistance2EpipolarLine( Eigen::Vector3d Epip_Line_Coeffs, Eigen::VectorXd edge, int index, double &epiline_x, double &epiline_y );
+        double getTangentialDistance2EpipolarLine( Eigen::Vector3d Epip_Line_Coeffs, Eigen::Vector3d edge, double &x_intersection, double &y_intersection );
+        double getTangentialDistance2EpipolarLine( Eigen::Vector3d Epip_Line_Coeffs, Eigen::VectorXd edges, int index, double &x_intersection, double &y_intersection );
+
         Eigen::Matrix3d getRelativePose_R21(Eigen::Matrix3d R1, Eigen::Matrix3d R2);
         Eigen::Vector3d getRelativePose_T21(Eigen::Matrix3d R1, Eigen::Matrix3d R2, Eigen::Vector3d T1, Eigen::Vector3d T2);
 

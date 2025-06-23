@@ -5,21 +5,34 @@
 #define DELETE_ALL_FILES_UNDER_OUTPUTS  (true)
 
 //> Write to the files
-#define WRITE_3D_EDGES                 (true)
+#define WRITE_3D_EDGES                  (true)
+#define WRITE_3D_EDGE_GRAPH             (true)
 
 //> Print out in terminal
-#define SHOW_EDGE_SKETCH_SETTINGS     (false)
+#define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
-//> Form hypothesis edges parameters
-#define EPIP_TANGENCY_ORIENT_THRESH     (4)     //> in degrees
-#define EPIP_TANGENCY_DISPL_THRESH      (3)     //> in pixels
+//> hypotheses formation settings
+#define EPIP_TANGENCY_DISPL_THRESH      (3)         //> in pixels
+#define LOCATION_PERTURBATION           (0.3)         //> in pixels
+#define ORIENT_PERTURBATION             (0.174533)  //> in radians. 0.174533 is 10 degrees
+#define CLUSTER_DIST_THRESH             (1)         //> τc, in pixels
+#define CLUSTER_ORIENT_THRESH           (20.0)      //> in degrees
+#define CLUSTER_ORIENT_THRESH_RAD       (CLUSTER_ORIENT_THRESH * (M_PI / 180.0))
+#define MAX_CLUSTER_SIZE                (10)        //> max number of edges per cluster
+#define CLUSTER_ORIENT_GAUSS_SIGMA      (2.0)
 
 //> Edge graph pruning parameters
-#define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (0.5)
-#define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (0.5)
-#define PRUNE_3D_EDGE_GRAPH_LAMBDA3     (0.5)
+#define PRUNE_3D_EDGE_GRAPH_LAMBDA1     (1)
+#define PRUNE_3D_EDGE_GRAPH_LAMBDA2     (1)
+#define PRUNE_3D_EDGE_GRAPH_LAMBDA3     (1)
 #define PRUNE_BY_PROJ_PROX_THRESH       (6)     //> in pixels
-#define PRUNE_BY_PROJ_ORIE_THRESH       (60)    //> in degrees
+
+//> Edge graph alignment parameters
+#define NUM_OF_ITERATIONS               (1000)
+#define INIT_FROCE_STEP_SIZE            (0.01)
+#define INIT_TORQUE_STEP_SIZE           (0.01)
+#define ENABLE_EXPO_FORCE_AND_TORQUE    (false)
+#define EXPO_INCREASE_FACTOR            (sqrt(2))
 
 //> Debugging purpose
 #define DEBUG                      (0)

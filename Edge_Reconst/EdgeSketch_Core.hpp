@@ -31,13 +31,13 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
-#include "../Edge_Reconst/mvt.hpp"
+#include "mvt.hpp"
+#include "EdgeClusterer.hpp"
 
 //> mutual best support
 #include <unordered_map>
 #include <utility>
 
-    
 class EdgeSketch_Core {
 
 public:
@@ -45,12 +45,16 @@ public:
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
 
     // For each edge index, store all other edge indices in the same cluster
-    std::unordered_map<int, std::vector<int>> hypo2_clusters;
+    std::vector< std::vector< std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> > > local_hypo2_clusters;
+    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters;
+
+
+    std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters_CH;
 
     //> Constructor
     EdgeSketch_Core( YAML::Node );
     void Read_Camera_Data();
-    void Read_Edgels_Data();
+    // void Read_Edgels_Data();
     void Set_Hypothesis_Views_Camera();
     void Set_Hypothesis_Views_Edgels();
     void Run_3D_Edge_Sketch();
@@ -58,31 +62,45 @@ public:
     void Clear_Data();
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    void Calculate_Edge_Support_Ratios_And_Select_Next_Views(std::shared_ptr<EdgeMapping> edgeMapping);
 
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);
 
-    // Function to get all edges in the same cluster as a given edge
-    std::vector<int> get_edges_in_same_cluster(int edge_index);
-    // Function to reset clusters for a new hypo1-hypo2 iteration
-    void reset_hypo2_clusters();
-
     //> Destructor
     ~EdgeSketch_Core();
+
+    void Read_Edgels_Data() {
+        //> Read edgels detected at a specific threshold 
+        Load_Data->read_All_Edgels( All_Edgels, thresh_EDG );
+    }
     
     bool Skip_this_Edge( const int edge_idx ) {
       //> Edge Boundary Check: not too close to boundary
-      if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10)
+      if ( Edges_HYPO1(edge_idx,0) < 10 || Edges_HYPO1(edge_idx,0) > Img_Cols-10 || Edges_HYPO1(edge_idx,1) < 10 || Edges_HYPO1(edge_idx,1) > Img_Rows-10){
         return true;
+      }
+
+      int paired_edge_row = edge_idx * Num_Of_Total_Imgs;
       
       //> Paired Edge Check: not yet been paired
-      if ( paired_edge(edge_idx,0) != -2 )
-        return true;
+      if (paired_edge_row >= paired_edge.rows()) {
+          std::cout << "Error: paired_edge index out of bounds: " << paired_edge_row << " >= " << paired_edge.rows() << std::endl;
+          return true;
+      }
+      
+      if ( paired_edge(paired_edge_row, 0) != -2 ){
+          return true;
+      }
       return false;
     }
 
-    bool is_Epipolar_Wedges_in_Parallel(double thresh_ore31_1, double thresh_ore31_2, double thresh_ore32_1, double thresh_ore32_2, int idx_pair, Eigen::VectorXd &isparallel, Eigen::MatrixXd &supported_indice_current) {
+    bool is_Epipolar_Wedges_in_Parallel(std::pair<double, double> epip_angle_range_from_H1, std::pair<double, double> epip_angle_range_from_H2, int idx_pair, Eigen::VectorXd &isparallel, Eigen::MatrixXd &supported_indice_current) {
+      double thresh_ore31_1 = epip_angle_range_from_H1.first;
+      double thresh_ore31_2 = epip_angle_range_from_H1.second;
+      double thresh_ore32_1 = epip_angle_range_from_H2.first;
+      double thresh_ore32_2 = epip_angle_range_from_H2.second;
       Eigen::MatrixXd anglediff(4,1);
       anglediff << fabs(thresh_ore31_1 - thresh_ore32_1), fabs(thresh_ore31_1 - thresh_ore32_2), \
                    fabs(thresh_ore31_2 - thresh_ore32_1), fabs(thresh_ore31_2 - thresh_ore32_2);
@@ -125,6 +143,7 @@ public:
     double cx;
     double cy;
     std::string Delta_FileName_Str;
+    std::string Post_File_Name_Str;
 
     std::vector< Eigen::MatrixXd > all_supported_indices;
     Eigen::MatrixXd Gamma1s;
@@ -150,11 +169,121 @@ private:
     std::shared_ptr<GetReprojectedEdgel::get_Reprojected_Edgel> getReprojEdgel = nullptr;
     std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels> getSupport = nullptr;
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
-    //std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
+    // std::shared_ptr<EdgeClusterer> edge_cluster_ = nullptr;
+
+    // // If orientation is less than -90 + threshold/2, add 180 degrees
+    // double normalizeOrientation(double orientation) {
+
+    //   //std::cout<<"input orientation is: "<<orientation<<" radians"<<std::endl;
+    //   double wrap_threshold = -90.0 + (CLUSTER_ORIENT_THRESH / 2.0);
+    //   //std::cout<<"wrap_threshold is: "<<wrap_threshold<<" degrees"<<std::endl;
+    //   double orientation_degrees = orientation * (180.0 / M_PI);
+    //   //std::cout<<"input orientation is: "<<orientation<<" radians"<<std::endl;
+    //   double normalized_orientation = orientation;
+    //   if (orientation_degrees < wrap_threshold) {
+    //       normalized_orientation += M_PI;
+    //   }
+    //   //std::cout<<"normalized_orientation is: "<<normalized_orientation<<" radians"<<std::endl;
+    //   return normalized_orientation;
+    // }
+
+    // //Counts how many edges belong to a specific cluster
+    // int getClusterSize(int label, int N, const std::vector<int>& cluster_labels) {
+    //     int size = 0;
+    //     for (int i = 0; i < N; ++i) {
+    //         if (cluster_labels[i] == label) size++;
+    //     }
+    //     return size;
+    // }
+
+    // std::tuple<double, double, double> computeGaussianAverage(
+    //   int label1, 
+    //   const std::vector<int>& cluster_labels,
+    //   const std::unordered_map<int, double>& cluster_avg_orientations,
+    //   const Eigen::MatrixXd& Edges_HYPO2_Final,
+    //   int N,
+    //   int label2 = -1) 
+    // {
+    //   //> If label2 is -1 by default, compute for single cluster (label1 only)
+    //   //> Otherwise, compute for merged cluster (label1 + label2)
+      
+    //   // Calculate the geometric mean of the cluster(s)
+    //   double sum_x = 0, sum_y = 0;
+    //   int count = 0;
+      
+    //   for (int i = 0; i < N; ++i) {
+    //       if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
+    //           sum_x += Edges_HYPO2_Final(i, 0);
+    //           sum_y += Edges_HYPO2_Final(i, 1);
+    //           count++;
+    //       }
+    //   }
+      
+    //   if (count == 0) return std::make_tuple(0.0, 0.0, 0.0);
+      
+    //   double centroid_x = sum_x / count;
+    //   double centroid_y = sum_y / count;
+      
+    //   // Calculate mean shift distance from centroid for this cluster
+    //   double total_shift_from_centroid = 0.0;
+    //   for (int i = 0; i < N; ++i) {
+    //       if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
+    //           double dx = Edges_HYPO2_Final(i, 0) - centroid_x;
+    //           double dy = Edges_HYPO2_Final(i, 1) - centroid_y;
+    //           double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
+    //           total_shift_from_centroid += distance_from_centroid;
+    //       }
+    //   }
+    //   double mean_shift_from_centroid = total_shift_from_centroid / count;
+      
+    //   // Calculate Gaussian-weighted averages for x, y, and orientation
+    //   double sum_weighted_x = 0;
+    //   double sum_weighted_y = 0;
+    //   double sum_weighted_orientation = 0;
+    //   double total_weight = 0;
+      
+    //   for (int i = 0; i < N; ++i) {
+    //       if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
+    //           double dx = Edges_HYPO2_Final(i, 0) - centroid_x;
+    //           double dy = Edges_HYPO2_Final(i, 1) - centroid_y;
+    //           double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
+    //           double gaussian_weight = std::exp(-0.5 * std::pow((distance_from_centroid - mean_shift_from_centroid) / CLUSTER_ORIENT_GAUSS_SIGMA, 2));
+
+    //           sum_weighted_x += gaussian_weight * Edges_HYPO2_Final(i, 0);
+    //           sum_weighted_y += gaussian_weight * Edges_HYPO2_Final(i, 1);
+    //           sum_weighted_orientation += gaussian_weight * Edges_HYPO2_Final(i, 2);
+    //           total_weight += gaussian_weight;
+    //       }
+    //   }
+
+    //   double gaussian_weighted_x = sum_weighted_x / total_weight;
+    //   double gaussian_weighted_y = sum_weighted_y / total_weight;
+    //   double gaussian_weighted_orientation = sum_weighted_orientation / total_weight;
+      
+    //   return std::make_tuple(gaussian_weighted_x, gaussian_weighted_y, gaussian_weighted_orientation);
+    // }
+
+    ///////////////////////////// cluster related /////////////////////////////
+    //> Reset clusters for a new hypo1-hypo2 iteration
+    void reset_hypo2_clusters() {
+        hypo2_clusters.clear();
+    }
+
+    //> get all edges in the same cluster as a given edge
+    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge) {
+        // Check if the edge exists in our mapping
+        auto it = hypo2_clusters.find(std::make_pair(hypo1_edge, hypo2_edge));
+        if (it != hypo2_clusters.end()) {
+            return it->second;
+        }
+        
+        // If not found in any cluster, return a vector containing only this edge
+        return {hypo2_edge};
+    }
+    ///////////////////////////// cluster related /////////////////////////////
 
     Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
 
-    
     int claim_Projected_Edges(const Eigen::MatrixXd& projectedEdges, const Eigen::MatrixXd& observedEdges, double threshold);
     void select_Next_Best_Hypothesis_Views( 
       const std::vector< int >& claimedEdges, std::vector<Eigen::MatrixXd> All_Edgels,
@@ -197,6 +326,10 @@ private:
         if (VALID_INDX == hyp01_view_indx || VALID_INDX == hyp02_view_indx) continue;
         valid_view_index.push_back(VALID_INDX);
       }
+    }
+
+    bool any_H2_Edge_Surviving_Epipolar_Corrected(Eigen::MatrixXd Edges_HYPO2_final) {
+      return (Edges_HYPO2_final.rows() == 0) ? (false) : (true);
     }
     
 
@@ -242,6 +375,15 @@ private:
 
     //> a list of validation view indices
     std::vector<int> valid_view_index;
+
+
+    template<typename T>
+    T Uniform_Random_Number_Generator(T range_from, T range_to) {
+        std::random_device                                          rand_dev;
+        std::mt19937                                                rng(rand_dev());
+        std::uniform_int_distribution<std::mt19937::result_type>    distr(range_from, range_to);
+        return distr(rng);
+    }
 };
 
 
