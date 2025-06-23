@@ -68,11 +68,6 @@ public:
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
                            const std::string& filename);
 
-    // Function to get all edges in the same cluster as a given edge
-    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge);
-    // Function to reset clusters for a new hypo1-hypo2 iteration
-    void reset_hypo2_clusters();
-
     //> Destructor
     ~EdgeSketch_Core();
 
@@ -176,97 +171,116 @@ private:
     std::shared_ptr<GetOrientationList::get_OrientationList> getOre = nullptr;
     // std::shared_ptr<EdgeClusterer> edge_cluster_ = nullptr;
 
-    // If orientation is less than -90 + threshold/2, add 180 degrees
-    double normalizeOrientation(double orientation) {
+    // // If orientation is less than -90 + threshold/2, add 180 degrees
+    // double normalizeOrientation(double orientation) {
 
-      //std::cout<<"input orientation is: "<<orientation<<" radians"<<std::endl;
-      double wrap_threshold = -90.0 + (CLUSTER_ORIENT_THRESH / 2.0);
-      //std::cout<<"wrap_threshold is: "<<wrap_threshold<<" degrees"<<std::endl;
-      double orientation_degrees = orientation * (180.0 / M_PI);
-      //std::cout<<"input orientation is: "<<orientation<<" radians"<<std::endl;
-      double normalized_orientation = orientation;
-      if (orientation_degrees < wrap_threshold) {
-          normalized_orientation += M_PI;
-      }
-      //std::cout<<"normalized_orientation is: "<<normalized_orientation<<" radians"<<std::endl;
-      return normalized_orientation;
+    //   //std::cout<<"input orientation is: "<<orientation<<" radians"<<std::endl;
+    //   double wrap_threshold = -90.0 + (CLUSTER_ORIENT_THRESH / 2.0);
+    //   //std::cout<<"wrap_threshold is: "<<wrap_threshold<<" degrees"<<std::endl;
+    //   double orientation_degrees = orientation * (180.0 / M_PI);
+    //   //std::cout<<"input orientation is: "<<orientation<<" radians"<<std::endl;
+    //   double normalized_orientation = orientation;
+    //   if (orientation_degrees < wrap_threshold) {
+    //       normalized_orientation += M_PI;
+    //   }
+    //   //std::cout<<"normalized_orientation is: "<<normalized_orientation<<" radians"<<std::endl;
+    //   return normalized_orientation;
+    // }
+
+    // //Counts how many edges belong to a specific cluster
+    // int getClusterSize(int label, int N, const std::vector<int>& cluster_labels) {
+    //     int size = 0;
+    //     for (int i = 0; i < N; ++i) {
+    //         if (cluster_labels[i] == label) size++;
+    //     }
+    //     return size;
+    // }
+
+    // std::tuple<double, double, double> computeGaussianAverage(
+    //   int label1, 
+    //   const std::vector<int>& cluster_labels,
+    //   const std::unordered_map<int, double>& cluster_avg_orientations,
+    //   const Eigen::MatrixXd& Edges_HYPO2_Final,
+    //   int N,
+    //   int label2 = -1) 
+    // {
+    //   //> If label2 is -1 by default, compute for single cluster (label1 only)
+    //   //> Otherwise, compute for merged cluster (label1 + label2)
+      
+    //   // Calculate the geometric mean of the cluster(s)
+    //   double sum_x = 0, sum_y = 0;
+    //   int count = 0;
+      
+    //   for (int i = 0; i < N; ++i) {
+    //       if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
+    //           sum_x += Edges_HYPO2_Final(i, 0);
+    //           sum_y += Edges_HYPO2_Final(i, 1);
+    //           count++;
+    //       }
+    //   }
+      
+    //   if (count == 0) return std::make_tuple(0.0, 0.0, 0.0);
+      
+    //   double centroid_x = sum_x / count;
+    //   double centroid_y = sum_y / count;
+      
+    //   // Calculate mean shift distance from centroid for this cluster
+    //   double total_shift_from_centroid = 0.0;
+    //   for (int i = 0; i < N; ++i) {
+    //       if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
+    //           double dx = Edges_HYPO2_Final(i, 0) - centroid_x;
+    //           double dy = Edges_HYPO2_Final(i, 1) - centroid_y;
+    //           double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
+    //           total_shift_from_centroid += distance_from_centroid;
+    //       }
+    //   }
+    //   double mean_shift_from_centroid = total_shift_from_centroid / count;
+      
+    //   // Calculate Gaussian-weighted averages for x, y, and orientation
+    //   double sum_weighted_x = 0;
+    //   double sum_weighted_y = 0;
+    //   double sum_weighted_orientation = 0;
+    //   double total_weight = 0;
+      
+    //   for (int i = 0; i < N; ++i) {
+    //       if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
+    //           double dx = Edges_HYPO2_Final(i, 0) - centroid_x;
+    //           double dy = Edges_HYPO2_Final(i, 1) - centroid_y;
+    //           double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
+    //           double gaussian_weight = std::exp(-0.5 * std::pow((distance_from_centroid - mean_shift_from_centroid) / CLUSTER_ORIENT_GAUSS_SIGMA, 2));
+
+    //           sum_weighted_x += gaussian_weight * Edges_HYPO2_Final(i, 0);
+    //           sum_weighted_y += gaussian_weight * Edges_HYPO2_Final(i, 1);
+    //           sum_weighted_orientation += gaussian_weight * Edges_HYPO2_Final(i, 2);
+    //           total_weight += gaussian_weight;
+    //       }
+    //   }
+
+    //   double gaussian_weighted_x = sum_weighted_x / total_weight;
+    //   double gaussian_weighted_y = sum_weighted_y / total_weight;
+    //   double gaussian_weighted_orientation = sum_weighted_orientation / total_weight;
+      
+    //   return std::make_tuple(gaussian_weighted_x, gaussian_weighted_y, gaussian_weighted_orientation);
+    // }
+
+    ///////////////////////////// cluster related /////////////////////////////
+    //> Reset clusters for a new hypo1-hypo2 iteration
+    void reset_hypo2_clusters() {
+        hypo2_clusters.clear();
     }
 
-    //Counts how many edges belong to a specific cluster
-    int getClusterSize(int label, int N, const std::vector<int>& cluster_labels) {
-        int size = 0;
-        for (int i = 0; i < N; ++i) {
-            if (cluster_labels[i] == label) size++;
+    //> get all edges in the same cluster as a given edge
+    std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge) {
+        // Check if the edge exists in our mapping
+        auto it = hypo2_clusters.find(std::make_pair(hypo1_edge, hypo2_edge));
+        if (it != hypo2_clusters.end()) {
+            return it->second;
         }
-        return size;
+        
+        // If not found in any cluster, return a vector containing only this edge
+        return {hypo2_edge};
     }
-
-    std::tuple<double, double, double> computeGaussianAverage(
-      int label1, 
-      const std::vector<int>& cluster_labels,
-      const std::unordered_map<int, double>& cluster_avg_orientations,
-      const Eigen::MatrixXd& Edges_HYPO2_Final,
-      int N,
-      int label2 = -1) 
-    {
-      //> If label2 is -1 by default, compute for single cluster (label1 only)
-      //> Otherwise, compute for merged cluster (label1 + label2)
-      
-      // Calculate the geometric mean of the cluster(s)
-      double sum_x = 0, sum_y = 0;
-      int count = 0;
-      
-      for (int i = 0; i < N; ++i) {
-          if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
-              sum_x += Edges_HYPO2_Final(i, 0);
-              sum_y += Edges_HYPO2_Final(i, 1);
-              count++;
-          }
-      }
-      
-      if (count == 0) return std::make_tuple(0.0, 0.0, 0.0);
-      
-      double centroid_x = sum_x / count;
-      double centroid_y = sum_y / count;
-      
-      // Calculate mean shift distance from centroid for this cluster
-      double total_shift_from_centroid = 0.0;
-      for (int i = 0; i < N; ++i) {
-          if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
-              double dx = Edges_HYPO2_Final(i, 0) - centroid_x;
-              double dy = Edges_HYPO2_Final(i, 1) - centroid_y;
-              double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
-              total_shift_from_centroid += distance_from_centroid;
-          }
-      }
-      double mean_shift_from_centroid = total_shift_from_centroid / count;
-      
-      // Calculate Gaussian-weighted averages for x, y, and orientation
-      double sum_weighted_x = 0;
-      double sum_weighted_y = 0;
-      double sum_weighted_orientation = 0;
-      double total_weight = 0;
-      
-      for (int i = 0; i < N; ++i) {
-          if (cluster_labels[i] == label1 || (label2 != -1 && cluster_labels[i] == label2)) {
-              double dx = Edges_HYPO2_Final(i, 0) - centroid_x;
-              double dy = Edges_HYPO2_Final(i, 1) - centroid_y;
-              double distance_from_centroid = std::sqrt(dx*dx + dy*dy);
-              double gaussian_weight = std::exp(-0.5 * std::pow((distance_from_centroid - mean_shift_from_centroid) / CLUSTER_ORIENT_GAUSS_SIGMA, 2));
-
-              sum_weighted_x += gaussian_weight * Edges_HYPO2_Final(i, 0);
-              sum_weighted_y += gaussian_weight * Edges_HYPO2_Final(i, 1);
-              sum_weighted_orientation += gaussian_weight * Edges_HYPO2_Final(i, 2);
-              total_weight += gaussian_weight;
-          }
-      }
-
-      double gaussian_weighted_x = sum_weighted_x / total_weight;
-      double gaussian_weighted_y = sum_weighted_y / total_weight;
-      double gaussian_weighted_orientation = sum_weighted_orientation / total_weight;
-      
-      return std::make_tuple(gaussian_weighted_x, gaussian_weighted_y, gaussian_weighted_orientation);
-    }
+    ///////////////////////////// cluster related /////////////////////////////
 
     Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
 

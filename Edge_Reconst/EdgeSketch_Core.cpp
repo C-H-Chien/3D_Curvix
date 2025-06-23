@@ -51,7 +51,6 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     Reproj_Dist_Thresh                              = Edge_Sketch_Setting_YAML_File["Reproj_Dist_Thresh"].as<double>();
     Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges   = Edge_Sketch_Setting_YAML_File["Ratio_Of_Claimed_Edges_to_Stop"].as<double>();
     Max_3D_Edge_Sketch_Passes                       = Edge_Sketch_Setting_YAML_File["Max_Num_Of_3D_Edge_Sketch_Passes"].as<int>();
-    circleR                                         = Edge_Sketch_Setting_YAML_File["circleR"].as<double>(); //> Unknown setting
     //> (2) Dataset Settings
     Dataset_Path                                    = Edge_Sketch_Setting_YAML_File["Dataset_Path"].as<std::string>();
     Dataset_Name                                    = Edge_Sketch_Setting_YAML_File["Dataset_Name"].as<std::string>();
@@ -81,7 +80,7 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     //> Class objects
     Load_Data       = std::shared_ptr<file_reader>(new file_reader(Dataset_Path, Dataset_Name, Scene_Name, Num_Of_Total_Imgs));
     util            = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
-    PairHypo        = std::shared_ptr<PairEdgeHypothesis::pair_edge_hypothesis>(new PairEdgeHypothesis::pair_edge_hypothesis( Reproj_Dist_Thresh, circleR ));
+    PairHypo        = std::shared_ptr<PairEdgeHypothesis::pair_edge_hypothesis>(new PairEdgeHypothesis::pair_edge_hypothesis( Reproj_Dist_Thresh ));
     getReprojEdgel  = std::shared_ptr<GetReprojectedEdgel::get_Reprojected_Edgel>(new GetReprojectedEdgel::get_Reprojected_Edgel());
     getSupport      = std::shared_ptr<GetSupportedEdgels::get_SupportedEdgels>(new GetSupportedEdgels::get_SupportedEdgels( Orien_Thresh ));
     getOre          = std::shared_ptr<GetOrientationList::get_OrientationList>(new GetOrientationList::get_OrientationList( Edge_Loc_Pertubation, Img_Rows, Img_Cols ));
@@ -140,28 +139,6 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Camera() {
     history_hypothesis_views_index.push_back(hyp01_view_indx);
     history_hypothesis_views_index.push_back(hyp02_view_indx);
 }
-
-
-
-///////////////////////////// cluster related /////////////////////////////
-void EdgeSketch_Core::reset_hypo2_clusters() {
-    hypo2_clusters.clear();
-}
-
-
-std::vector<int> EdgeSketch_Core::get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge) {
-    // Check if the edge exists in our mapping
-    auto it = hypo2_clusters.find(std::make_pair(hypo1_edge, hypo2_edge));
-    if (it != hypo2_clusters.end()) {
-        return it->second;
-    }
-    
-    // If not found in any cluster, return a vector containing only this edge
-    return {hypo2_edge};
-}
-///////////////////////////// cluster related /////////////////////////////
-
-
 
 void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 
@@ -222,8 +199,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Eigen::MatrixXd edgels_HYPO2 = PairHypo->getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, epip_angle_range_from_H1_edge);
 
             //> Correct the corresponding H2 edges by shifting to the epipolar line
-            //> CH TODO: CHECK CORRECTNESS
-            Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
+            // Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
+            Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
             
             //> Organize the final edge data (hypothesis edge pairs)
             Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
@@ -251,201 +228,14 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
 
             int Num_Of_Epipolar_Corrected_H2_Edges = Edges_HYPO2_final.rows();
 
-            //> =================================================== CH'S MIDIFICATION ==============================================================
+            //> =========== CLUSTERING H2 EDGES ===========
             EdgeClusterer edge_cluster_engine(Num_Of_Epipolar_Corrected_H2_Edges, Edges_HYPO2_final, H1_edge_idx);
             Eigen::MatrixXd HYPO2_idx = edge_cluster_engine.performClustering( HYPO2_idx_raw, Edges_HYPO2, edgels_HYPO2_corrected );
 
             Edges_HYPO2_final = edge_cluster_engine.Epip_Correct_H2_Edges;
             local_hypo2_clusters[thread_id].push_back(edge_cluster_engine.H2_Clusters);
-            //> =================================================== CH'S MIDIFICATION ==============================================================
+            //> =========== CLUSTERING H2 EDGES ===========
 
-            // //> Initialize each H2 edge as a single cluster. The cluster label of edge i is i-1, i.e., cluster_labels[i] = i-1
-            // std::vector<int> cluster_labels(Num_Of_Epipolar_Corrected_H2_Edges);
-            // std::iota(cluster_labels.begin(), cluster_labels.end(), 0); // Each point starts in its own cluster
-
-            // //> Track average orientations for each cluster in degrees
-            // std::unordered_map<int, double> cluster_avg_orientations;
-            // for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-            //     double normalized_orient = normalizeOrientation(Edges_HYPO2_final(i, 2));
-            //     Edges_HYPO2_final(i, 2) = normalized_orient;
-            //     cluster_avg_orientations[i] = normalized_orient;
-            // }
-
-            // // Store original positions before correction for distance calculation
-            // // Eigen::MatrixXd original_positions(edgels_HYPO2.rows(), 2);
-            // // for (int i = 0; i < edgels_HYPO2.rows(); ++i) {
-            // //     original_positions(i, 0) = edgels_HYPO2(i, 0);
-            // //     original_positions(i, 1) = edgels_HYPO2(i, 1);
-            // // }
-
-            // // Merge clusters starting from closest pairs
-            // bool merged = true;
-            // while (merged) {
-            //     merged = false;
-
-            //     // For each point, find its nearest neighbor and merge if within threshold
-            //     for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-            //         double min_dist = std::numeric_limits<double>::max();
-            //         int nearest = -1;
-                    
-            //         // Find the nearest edge to the current edge
-            //         for (int j = 0; j < Num_Of_Epipolar_Corrected_H2_Edges; ++j) {
-            //             if (cluster_labels[i] != cluster_labels[j]) {
-            //                 double dist = (Edges_HYPO2_final.row(i).head<2>() - Edges_HYPO2_final.row(j).head<2>()).norm();
-            //                 // orient_i and orient_j are both in degrees
-            //                 double orient_i = cluster_avg_orientations[cluster_labels[i]];
-            //                 double orient_j = cluster_avg_orientations[cluster_labels[j]];
-            //                 if (dist < min_dist && dist < CLUSTER_DIST_THRESH && std::abs(orient_i - orient_j) < CLUSTER_ORIENT_THRESH_RAD) {
-            //                     min_dist = dist;
-            //                     nearest = j;
-            //                 }
-            //             }
-            //         }
-            //         // If found a nearest edge within threshold, merge clusters
-            //         if (nearest != -1) {
-            //             int old_label = cluster_labels[nearest];
-            //             int new_label = cluster_labels[i];
-            //             int size_old = getClusterSize(old_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
-            //             int size_new = getClusterSize(new_label, Num_Of_Epipolar_Corrected_H2_Edges, cluster_labels);
-            //             if (size_old + size_new <= MAX_CLUSTER_SIZE) {
-            //                 // Calculate new average orientation for the merged cluster
-            //                 std::tuple<double, double, double> result = computeGaussianAverage(
-            //                                                                 old_label, 
-            //                                                                 cluster_labels, 
-            //                                                                 cluster_avg_orientations, 
-            //                                                                 Edges_HYPO2_final, 
-            //                                                                 Num_Of_Epipolar_Corrected_H2_Edges, 
-            //                                                                 new_label
-            //                                                             );
-            //                 double merged_orientation = std::get<2>(result);
-            //                 // Update the average orientation of the merged cluster
-            //                 //cluster_avg_orientations[new_label] = merged_orientation;
-
-            //                 double normalized_merged_orient = normalizeOrientation(merged_orientation);
-            //                 cluster_avg_orientations[new_label] = normalized_merged_orient;
-
-            //                 // Update all points in the smaller cluster
-            //                 for (int k = 0; k < Num_Of_Epipolar_Corrected_H2_Edges; ++k) {
-            //                     if (cluster_labels[k] == old_label) {
-            //                         cluster_labels[k] = new_label;
-            //                     }
-            //                 }
-
-            //                 merged = true;
-            //                 break;
-            //             }
-            //         }
-            //     }
-            // }
-
-            // // Group hypothesis edge indices by their cluster label
-            // // example: cluster_labels = [0, 0, 1, 2, 1]
-            // // result: cluster 0: edge 0 and 1; cluster 1: edge 2 and 4; cluster 2: edge 3
-            // std::map<int, std::vector<int> > label_to_cluster;
-            // for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
-            //     label_to_cluster[cluster_labels[i]].push_back(i); 
-            // }
-
-            // //////////// push to clusters////////////
-            
-            // thread_local_clusters.clear(); // Clears the thread-local cluster storage for the current hypothesis 1 edge
-
-            // std::map<int, std::vector<int> >::iterator kv_it;
-
-            // //label_to_cluster contains cluster labels as keys and vectors of local edge indices as values
-            // //example: {0: [0,1], 1: [2,4], 2: [3]} 
-            // for (kv_it = label_to_cluster.begin(); kv_it != label_to_cluster.end(); ++kv_it) {
-            //     std::vector<int> original_indices;
-                
-            //     //> CH: In each cluster the H2 edges are epipolar corrected edges,
-            //     //  but here we use HYPO2_idx_raw which comes from the original H2 edges.
-            //     //  
-            //     // Use HYPO2_idx_raw as a lookup table to convert local indices back to original edge indices in Edges_HYPO2 
-            //     for (size_t i = 0; i < kv_it->second.size(); ++i) {
-            //         int local_idx = kv_it->second[i];
-            //         if (local_idx >= 0 && local_idx < HYPO2_idx_raw.rows()) {
-            //             int original_idx = static_cast<int>(HYPO2_idx_raw(local_idx));
-            //             if (original_idx >= 0 && original_idx < Edges_HYPO2.rows()) {
-            //                 original_indices.push_back(original_idx);
-            //             }
-            //         }
-            //     }
-                
-            //     // For each edge in the cluster, it stores all edges in that cluster
-            //     for (size_t i = 0; i < original_indices.size(); ++i) {
-            //         int original_idx = original_indices[i];
-            //         thread_local_clusters[original_idx] = original_indices;
-            //     }
-            // }
-
-            // //> CH: Yet to understand hypo2_clusters.
-            // #pragma omp critical
-            // {
-            //     std::unordered_map<int, std::vector<int> >::iterator kv_it;
-            //     for (kv_it = thread_local_clusters.begin(); kv_it != thread_local_clusters.end(); ++kv_it) {
-            //         hypo2_clusters[std::make_pair(H1_edge_idx, kv_it->first)] = kv_it->second;
-            //     }
-            // }
-            // //////////// push to clusters////////////
-
-            // std::vector<std::vector<int> > clusters;
-            // std::map<int, std::vector<int> >::iterator it;
-            // for (it = label_to_cluster.begin(); it != label_to_cluster.end(); ++it) {
-            //     clusters.push_back(it->second);
-            // }
-
-            
-            // Eigen::MatrixXd HYPO2_idx(Num_Of_Epipolar_Corrected_H2_Edges, 1);
-
-            // // For each cluster, compute the Gaussian-weighted average edge and update all edges in the cluster
-            // for (size_t c = 0; c < clusters.size(); ++c) {
-            //     const std::vector<int>& cluster = clusters[c];
-            //     if (cluster.empty()) continue;
- 
-            //     int cluster_label = cluster_labels[cluster[0]];
-            //     std::tuple<double, double, double> result = computeGaussianAverage(
-            //                                                         cluster_label, 
-            //                                                         cluster_labels, 
-            //                                                         cluster_avg_orientations, 
-            //                                                         Edges_HYPO2_final, 
-            //                                                         Num_Of_Epipolar_Corrected_H2_Edges
-            //                                                     );
-            //     double gaussian_average_x = std::get<0>(result);
-            //     double gaussian_average_y = std::get<1>(result);
-            //     double gaussian_average_orientation = std::get<2>(result);
-                
-            //     // Create the Gaussian-weighted average edge
-            //     Eigen::RowVector4d gaussian_weighted_avg;
-            //     gaussian_weighted_avg << gaussian_average_x, gaussian_average_y, gaussian_average_orientation, Edges_HYPO2_final(cluster[0], 3);
-                
-            //     // Find the edge closest to the Gaussian-weighted average to use as the representative
-            //     double min_dist = std::numeric_limits<double>::max();
-            //     int closest_idx = -1;
-            //     for (size_t i = 0; i < cluster.size(); ++i) {
-            //         int idx = cluster[i];
-            //         double dist = (Edges_HYPO2_final.row(idx).head<2>() - gaussian_weighted_avg.head<2>()).norm();
-            //         if (dist < min_dist) {
-            //             min_dist = dist;
-            //             closest_idx = idx;
-            //         }
-            //     }
-                
-            //     // Update all edges in the cluster with the average edge
-            //     for (size_t i = 0; i < cluster.size(); ++i) {
-            //         int idx = cluster[i];
-            //         Edges_HYPO2_final.row(idx) = gaussian_weighted_avg;
-                    
-            //         // Preserve the original index for reference
-            //         if (edgels_HYPO2_corrected.cols() > 8) {
-            //             HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);
-            //         } else {
-            //             HYPO2_idx(idx, 0) = -2;
-            //         }
-            //     }
-            // }
-            // ////////////////////////////////////// cluster hypothesis 2's edges //////////////////////////////////////
-
-            
             int valid_view_counter = 0;
             int stack_idx = 0;
             Eigen::MatrixXd supported_indices;
@@ -748,8 +538,9 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         Eigen::MatrixXd edgel_HYPO2   = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));  //> edge index in hypo 2
         Eigen::MatrixXd HYPO2_idx_raw = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));
 
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
-        //Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        //> CH: WHY IS HERE ANOTHER EPIPOLAR CORRECTION?????
+        // Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
         Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
         Edges_HYPO1_final << edgels_HYPO2_corrected.col(0), edgels_HYPO2_corrected.col(1), edgels_HYPO2_corrected.col(2), edgels_HYPO2_corrected.col(3);
         Eigen::MatrixXd Edges_HYPO2_final(edgels_HYPO2_corrected.rows(), 4);
@@ -782,44 +573,43 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
                 // /////////////////////////////////// epipolar correcting validation view edges ///////////////////////////////////
                 Eigen::RowVectorXd R_vector = Eigen::Map<Eigen::RowVectorXd>(All_R[val_idx].data(), All_R[val_idx].size());
                 Eigen::MatrixXd edgel_VALID = All_Edgels[val_idx].row(support_idx);
-                Eigen::Matrix3d Rot_HYPO1_val       = All_R[hyp01_view_indx];
-                Eigen::Matrix3d Rot_HYPO3       = All_R[val_idx];
-                Eigen::Vector3d Transl_HYPO1_val    = All_T[hyp01_view_indx];
-                Eigen::Vector3d Transl_HYPO3    = All_T[val_idx];
-                Eigen::Matrix3d R31;
-                Eigen::Vector3d T31;
-                Eigen::Matrix3d R13;
-                Eigen::Vector3d T13;
+                // Eigen::Matrix3d Rot_HYPO1_val       = All_R[hyp01_view_indx];
+                // Eigen::Matrix3d Rot_HYPO3       = All_R[val_idx];
+                // Eigen::Vector3d Transl_HYPO1_val    = All_T[hyp01_view_indx];
+                // Eigen::Vector3d Transl_HYPO3    = All_T[val_idx];
+                // Eigen::Matrix3d R31;
+                // Eigen::Vector3d T31;
+                // Eigen::Matrix3d R13;
+                // Eigen::Vector3d T13;
 
-                if (Use_Multiple_K) {
-                    K_HYPO1 = All_K[hyp01_view_indx];
-                    K_HYPO2 = All_K[hyp02_view_indx];
-                }
-                else {
-                    K_HYPO1 = K;
-                    K_HYPO2 = K;
-                }
-                util->getRelativePoses(Rot_HYPO1_val, Transl_HYPO1_val, Rot_HYPO3, Transl_HYPO3, R31, T31, R13, T13);
-                Eigen::Matrix3d F31 = util->getFundamentalMatrix(K_HYPO1.inverse(), K_HYPO2.inverse(), R31, T31); 
-                Eigen::Matrix3d F13 = util->getFundamentalMatrix(K_HYPO2.inverse(), K_HYPO1.inverse(), R13, T13);
+                // if (Use_Multiple_K) {
+                //     K_HYPO1 = All_K[hyp01_view_indx];
+                //     K_HYPO2 = All_K[hyp02_view_indx];
+                // }
+                // else {
+                //     K_HYPO1 = K;
+                //     K_HYPO2 = K;
+                // }
+                // util->getRelativePoses(Rot_HYPO1_val, Transl_HYPO1_val, Rot_HYPO3, Transl_HYPO3, R31, T31, R13, T13);
+                // Eigen::Matrix3d F31 = util->getFundamentalMatrix(K_HYPO1.inverse(), K_HYPO2.inverse(), R31, T31); 
+                // Eigen::Matrix3d F13 = util->getFundamentalMatrix(K_HYPO2.inverse(), K_HYPO1.inverse(), R13, T13);
 
-                Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct(edgel_VALID, edgel_HYPO1, F31, F13, HYPO2_idx_raw);
-                //Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct_post_validation(edgel_VALID, edgel_HYPO1, F31, F13, HYPO2_idx_raw);
-                Eigen::MatrixXd Edges_VAL_final(corrected_validation_edge.rows(), 4);
-                Edges_VAL_final << corrected_validation_edge.col(4), corrected_validation_edge.col(5), corrected_validation_edge.col(6), corrected_validation_edge.col(7);
-                if (corrected_validation_edge.rows() == 0) {
-                    continue;
-                }
+                // Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct(edgel_VALID, edgel_HYPO1, F31, F13, HYPO2_idx_raw);
+                // Eigen::MatrixXd Edges_VAL_final(corrected_validation_edge.rows(), 4);
+                // Edges_VAL_final << corrected_validation_edge.col(4), corrected_validation_edge.col(5), corrected_validation_edge.col(6), corrected_validation_edge.col(7);
+                // if (corrected_validation_edge.rows() == 0) {
+                //     continue;
+                // }
 
-                if (corrected_validation_edge.rows() > 0) {
-                    Eigen::Vector2d pt_VAL = Edges_VAL_final.row(0);
-                    paired_edges_locations_file << pt_VAL(0) << " " << pt_VAL(1) << " " << R_vector << " " << All_T[val_idx].transpose() << "\n";
-                }
-                val_count++;
+                // if (corrected_validation_edge.rows() > 0) {
+                    // Eigen::Vector2d pt_VAL = Edges_VAL_final.row(0);
+                    // paired_edges_locations_file << pt_VAL(0) << " " << pt_VAL(1) << " " << R_vector << " " << All_T[val_idx].transpose() << "\n";
+                // }
                 // /////////////////////////////////// epipolar correcting validation view edges ///////////////////////////////////
+                // Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
 
-                Eigen::Vector2d supporting_edge = All_Edgels[val_idx].row(support_idx).head<2>();
-                
+                paired_edges_locations_file << edgel_VALID(0) << " " << edgel_VALID(1) << " " << R_vector << " " << All_T[val_idx].transpose() << "\n";
+                val_count++;
             }
 
         }
@@ -895,8 +685,8 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         // exit(0);
         /////////// get cluster member ///////////
 
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
-        //Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        // Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
 
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
             std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
@@ -1024,8 +814,10 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
                 util->getRelativePoses(Rot_HYPO1_val, Transl_HYPO1_val, Rot_HYPO3, Transl_HYPO3, R31, T31, R13, T13);
                 Eigen::Matrix3d F31 = util->getFundamentalMatrix(K_HYPO1.inverse(), K_HYPO2.inverse(), R31, T31); 
                 Eigen::Matrix3d F13 = util->getFundamentalMatrix(K_HYPO2.inverse(), K_HYPO1.inverse(), R13, T13);
-                //Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct(edges_for_val_frame.row(support_idx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
-                Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct_post_validation(edges_for_val_frame.row(support_idx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
+                // Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct_post_validation(edges_for_val_frame.row(support_idx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
+                Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2_epipolar_correction(edges_for_val_frame.row(support_idx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
+                
+
                 Eigen::MatrixXd Edges_VAL_final(corrected_validation_edge.rows(), 4);
                 Edges_VAL_final << corrected_validation_edge.col(4), corrected_validation_edge.col(5), corrected_validation_edge.col(6), corrected_validation_edge.col(7);
                 if (corrected_validation_edge.rows() > 0) {
