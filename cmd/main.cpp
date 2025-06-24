@@ -122,8 +122,8 @@ int main(int argc, char **argv) {
     MWV_Edge_Rec.Stack_3D_Edges();
 
     //> Find the next hypothesis view pairs, if any
-    MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
-    // MWV_Edge_Rec.Calculate_Edge_Support_Ratios_And_Select_Next_Views(edgeMapping);
+    // MWV_Edge_Rec.Project_3D_Edges_and_Find_Next_Hypothesis_Views();
+    MWV_Edge_Rec.Calculate_Edge_Support_Ratios_And_Select_Next_Views(edgeMapping);
     MWV_Edge_Rec.Clear_Data();
 
     edge_sketch_pass_count++;
