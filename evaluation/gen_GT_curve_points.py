@@ -65,10 +65,10 @@ def get_gt_points(name, base_dir):
     edge_pts = []
     edge_pts_raw = []
     for each_curve in json_data_feats[name]:
-        #> Take all curves, regardless whether any of them is 'sharp' or not
-        # if each_curve['sharp']:
-        each_edge_pts = [vertices_xyz[i] for i in each_curve['vert_indices']]
-        edge_pts_raw += each_edge_pts
+        #> Decide if "sharp" curves are the only curve types to be extracted. Sometimes this is needed.
+        if each_curve['sharp']:
+            each_edge_pts = [vertices_xyz[i] for i in each_curve['vert_indices']]
+            edge_pts_raw += each_edge_pts
 
         gt_sampling = []
         each_edge_pts = np.array(each_edge_pts)
@@ -88,7 +88,7 @@ def get_gt_points(name, base_dir):
     return edge_pts_raw.astype(np.float32), edge_pts.astype(np.float32)
 
 #> Define the root paths and base directory
-root_dir = "/gpfs/data/bkimia/cchien3/Qiwu_Edge_Grouping/3D_Edge_Sketch_and_Grouping/"
+root_dir = "/gpfs/data/bkimia/cchien3/Learning_Based_Edge_Reconstruction/NEF_code/"
 base_dir = root_dir + "ABC_NEF_obj"
 objs_dir = os.path.join(base_dir, "obj")
 obj_names = os.listdir(objs_dir)
@@ -98,9 +98,10 @@ for i, obj_name in enumerate(obj_names):
     sorted_obj_names[i] = obj_name[:8]
 
 #> Define the path for saving figures
-vis_gt_dir = root_dir + "evaluations/gt_curve_points"
+repo_dir = "/gpfs/data/bkimia/cchien3/Qiwu_Edge_Grouping/3D_Edge_Sketch_and_Grouping/"
+vis_gt_dir = repo_dir + "evaluation/gt_curve_points"
 os.makedirs(vis_gt_dir, exist_ok=True)
-desired_obj = "00004605"
+desired_obj = "00000006"
 do_only_on_desired_obj = True
 
 if do_only_on_desired_obj == True:

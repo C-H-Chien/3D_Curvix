@@ -46,10 +46,10 @@ def print_metrics(metrics, totals, edge_type):
     print(f"  Accuracy: {metrics[f'acc_{edge_type}']}")
 
 
-def eval_3D_edges(obj_name, base_dir, output_name, GT_dir, metrics, totals):
+def eval_3D_edges(obj_name, base_dir, output_name, object_file, GT_dir, metrics, totals):
     #> get the 3D edge sketch curve points
     print(f"Processing: {obj_name}")
-    out_cruve_points_path = os.path.join( base_dir, output_name, "curves_points.txt" )
+    out_cruve_points_path = os.path.join( base_dir, output_name, object_file )
     print( out_cruve_points_path )
     if not os.path.exists( out_cruve_points_path ):
         print(f"Invalid 3D edge sketch result at {obj_name}")
@@ -101,8 +101,9 @@ def eval_3D_edges(obj_name, base_dir, output_name, GT_dir, metrics, totals):
     )
 
 
-def main(base_dir, GT_dir, exp_name):
-    eval_obj_name = "00000006"
+def main(base_dir, GT_dir, exp_name, eval_obj_name, obj_file):
+    #eval_obj_name = "00002594"
+    #obj_file = "curves_points_2594.txt"
     set_random_seeds()
     metrics = {
         "chamfer": [],
@@ -145,7 +146,7 @@ def main(base_dir, GT_dir, exp_name):
         },
     }
 
-    eval_3D_edges(eval_obj_name, base_dir, exp_name, GT_dir, metrics, totals)
+    eval_3D_edges(eval_obj_name, base_dir, exp_name, obj_file, GT_dir, metrics, totals)
 
     metrics = finalize_metrics(metrics)
 
@@ -181,7 +182,10 @@ if __name__ == "__main__":
         default="/gpfs/data/bkimia/Datasets/ABC-NEF/gt_curve_points/",
         help="Directory for the GT 3D curve points",
     )
-    parser.add_argument("--output_name", type=str, default="outputs", help="output folder name")
+    parser.add_argument("--output_name", type=str, default="output_ours/", help="output folder name")
+
+    parser.add_argument("--eval_obj_name", type=str, default="00000006", help="evaluated ABC-NEF object name")
+    parser.add_argument("--obj_file_name", type=str, default="curves_points_0006.txt", help="evaluated ABC-NEF object file name")
 
     args = parser.parse_args()
-    main(args.base_dir, args.GT_dir, args.output_name)
+    main(args.base_dir, args.GT_dir, args.output_name, args.eval_obj_name, args.obj_file_name)
