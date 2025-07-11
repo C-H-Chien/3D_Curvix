@@ -24,7 +24,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-// using namespace std;
 
 namespace GetOrientationList {
     
@@ -37,9 +36,6 @@ namespace GetOrientationList {
         OreListBar_raw.conservativeResize(Edges_HYPO1.rows(),2);
         Eigen::MatrixXd OreListBardegree;
         OreListBardegree.conservativeResize(Edges_HYPO1.rows(),2);
-        Eigen::Vector3d e1  = {1,0,0};
-        Eigen::Vector3d e2  = {0,1,0};
-        Eigen::Vector3d e3  = {0,0,1};
         Eigen::Matrix3d R1  = All_R[REFIDX];
         Eigen::Vector3d T1  = All_T[REFIDX];
         Eigen::Matrix3d R2  = All_R[VALID_INDX];
@@ -350,70 +346,16 @@ namespace GetOrientationList {
             if(slope12all(3,0) < 0){
                 slope12all(3,0) = slope12all(3,0)+180;
             }
-            
-            /*
-            if(VALID_INDX == 39 && REFIDX == hyp02_view_indx){
-                std::cout << "VALID_INDX: \n" << VALID_INDX <<std::endl;
-                std::cout << "p1_xy: \n" << p1_xy.row(idx_pt12) <<std::endl;
-                std::cout << "p2_xy: \n" << p2_xy.row(idx_pt12) <<std::endl;
-                std::cout << "p1_dxdy: \n" << p1_dxdy.row(idx_pt12) <<std::endl;
-                std::cout << "p1_final_dxdyp: \n" << p1_final_dxdyp.row(idx_pt12) <<std::endl;
-                std::cout << "p1_final_dxdyn: \n" << p1_final_dxdyn.row(idx_pt12) <<std::endl;
-                std::cout << "p2_dxdy: \n" << p2_dxdy.row(idx_pt12) <<std::endl;
-                std::cout << "p2_final_dxdyp: \n" << p2_final_dxdyp.row(idx_pt12) <<std::endl;
-                std::cout << "p2_final_dxdyn: \n" << p2_final_dxdyn.row(idx_pt12) <<std::endl;
-                std::cout << "delta_x1: \n" << delta_x1 <<std::endl;
-                std::cout << "delta_x2: \n" << delta_x2 <<std::endl;
-                std::cout << "slope12all: \n" << slope12all <<std::endl;
-                if (DEBUG == 1) { std::cerr << "\n—=>DEBUG MODE<=—\n"; exit(1); }
-            }
-            */
             OreListBar_raw(idx_pt12,0) = slope12all.minCoeff();
-            OreListBar_raw(idx_pt12,1) = slope12all.maxCoeff();
-            
-            /*
-            if(OreListBar_raw(idx_pt12,0) <= 0){
-                OreListBardegree(idx_pt12,0) = OreListBar_raw(idx_pt12,0)+180;
-            }else{
-                OreListBardegree(idx_pt12,0) = OreListBar_raw(idx_pt12,0);
-            }
-            if(OreListBar_raw(idx_pt12,1) <= 0){
-                OreListBardegree(idx_pt12,1) = OreListBar_raw(idx_pt12,1)+180;
-            }else{
-                OreListBardegree(idx_pt12,1) = OreListBar_raw(idx_pt12,1);
-            }
-            */
-            
+            OreListBar_raw(idx_pt12,1) = slope12all.maxCoeff();            
         }
-        
-        //OreListBar_raw.col(0) = -1*(Eigen::VectorXd::Ones(Edges_HYPO1.rows())*F(0,0)+F(0,1)*slope_hypo1.col(0));
-        //OreListBar_raw.col(1) = (Eigen::VectorXd::Ones(Edges_HYPO1.rows())*F(1,0)+F(1,1)*slope_hypo1.col(0));
-        //Eigen::MatrixXd OreListBar = OreListBar_raw.col(0).array()/OreListBar_raw.col(1).array();
-        //
-        //Eigen::MatrixXd OreListBarAtan = OreListBar.col(0).array().atan();
-        //
-        
-        /*
-        Eigen::MatrixXd OreListBar_rawp1 = OreListBar_raw.col(0) + Eigen::VectorXd::Ones(OreListBar_raw.rows())*180;
-        Eigen::MatrixXd OreListBar_rawp2 = OreListBar_raw.col(1) + Eigen::VectorXd::Ones(OreListBar_raw.rows())*180;
-        OreListBardegree.col(0) = (OreListBar_raw.col(0).array() < 0).select(OreListBar_rawp1, OreListBar_raw.col(0));
-        OreListBardegree.col(1) = (OreListBar_raw.col(1).array() < 0).select(OreListBar_rawp2, OreListBar_raw.col(1));
-        */
-
-        //return OreListBar_raw;
         return {OreListBar_raw, epipole_pix_view2};
     }
-
-
-
 
     Eigen::MatrixXd get_OrientationList::getOreListBarVali(Eigen::MatrixXd Edges_HYPO1, std::vector<Eigen::Matrix3d> All_R, std::vector<Eigen::Vector3d> All_T, Eigen::Matrix3d K1, Eigen::Matrix3d K2, int VALID_INDX, int REFIDX) {
         MultiviewGeometryUtil::multiview_geometry_util util;
         Eigen::MatrixXd OreListBar_raw;
         OreListBar_raw.conservativeResize(Edges_HYPO1.rows(),2);
-        Eigen::Vector3d e1  = {1,0,0};
-        Eigen::Vector3d e2  = {0,1,0};
-        Eigen::Vector3d e3  = {0,0,1};
         Eigen::Matrix3d R1  = All_R[REFIDX];
         Eigen::Vector3d T1  = All_T[REFIDX];
         Eigen::Matrix3d R2  = All_R[VALID_INDX];
@@ -450,9 +392,6 @@ namespace GetOrientationList {
         MultiviewGeometryUtil::multiview_geometry_util util;
         Eigen::MatrixXd OreListBar_raw;
         OreListBar_raw.conservativeResize(Edges_HYPO2.rows(),2);
-        Eigen::Vector3d e1  = {1,0,0};
-        Eigen::Vector3d e2  = {0,1,0};
-        Eigen::Vector3d e3  = {0,0,1};
         Eigen::Matrix3d R1  = All_R[hyp01_view_indx];
         Eigen::Vector3d T1  = All_T[hyp01_view_indx];
         Eigen::Matrix3d R2  = All_R[hyp02_view_indx];
@@ -489,9 +428,6 @@ namespace GetOrientationList {
         MultiviewGeometryUtil::multiview_geometry_util util;
         Eigen::MatrixXd OreListBar_raw;
         OreListBar_raw.conservativeResize(Edges_HYPO2.rows(),2);
-        Eigen::Vector3d e1  = {1,0,0};
-        Eigen::Vector3d e2  = {0,1,0};
-        Eigen::Vector3d e3  = {0,0,1};
         Eigen::Matrix3d R1  = All_R[REFIDX];
         Eigen::Vector3d T1  = All_T[REFIDX];
         Eigen::Matrix3d R2  = All_R[VALID_INDX];
