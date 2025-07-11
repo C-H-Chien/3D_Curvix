@@ -91,6 +91,17 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
 #if SHOW_OMP_NUM_OF_THREADS
     std::cout << "Using " << Num_Of_OMP_Threads << " threads for OpenMP parallelization." << std::endl;
 #endif
+
+#if ISOLATE_DATA
+    const std::string file_name_for_valid_edges = OUTPUT_FOLDER_NAME + "/hypothesize_validate_V_data.txt";
+    const std::string file_name_for_valid_edges_in_H1_wedges = OUTPUT_FOLDER_NAME + "/V_edges_in_H1_wedges.txt";
+    const std::string file_name_for_valid_edges_in_H2_wedges = OUTPUT_FOLDER_NAME + "/V_edges_in_H2_wedges.txt";
+    const std::string file_name_for_valid_edges_intersection = OUTPUT_FOLDER_NAME + "/V_edges_in_intersection.txt";
+    V_edges_outFile.open(file_name_for_valid_edges);
+    V_edges_in_H1_wedges_outFile.open(file_name_for_valid_edges_in_H1_wedges);
+    V_edges_in_H2_wedges_outFile.open(file_name_for_valid_edges_in_H2_wedges);
+    V_edges_intersection.open(file_name_for_valid_edges_intersection);
+#endif
 }
 
 void EdgeSketch_Core::Read_Camera_Data() {
@@ -187,8 +198,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             if ( Skip_this_Edge( H1_edge_idx ) ) continue;
 
             //> Get the epipolar angle range in H2 arising from the H1 edge
-            // double thresh_ore21_1 = OreListBardegree(H1_edge_idx, 0);
-            // double thresh_ore21_2 = OreListBardegree(H1_edge_idx, 1);
             std::pair<double, double> epip_angle_range_from_H1_edge = std::make_pair(OreListBardegree(H1_edge_idx, 0), OreListBardegree(H1_edge_idx, 1));
 
             //> Find the corresponding H2 edge using the epipolar angle range
@@ -199,7 +208,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Eigen::MatrixXd edgels_HYPO2 = PairHypo->getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, epip_angle_range_from_H1_edge);
 
             //> Correct the corresponding H2 edges by shifting to the epipolar line
-            // Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2correct_post_validation(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
             Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
             
             //> Organize the final edge data (hypothesis edge pairs)
@@ -215,8 +223,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             // if (HYPO2_idx.rows() == 0) continue;
             // std::cout << "Before clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
             //std::cout << "Before clustering (HYPO2_idx):\n" << HYPO2_idx_raw.transpose() << std::endl;
-            // Eigen::Vector2d pt_H1 = Edges_HYPO1_final.row(0);
-            // Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
+            Eigen::Vector2d pt_H1 = Edges_HYPO1_final.row(0);
+            Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
 
             // if (abs(pt_H1(0) - 529) <0.001 && abs(pt_H1(1) - 398.495) <0.001){
             //     std::cout << "Before clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
@@ -227,6 +235,17 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             ////////////////////////////////////// cluster hypothesis 2's edges //////////////////////////////////////
 
             int Num_Of_Epipolar_Corrected_H2_Edges = Edges_HYPO2_final.rows();
+
+            bool exit_flag = false;
+            if (abs(pt_H1(0) - 352.453)<0.001 && abs(pt_H1(1) - 413.393)<0.001){
+                std::cout<<"H1 index is: "<<H1_edge_idx<<std::endl;
+                std::cout<<"thresh_ore are: "<<epip_angle_range_from_H1_edge.first<<", "<<epip_angle_range_from_H1_edge.second<<std::endl;
+                std::cout<<"corresponding_epipole is: "<< epipole.transpose() <<std::endl;
+                std::cout<<"before correction: \n"<<edgels_HYPO2<<std::endl;
+                std::cout << "Before clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
+                std::cout<<"hypothesis 1 edge is: "<<Edges_HYPO1.row(H1_edge_idx)<<std::endl;
+                exit_flag = true;
+            }
 
             //> =========== CLUSTERING H2 EDGES ===========
             EdgeClusterer edge_cluster_engine(Num_Of_Epipolar_Corrected_H2_Edges, Edges_HYPO2_final, H1_edge_idx);
@@ -245,6 +264,37 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Eigen::MatrixXi supported_indices_stack;
 
             bool isempty_link = true;
+
+#if ISOLATE_DATA
+            // edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
+            //                                            corrected_x, corrected_y, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
+            //                                            HYPO2_idx_raw(idx_hypo2), idx_hypo2;
+
+            bool found_data = false;
+            Eigen::MatrixXd H1_Isolated_Edge_Row = Edges_HYPO1.row(H1_edge_idx);
+            Eigen::Vector2d H1_Isolated_Edge(H1_Isolated_Edge_Row(0), H1_Isolated_Edge_Row(1));
+            Eigen::Vector2d target_H1_edge( 352.453, 413.393 );
+            if ( H1_Isolated_Edge.isApprox(target_H1_edge, 1e-4) ) {
+                const std::string file_name_for_H2_edges = OUTPUT_FOLDER_NAME + "/hypothesize_validate_H2_data.txt";
+                std::ofstream H2_edges_outFile(file_name_for_H2_edges);
+                found_data = true;
+                std::cout << "Found: " << H1_Isolated_Edge_Row << std::endl;
+                std::cout << "Epipolar angle range:(" << epip_angle_range_from_H1_edge.first << ", " << epip_angle_range_from_H1_edge.second << ")" << std::endl;
+                int corrected_counter = 0;
+                for (int ff = 0; ff < edgels_HYPO2.rows(); ff++) {
+                    H2_edges_outFile << edgels_HYPO2(ff,0) << "\t" << edgels_HYPO2(ff,1) << "\t" << edgels_HYPO2(ff,2) << "\t";
+                    if (ff == edgels_HYPO2_corrected(corrected_counter, 9)) {
+                        H2_edges_outFile << edgels_HYPO2_corrected(corrected_counter,4) << "\t" << edgels_HYPO2_corrected(corrected_counter,5) << "\t" << edgels_HYPO2_corrected(corrected_counter,6) << "\t" \
+                                         << Edges_HYPO2_final(corrected_counter,0) << "\t" << Edges_HYPO2_final(corrected_counter,1) << "\t" << Edges_HYPO2_final(corrected_counter,2) << "\n";
+                        corrected_counter++;
+                    }
+                    else {
+                        H2_edges_outFile << "-1\t-1\t-1\t-1\t-1\t-1\n";
+                    }
+                }
+                H2_edges_outFile.close();
+            }
+#endif
 
             //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Second loop:loop over all validation views >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
             for (int VALID_INDX = 0; VALID_INDX < Num_Of_Total_Imgs; VALID_INDX++) {
@@ -266,7 +316,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 Eigen::Matrix3d R31 = util->getRelativePose_R21(Rot_HYPO1, R3);
                 Eigen::Vector3d T31 = util->getRelativePose_T21(Rot_HYPO1, R3, Transl_HYPO1, T3);
 
-                
                 //> Find the reprojected edgels
                 Eigen::MatrixXd edge_loc_tgt_gamma3 = getReprojEdgel->getGamma3LocationAndTangent(hyp01_view_indx, hyp02_view_indx, Edges_HYPO1_final, Edges_HYPO2_final, All_R, All_T, VALID_INDX, K_HYPO1, K_HYPO2);
                 Eigen::MatrixXd edge_tgt_gamma3     = edge_loc_tgt_gamma3.block(0, edge_loc_tgt_gamma3.cols() - 2, edge_loc_tgt_gamma3.rows(), 2);
@@ -283,14 +332,21 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 Eigen::MatrixXd OreListdegree32    = getOre->getOreListVali(TO_Edges_VALID, All_R, All_T, K_HYPO2, K3, VALID_INDX, hyp02_view_indx);
                 
                 //> Find the epipolar angle range of the epipolar wedge on the validation view arising from Edges_HYPO1_final, and parse the corresponding edgels on the validation view
-                // double thresh_ore31_1 = OreListBardegree31(0,0);
-                // double thresh_ore31_2 = OreListBardegree31(0,1);
                 std::pair<double, double> epip_angle_range_from_H1_edge_to_V1 = std::make_pair(OreListBardegree31(0,0), OreListBardegree31(0,1));
                 Eigen::Vector3d epipole1 = result1.second;
 
                 Eigen::MatrixXd vali_idx31 = PairHypo->getHYPO2_idx_Ore(OreListdegree31, epip_angle_range_from_H1_edge_to_V1);
                 Eigen::MatrixXd edgels_31  = PairHypo->getedgels_HYPO2_Ore(TO_Edges_VALID, OreListdegree31, epip_angle_range_from_H1_edge_to_V1);
 
+#if ISOLATE_DATA
+                if (found_data) {
+                    // std::cout << "check: " << VALID_INDX << " - (" << vali_idx31.rows() << ", " << edgels_31.rows() << ")" << std::endl;
+                    for (int m = 0; m < vali_idx31.rows(); m++) {
+                        V_edges_in_H1_wedges_outFile << VALID_INDX << "\t" << vali_idx31(m) << "\t";
+                        V_edges_in_H1_wedges_outFile << edgels_31(m,0) << "\t" << edgels_31(m,1) << "\t" << edgels_31(m,2) << "\n";
+                    }
+                }
+#endif
                 //> An array indicating if the two epipolar edges are "almost" parallel (if so, discard the edge pair as too much uncertainty is given)
                 Eigen::VectorXd isparallel = Eigen::VectorXd::Ones(Edges_HYPO2_final.rows());
 
@@ -298,15 +354,31 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 for (int idx_pair = 0; idx_pair < Edges_HYPO2_final.rows(); idx_pair++) {
 
                     //> Epipolar angle range of the epipolar wedge on the validation view arising from Edges_HYPO2_final
-                    // double thresh_ore32_1 = OreListBardegree32(idx_pair,0);
-                    // double thresh_ore32_2 = OreListBardegree32(idx_pair,1);
                     std::pair<double, double> epip_angle_range_from_H2_edge_to_V1 = std::make_pair(OreListBardegree32(idx_pair,0), OreListBardegree32(idx_pair,1));
                     Eigen::Vector3d epipole2 = result2.second;
-                    
+
+#if ISOLATE_DATA
+                    if (found_data) {
+                        V_edges_outFile << VALID_INDX << "\t";;
+                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H1_edge_to_V1.first << "\t";
+                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H1_edge_to_V1.second << "\t";
+                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H2_edge_to_V1.first << "\t";
+                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H2_edge_to_V1.second << "\t";
+                        V_edges_outFile << edge_loc_tgt_gamma3(idx_pair, 0) << "\t" << edge_loc_tgt_gamma3(idx_pair, 1) << "\t" << edge_loc_tgt_gamma3(idx_pair, 2) << "\t" << edge_loc_tgt_gamma3(idx_pair, 3) << "\t";
+                    }
+#endif
+                    //> CH: SOMETHING'S WRONG IN vali_idx32
                     //> Find the epipolar angle range of the epipolar wedge on the validation view arising from Edges_HYPO2_final, and parse the corresponding edgels on the validation view
                     Eigen::MatrixXd vali_idx32 = PairHypo->getHYPO2_idx_Ore(OreListdegree32, epip_angle_range_from_H2_edge_to_V1);
                     Eigen::MatrixXd edgels_32  = PairHypo->getedgels_HYPO2_Ore(TO_Edges_VALID, OreListdegree32, epip_angle_range_from_H2_edge_to_V1);
                     
+#if ISOLATE_DATA
+                    if ( found_data ) {
+                        if ( is_Epipolar_Wedges_in_Parallel( epip_angle_range_from_H1_edge_to_V1, epip_angle_range_from_H2_edge_to_V1, idx_pair, isparallel, supported_indice_current ) )
+                            V_edges_outFile << "0\n";
+                    }
+#endif
+
                     //> Check if the two epipolar wedges are almost parallel
                     if ( is_Epipolar_Wedges_in_Parallel( epip_angle_range_from_H1_edge_to_V1, epip_angle_range_from_H2_edge_to_V1, idx_pair, isparallel, supported_indice_current ) )
                         continue;
@@ -318,6 +390,19 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     set_intersection(v1.begin(), v1.end(), v2.begin(), v2.end(), back_inserter(v_intersection));
                     Eigen::VectorXd idxVector = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(v_intersection.data(), v_intersection.size());
                     Eigen::MatrixXd inliner(idxVector);
+
+#if ISOLATE_DATA
+                    if (found_data) {
+                        for (int m = 0; m < vali_idx32.rows(); m++) {
+                            V_edges_in_H2_wedges_outFile << VALID_INDX << "\t" << idx_pair << "\t" << vali_idx32(m) << "\t";
+                            V_edges_in_H2_wedges_outFile << edgels_32(m,0) << "\t" << edgels_32(m,1) << "\t" << edgels_32(m,2) << "\n";
+                        }
+                        for (int m = 0; m < inliner.rows(); m++) {
+                            V_edges_intersection << VALID_INDX << "\t" << idx_pair << "\t" << inliner(m) << "\n";
+                        }
+                    }
+#endif
+                    
 
                     //> Calculate orientation of gamma 3 (the reprojected edge)
                     Eigen::Vector2d edgels_tgt_reproj = {edge_tgt_gamma3(idx_pair,0), edge_tgt_gamma3(idx_pair,1)};
@@ -337,6 +422,14 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         isempty_link = false;
                         stack_idx++;
                     }
+#if ISOLATE_DATA
+                    if (found_data) {
+                        if (supported_link_indx == -2)
+                            V_edges_outFile << "0\n";
+                        else
+                            V_edges_outFile << "1\n";
+                    }
+#endif
                 }
                 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  End of third loop >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
                 supported_indices.col(valid_view_counter) << supported_indice_current.col(0);
@@ -391,6 +484,15 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     paired_edge.row(pair_row_idx) << H1_edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
                 } 
             }
+
+#if ISOLATE_DATA
+            if (found_data) {
+                V_edges_outFile.close();
+                V_edges_in_H1_wedges_outFile.close();
+                V_edges_in_H2_wedges_outFile.close();
+                V_edges_intersection.close();
+            }
+#endif
         }
         //> A critical session to stack all local supported indices
         #pragma omp critical
@@ -725,13 +827,9 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
                 util->getRelativePoses(Rot_HYPO1_val, Transl_HYPO1_val, Rot_HYPO3, Transl_HYPO3, R31, T31, R13, T13);
                 Eigen::Matrix3d F31 = util->getFundamentalMatrix(K_HYPO1.inverse(), K_HYPO2.inverse(), R31, T31); 
                 Eigen::Matrix3d F13 = util->getFundamentalMatrix(K_HYPO2.inverse(), K_HYPO1.inverse(), R13, T13);
-                // Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2correct_post_validation(edges_for_val_frame.row(support_idx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
-                Eigen::MatrixXd corrected_validation_edge = PairHypo->edgelsHYPO2_epipolar_correction(edges_for_val_frame.row(support_idx), Edges_HYPO1_final, F31, F13, HYPO2_idx_raw);
-                
+                Eigen::MatrixXd Edges_VAL_final = edges_for_val_frame.row(support_idx);
 
-                Eigen::MatrixXd Edges_VAL_final(corrected_validation_edge.rows(), 4);
-                Edges_VAL_final << corrected_validation_edge.col(4), corrected_validation_edge.col(5), corrected_validation_edge.col(6), corrected_validation_edge.col(7);
-                if (corrected_validation_edge.rows() > 0) {
+                if (Edges_VAL_final.rows() > 0) {
                     Eigen::Vector2d pt_VAL = Edges_VAL_final.row(0);
                     //> Qiwu: Add the supporting edge to the edgeMapping for the 3D edge
                     Eigen::Vector2d corrected_val = pt_VAL.segment(0,2);
@@ -739,7 +837,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
                     //> Qiwu: Store validation view and the supporting edge
                     validation_support_edges.emplace_back(val_idx, supporting_edge);
                     //> Qiwu: Add the supporting edge to the edgeMapping for the 3D edge
-                    //edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, supporting_edge, val_idx, All_R[val_idx], All_T[val_idx]);
                     edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, tangents_3D_world, corrected_val, supporting_edge_mapping, val_idx, support_idx, All_R[val_idx], All_T[val_idx]);
                 }
             }

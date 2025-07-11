@@ -39,6 +39,7 @@
 #define DEBUG_PAIRED_EDGES         (true)
 #define SHOW_DATA_LOADING_INFO     (false)
 #define SHOW_OMP_NUM_OF_THREADS    (true)
+#define ISOLATE_DATA               (true)
 
 //> Constant values (no change)
 #define PI                            (3.1415926)
