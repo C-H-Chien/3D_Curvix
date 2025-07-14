@@ -6,12 +6,18 @@ import colorsys
 import random
 import json
 
-def visualize_gt(all_gt_points, name, save_fig=False, show_fig=True):
+def visualize_gt(all_gt_points, all_gt_directions, name, show_dir=False, save_fig=False, show_fig=True):
     ax = plt.figure(dpi=120).add_subplot(projection='3d')
     x = [k[0] for k in all_gt_points]
     y = [k[1] for k in all_gt_points]
     z = [k[2] for k in all_gt_points]
     ax.scatter(x, y, z, c='g', marker='o', s=0.5, linewidth=1, alpha=1, cmap='spectral')
+
+    if show_dir:
+        u = [k[0] for k in all_gt_directions]
+        v = [k[1] for k in all_gt_directions]
+        w = [k[2] for k in all_gt_directions]
+        ax.quiver(x, y, z, u, v, w, length=0.01, normalize=True, color='b')
 
     # ax.axis('auto')
     plt.axis('off')
@@ -19,10 +25,19 @@ def visualize_gt(all_gt_points, name, save_fig=False, show_fig=True):
     # plt.ylabel("Y axis")
 
     with open(os.path.join(vis_gt_dir, name + ".txt"), "w") as file:
-        for k in all_gt_points:
-            file.write('{}'.format(k[0]))
-            file.write('\t{}'.format(k[1]))
-            file.write('\t{}\n'.format(k[2]))
+        if show_dir:
+            for m, n in zip(all_gt_points, all_gt_directions):
+                file.write('{}'.format(m[0]))
+                file.write('\t{}'.format(m[1]))
+                file.write('\t{}'.format(m[2]))
+                file.write('\t{}'.format(n[0]))
+                file.write('\t{}'.format(n[1]))
+                file.write('\t{}\n'.format(n[2]))
+        else:
+            for k in all_gt_points:
+                file.write('{}'.format(k[0]))
+                file.write('\t{}'.format(k[1]))
+                file.write('\t{}\n'.format(k[2]))
 
     ax.view_init(azim=60, elev=60)
     range_size = [0, 1]
@@ -33,7 +48,7 @@ def visualize_gt(all_gt_points, name, save_fig=False, show_fig=True):
     if show_fig:
         plt.show()
 
-def get_gt_points(name, base_dir):
+def get_gt_points(name, base_dir, return_direction=False):
     objs_dir = os.path.join(base_dir, "obj")
     obj_names = os.listdir(objs_dir)
     obj_names.sort()
@@ -64,28 +79,32 @@ def get_gt_points(name, base_dir):
 
     edge_pts = []
     edge_pts_raw = []
+    edge_pts_direction = []
     for each_curve in json_data_feats[name]:
         #> Decide if "sharp" curves are the only curve types to be extracted. Sometimes this is needed.
-        if each_curve['sharp']:
+        if each_curve['sharp']: # each_curve["type"]: BSpline, Line, Circle
             each_edge_pts = [vertices_xyz[i] for i in each_curve['vert_indices']]
             edge_pts_raw += each_edge_pts
 
-        gt_sampling = []
-        each_edge_pts = np.array(each_edge_pts)
-        for index in range(len(each_edge_pts) - 1):
-            next = each_edge_pts[index + 1]
-            current = each_edge_pts[index]
-            num = int(np.linalg.norm(next - current) // 0.01)
-            linspace = np.linspace(0, 1, num)
-            gt_sampling.append(linspace[:, None] * current + (1 - linspace)[:, None] * next)
-        each_edge_pts = np.concatenate(gt_sampling).tolist()
-        edge_pts += each_edge_pts
-
-
+            gt_sampling = []
+            each_edge_pts = np.array(each_edge_pts)
+            for index in range(len(each_edge_pts) - 1):
+                next = each_edge_pts[index + 1]
+                current = each_edge_pts[index]
+                num = int(np.linalg.norm(next - current) // 0.01)
+                linspace = np.linspace(0, 1, num)
+                gt_sampling.append(linspace[:, None] * current + (1 - linspace)[:, None] * next)
+                if return_direction:
+                    direction = (next - current) / np.linalg.norm(next - current)
+                    edge_pts_direction.extend([direction] * num)
+            each_edge_pts = np.concatenate(gt_sampling).tolist()
+            edge_pts += each_edge_pts
+            
     edge_pts_raw = np.array(edge_pts_raw) * scale + set_location
     edge_pts = np.array(edge_pts) * scale + set_location
+    edge_pts_direction = np.array(edge_pts_direction)
 
-    return edge_pts_raw.astype(np.float32), edge_pts.astype(np.float32)
+    return edge_pts_raw.astype(np.float32), edge_pts.astype(np.float32), edge_pts_direction
 
 #> Define the root paths and base directory
 root_dir = "/gpfs/data/bkimia/cchien3/Learning_Based_Edge_Reconstruction/NEF_code/"
@@ -113,12 +132,12 @@ if do_only_on_desired_obj == True:
     print("-" * 50)
     print("processing:", i, ", name:", name)
 
-    gt_points_raw, gt_points = get_gt_points(name, base_dir)
-    visualize_gt(gt_points, name, save_fig=True, show_fig=True)
+    gt_points_raw, gt_points, gt_edge_directions = get_gt_points(name, base_dir, return_direction=True)
+    visualize_gt(gt_points, gt_edge_directions, name, show_dir=True, save_fig=True, show_fig=True)
 else:
     for i, name in enumerate(sorted_obj_names):
         print("-" * 50)
         print("processing:", i, ", name:", name)
 
-        gt_points_raw, gt_points = get_gt_points(name, base_dir)
-        visualize_gt(gt_points, name, save_fig=True, show_fig=False)
+        gt_points_raw, gt_points, gt_edge_directions = get_gt_points(name, base_dir)
+        visualize_gt(gt_points, gt_edge_directions, name, show_dir=False, save_fig=True, show_fig=False)
