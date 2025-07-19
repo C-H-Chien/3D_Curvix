@@ -131,7 +131,7 @@ Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw,
                     //> orient_i and orient_j are both in degrees
                     double orient_i = cluster_avg_orientations[cluster_labels[i]];
                     double orient_j = cluster_avg_orientations[cluster_labels[j]];
-                    if (dist < min_dist && dist < CLUSTER_DIST_THRESH && std::abs(orient_i - orient_j) < CLUSTER_ORIENT_THRESH_RAD) {
+                    if (dist < min_dist && dist < CLUSTER_DIST_THRESH && std::abs(orient_i - orient_j) < util->deg_to_rad(CLUSTER_ORIENT_THRESH)) {
                         min_dist = dist;
                         nearest = j;
                     }

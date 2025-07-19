@@ -37,6 +37,10 @@ namespace GetOrientationList {
         int dataset_img_rows;
         int dataset_img_cols;
         double delta;
+
+        const Eigen::Vector3d e1  = {1,0,0};
+        const Eigen::Vector3d e2  = {0,1,0};
+        const Eigen::Vector3d e3  = {0,0,1};
     };
 
 }

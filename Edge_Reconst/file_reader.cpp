@@ -11,8 +11,10 @@ file_reader::file_reader( std::string dataset_path, std::string dataset_name, st
 
   Edge_File_Path_First_Half = dataset_name_sequence_path + "/Edges/Edge_";
   Curvelet_File_Path_First_Half = dataset_name_sequence_path + "/curvelets/Curvelets_";
-  Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/R_matrix.txt";
-  Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/T_matrix.txt";
+  // Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/R_matrix.txt";
+  // Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/T_matrix.txt";
+  Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/refined_R.txt";
+  Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/refined_T.txt";
   Kmatrix_File_Path = dataset_name_sequence_path + "/RnT/K_matrix.txt";
 }
 
