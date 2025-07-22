@@ -222,6 +222,8 @@ Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw,
 
     Eigen::MatrixXd HYPO2_idx(Num_Of_Epipolar_Corrected_H2_Edges, 1);
 
+    Num_Of_Clusters = clusters.size();
+
     //> For each cluster, compute the Gaussian-weighted average edge and update all edges in the cluster
     for (size_t c = 0; c < clusters.size(); ++c) {
         const std::vector<int>& cluster = clusters[c];

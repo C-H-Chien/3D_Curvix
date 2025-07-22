@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream> 
 #include <vector>
 #include <string>
 #include <Eigen/Dense>
@@ -25,6 +26,7 @@ public:
     void readRmatrix( std::vector<Eigen::Matrix3d> &All_R );
     void readTmatrix( std::vector<Eigen::Vector3d> &All_T );
     void readK( std::vector<Eigen::Matrix3d> &All_K );
+    void readGT_EdgePairs( std::vector<std::vector<int>> &GT_EdgePairs );
 
 private:
     std::string dataset_name_sequence_path;
@@ -36,6 +38,7 @@ private:
     std::string Rmatrix_File_Path;
     std::string Tmatrix_File_Path;
     std::string Kmatrix_File_Path;
+    std::string GT_File_Path;
 };
 
 #endif // FILE_READER_HPP

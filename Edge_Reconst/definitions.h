@@ -8,6 +8,10 @@
 #define WRITE_3D_EDGES                  (true)
 #define WRITE_3D_EDGE_GRAPH             (true)
 
+//> NCC on Edges Settings
+#define EDGE_ORTHOGONAL_SHIFT_MAG       (5)         //> in pixels
+#define PATCH_SIZE                      (7)         //> in pixels
+
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
@@ -33,13 +37,16 @@
 #define ENABLE_EXPO_FORCE_AND_TORQUE    (false)
 #define EXPO_INCREASE_FACTOR            (sqrt(2))
 
+//> Precision-Recall evaluation parameters
+#define GT_PROXIMITY_THRESH             (1) //> in pixels
+
 //> Debugging purpose
 #define DEBUG                      (0)
 #define DEBUG_READ_FILES           (false)
 #define DEBUG_PAIRED_EDGES         (true)
 #define SHOW_DATA_LOADING_INFO     (false)
 #define SHOW_OMP_NUM_OF_THREADS    (true)
-#define ISOLATE_DATA               (true)
+#define ISOLATE_DATA               (false)
 
 //> Constant values (no change)
 #define PI                            (3.1415926)
@@ -56,6 +63,7 @@
 //> MVT definitions
 
 //> General Settings
+#define USE_REFINED_CAM_POSES           (true)
 #define FIX_RANDOMNESS                  (true)
 #define RUN_CERES_SOLVER_ON             (false)
 

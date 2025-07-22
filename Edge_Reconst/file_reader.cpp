@@ -11,11 +11,19 @@ file_reader::file_reader( std::string dataset_path, std::string dataset_name, st
 
   Edge_File_Path_First_Half = dataset_name_sequence_path + "/Edges/Edge_";
   Curvelet_File_Path_First_Half = dataset_name_sequence_path + "/curvelets/Curvelets_";
-  // Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/R_matrix.txt";
-  // Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/T_matrix.txt";
+  Kmatrix_File_Path = dataset_name_sequence_path + "/RnT/K_matrix.txt";
+
+//> Read camera poses. For ABC-NEF dataset, read the refined absolute camera poses.
+#if USE_REFINED_CAM_POSES
   Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/refined_R.txt";
   Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/refined_T.txt";
-  Kmatrix_File_Path = dataset_name_sequence_path + "/RnT/K_matrix.txt";
+#else
+  Rmatrix_File_Path = dataset_name_sequence_path + "/RnT/R_matrix.txt";
+  Tmatrix_File_Path = dataset_name_sequence_path + "/RnT/T_matrix.txt";
+#endif
+
+  //> Read GT edge correspondences for precision-recall experiments
+  GT_File_Path = dataset_name_sequence_path + "/GT_edge_pairs_indices_0006.txt";
 }
 
 //> Read all edgel files
@@ -198,6 +206,48 @@ void file_reader::readK( std::vector<Eigen::Matrix3d> &All_K )
   Kmatrix_File.close();
 #if SHOW_DATA_LOADING_INFO
   std::cout << "Multiple intrinsic matrices are loaded" <<std::endl;
+#endif
+}
+
+//> Read ground truth edge correspondence pairs indices
+void file_reader::readGT_EdgePairs( std::vector<std::vector<int>> &GT_EdgePairs )
+{
+  std::fstream GT_EdgePairs_File;
+  GT_EdgePairs_File.open(GT_File_Path, std::ios_base::in);
+  
+  if (!GT_EdgePairs_File) {
+    LOG_FILE_ERROR(GT_File_Path); 
+    exit(1);
+  }
+  else {
+    std::string line;
+    GT_EdgePairs.clear();
+    
+    while (std::getline(GT_EdgePairs_File, line)) {
+      std::istringstream iss(line);
+      std::vector<int> row;
+      int value;
+      
+      //> Read all values in the current line
+      while (iss >> value) {
+        row.push_back(value);
+      }
+      
+      //> Sanity check: Only add non-empty rows
+      if (!row.empty()) {
+        GT_EdgePairs.push_back(row);
+      }
+    }
+  }
+  
+  GT_EdgePairs_File.close();
+  
+#if SHOW_DATA_LOADING_INFO
+  std::cout << "GT edge pairs indices loaded successfully. Total 3D points: " \
+            << GT_EdgePairs.size() << std::endl;
+  std::vector<int> one_row_of_data = GT_EdgePairs[10];
+  for (int i = 0; i < one_row_of_data.size(); i++) std::cout << one_row_of_data[i] << ", ";
+  std::cout << std::endl;
 #endif
 }
 
