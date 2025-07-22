@@ -48,7 +48,7 @@ def visualize_gt(all_gt_points, all_gt_directions, name, show_dir=False, save_fi
     if show_fig:
         plt.show()
 
-def get_gt_points(name, base_dir, return_direction=False):
+def get_gt_points(name, base_dir, sampling_rate=0.01, return_direction=False):
     objs_dir = os.path.join(base_dir, "obj")
     obj_names = os.listdir(objs_dir)
     obj_names.sort()
@@ -91,7 +91,7 @@ def get_gt_points(name, base_dir, return_direction=False):
             for index in range(len(each_edge_pts) - 1):
                 next = each_edge_pts[index + 1]
                 current = each_edge_pts[index]
-                num = int(np.linalg.norm(next - current) // 0.01)
+                num = int(np.linalg.norm(next - current) // sampling_rate)
                 linspace = np.linspace(0, 1, num)
                 gt_sampling.append(linspace[:, None] * current + (1 - linspace)[:, None] * next)
                 if return_direction:
