@@ -85,8 +85,12 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     Num_Of_OMP_Threads = (Num_Of_OMP_Threads > omp_get_max_threads()) ? omp_get_max_threads() : Num_Of_OMP_Threads;
     omp_set_num_threads(Num_Of_OMP_Threads);
 
-    local_hypo2_clusters.resize(Num_Of_OMP_Threads);
-
+    num_of_correct_edges_before_clustering = 0;
+    num_of_wrong_edges_before_clustering = 0;
+    num_of_correct_edges_after_clustering = 0;
+    num_of_wrong_edges_after_clustering = 0;
+    num_of_correct_edges_after_validation = 0;
+    num_of_wrong_edges_after_validation = 0;
 
 #if SHOW_OMP_NUM_OF_THREADS
     std::cout << "Using " << Num_Of_OMP_Threads << " threads for OpenMP parallelization." << std::endl;
@@ -94,13 +98,7 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
 
 #if ISOLATE_DATA
     const std::string file_name_for_valid_edges = OUTPUT_FOLDER_NAME + "/hypothesize_validate_V_data.txt";
-    const std::string file_name_for_valid_edges_in_H1_wedges = OUTPUT_FOLDER_NAME + "/V_edges_in_H1_wedges.txt";
-    const std::string file_name_for_valid_edges_in_H2_wedges = OUTPUT_FOLDER_NAME + "/V_edges_in_H2_wedges.txt";
-    const std::string file_name_for_valid_edges_intersection = OUTPUT_FOLDER_NAME + "/V_edges_in_intersection.txt";
     V_edges_outFile.open(file_name_for_valid_edges);
-    V_edges_in_H1_wedges_outFile.open(file_name_for_valid_edges_in_H1_wedges);
-    V_edges_in_H2_wedges_outFile.open(file_name_for_valid_edges_in_H2_wedges);
-    V_edges_intersection.open(file_name_for_valid_edges_intersection);
 #endif
 }
 
@@ -111,6 +109,9 @@ void EdgeSketch_Core::Read_Camera_Data() {
 
     //> Read absolute camera translation vectors (all under world coordinate)
     Load_Data->readTmatrix( All_T );
+
+    //> Load GT edge correspondence pairs (edge indices)
+    Load_Data->readGT_EdgePairs( GT_EdgePairs );
 
     //> Read camera intrinsic matrix
     if (Use_Multiple_K)
@@ -179,20 +180,50 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     itime = omp_get_wtime();
     reset_hypo2_clusters();
 
+    local_hypo2_clusters.resize(Num_Of_OMP_Threads);
+    PR_before_clustering.resize(Num_Of_OMP_Threads);
+    PR_after_clustering.resize(Num_Of_OMP_Threads);
+    PR_after_validation.resize(Num_Of_OMP_Threads);
+    
+    //> ======================== precision and recall related ========================
+    std::vector<std::pair<int, int>> gt_pairs;
+    if ( !getGTEdgePairsBetweenImages(hyp01_view_indx, hyp02_view_indx, gt_pairs) ) exit(1);
+    std::cout << "Found " << gt_pairs.size() << " GT pairs between images "<<hyp01_view_indx<<" and "<< hyp02_view_indx << std::endl;
+
+    //Only loop over H1 edges that are included in GT set in the outermost loop
+    std::set<int> gt_h1_edges;
+    for (const auto& gt_pair : gt_pairs) {
+        gt_h1_edges.insert(gt_pair.first);
+    }
+    std::vector<int> h1_edges_to_process(gt_h1_edges.begin(), gt_h1_edges.end());
+    
+    std::cout << "- Total H1 edges: " << Edges_HYPO1.rows() << std::endl;
+    std::cout << "- H1 edges in GT pairs participating the precision-recall evaluation: " << gt_h1_edges.size() << std::endl;
+    //> ======================== precision and recall related ========================
+
     #pragma omp parallel
     {
-
         //> Local array stacking all supported indices
         std::vector<Eigen::MatrixXd> local_thread_supported_indices;
         // TODO:DOCUMENT THIS: Thread-local clusters 
         std::unordered_map<int, std::vector<int>> thread_local_clusters;
+
         int H1_edge_idx;
+        Eigen::Vector2d target_H2_edge;
        
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< First loop: loop over all edgels from hypothesis view 1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
-        #pragma omp for schedule(static, Num_Of_OMP_Threads)
-        for (H1_edge_idx = 0; H1_edge_idx < Edges_HYPO1.rows() ; H1_edge_idx++) {
+        #pragma omp for schedule(static, Num_Of_OMP_Threads) reduction(+: num_of_correct_edges_before_clustering, num_of_wrong_edges_before_clustering, num_of_correct_edges_after_clustering, num_of_wrong_edges_after_clustering, num_of_correct_edges_after_validation, num_of_wrong_edges_after_validation)
+        // for (H1_edge_idx = 0; H1_edge_idx < Edges_HYPO1.rows() ; H1_edge_idx++) {
+        for (int i = 0; i < h1_edges_to_process.size(); i++) {
+            H1_edge_idx = h1_edges_to_process[i];
 
             int thread_id = omp_get_thread_num();
+
+            //> Precision-Recall data
+            const int gt_H2_edge_idx = gt_pairs[i].second;
+            target_H2_edge << Edges_HYPO2(gt_H2_edge_idx, 0), Edges_HYPO2(gt_H2_edge_idx, 1);
+            double recall_per_edge, precision_per_edge;
+            bool find_TP_flag = false;
 
             //> Check if the H1 edge is not close to the image boundary or if it has been visited before
             if ( Skip_this_Edge( H1_edge_idx ) ) continue;
@@ -207,6 +238,22 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> (ii) H2 edge location and orientation
             Eigen::MatrixXd edgels_HYPO2 = PairHypo->getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, epip_angle_range_from_H1_edge);
 
+            //> ============ Calculate Precision-Recall: Before Clustering ============
+            find_TP_flag = false;
+            for (int i = 0; i < edgels_HYPO2.rows(); i++) {
+                Eigen::Vector2d H2_edge_candidate(edgels_HYPO2(i,0), edgels_HYPO2(i,1));
+                if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
+                    find_TP_flag = true;
+                    num_of_correct_edges_before_clustering++;
+                    break;
+                }
+            }
+            recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
+            precision_per_edge = (find_TP_flag) ? (1.0 / edgels_HYPO2.rows()) : (0.0);
+            num_of_wrong_edges_before_clustering += (find_TP_flag) ? (edgels_HYPO2.rows()-1) : (edgels_HYPO2.rows());
+            PR_before_clustering[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
+            //> ============ Calculate Precision-Recall: Before Clustering ============
+
             //> Correct the corresponding H2 edges by shifting to the epipolar line
             Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
             
@@ -217,12 +264,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Edges_HYPO2_final << edgels_HYPO2_corrected.col(4), edgels_HYPO2_corrected.col(5), edgels_HYPO2_corrected.col(6), edgels_HYPO2_corrected.col(7);
             if ( !any_H2_Edge_Surviving_Epipolar_Corrected(Edges_HYPO2_final) ) continue;
 
-            //> Store the Hypo2 Indices
-            //Eigen::MatrixXd HYPO2_idx(edgels_HYPO2_corrected.rows(), 1); 
-            //HYPO2_idx << edgels_HYPO2_corrected.col(8);
-            // if (HYPO2_idx.rows() == 0) continue;
-            // std::cout << "Before clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
-            //std::cout << "Before clustering (HYPO2_idx):\n" << HYPO2_idx_raw.transpose() << std::endl;
             Eigen::Vector2d pt_H1 = Edges_HYPO1_final.row(0);
             Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
 
@@ -236,16 +277,16 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
 
             int Num_Of_Epipolar_Corrected_H2_Edges = Edges_HYPO2_final.rows();
 
-            bool exit_flag = false;
-            if (abs(pt_H1(0) - 352.453)<0.001 && abs(pt_H1(1) - 413.393)<0.001){
-                std::cout<<"H1 index is: "<<H1_edge_idx<<std::endl;
-                std::cout<<"thresh_ore are: "<<epip_angle_range_from_H1_edge.first<<", "<<epip_angle_range_from_H1_edge.second<<std::endl;
-                std::cout<<"corresponding_epipole is: "<< epipole.transpose() <<std::endl;
-                std::cout<<"before correction: \n"<<edgels_HYPO2<<std::endl;
-                std::cout << "Before clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
-                std::cout<<"hypothesis 1 edge is: "<<Edges_HYPO1.row(H1_edge_idx)<<std::endl;
-                exit_flag = true;
-            }
+            // bool exit_flag = false;
+            // if (abs(pt_H1(0) - 352.453)<0.001 && abs(pt_H1(1) - 413.393)<0.001){
+            //     std::cout<<"H1 index is: "<<H1_edge_idx<<std::endl;
+            //     std::cout<<"thresh_ore are: "<<epip_angle_range_from_H1_edge.first<<", "<<epip_angle_range_from_H1_edge.second<<std::endl;
+            //     std::cout<<"corresponding_epipole is: "<< epipole.transpose() <<std::endl;
+            //     std::cout<<"before correction: \n"<<edgels_HYPO2<<std::endl;
+            //     std::cout << "Before clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
+            //     std::cout<<"hypothesis 1 edge is: "<<Edges_HYPO1.row(H1_edge_idx)<<std::endl;
+            //     exit_flag = true;
+            // }
 
             //> =========== CLUSTERING H2 EDGES ===========
             EdgeClusterer edge_cluster_engine(Num_Of_Epipolar_Corrected_H2_Edges, Edges_HYPO2_final, H1_edge_idx);
@@ -253,7 +294,30 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
 
             Edges_HYPO2_final = edge_cluster_engine.Epip_Correct_H2_Edges;
             local_hypo2_clusters[thread_id].push_back(edge_cluster_engine.H2_Clusters);
+            Num_Of_Clusters_per_H1_Edge = edge_cluster_engine.Num_Of_Clusters;
             //> =========== CLUSTERING H2 EDGES ===========
+
+            // if(exit_flag){
+            //     std::cout << "After clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
+            //     std::cout <<"H2 edge indices: "<<HYPO2_idx<<std::endl;
+            //     //exit(0);
+            // }
+
+            //> ============ Calculate Precision-Recall: After Clustering ============
+            find_TP_flag = false;
+            for (int i = 0; i < Edges_HYPO2_final.rows(); i++) {
+                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2_final(i,0), Edges_HYPO2_final(i,1));
+                if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
+                    find_TP_flag = true;
+                    num_of_correct_edges_after_clustering++;
+                    break;
+                }
+            }
+            recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
+            precision_per_edge = (find_TP_flag) ? (1.0 / Num_Of_Clusters_per_H1_Edge) : (0.0);
+            num_of_wrong_edges_after_clustering += (find_TP_flag) ? (Num_Of_Clusters_per_H1_Edge-1) : (Num_Of_Clusters_per_H1_Edge);
+            PR_after_clustering[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
+            //> ============ Calculate Precision-Recall: After Clustering ============
 
             int valid_view_counter = 0;
             int stack_idx = 0;
@@ -263,17 +327,11 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             supported_indice_current.conservativeResize(edgels_HYPO2.rows(),1);
             Eigen::MatrixXi supported_indices_stack;
 
-            bool isempty_link = true;
-
 #if ISOLATE_DATA
-            // edgels_HYPO2_corrected.row(idx_correct) << edgel_HYPO1(0,0), edgel_HYPO1(0,1), edgel_HYPO1(0,2), edgel_HYPO1(0,3), \
-            //                                            corrected_x, corrected_y, edgels_HYPO2(idx_hypo2,2), edgels_HYPO2(idx_hypo2,3), \
-            //                                            HYPO2_idx_raw(idx_hypo2), idx_hypo2;
-
             bool found_data = false;
             Eigen::MatrixXd H1_Isolated_Edge_Row = Edges_HYPO1.row(H1_edge_idx);
             Eigen::Vector2d H1_Isolated_Edge(H1_Isolated_Edge_Row(0), H1_Isolated_Edge_Row(1));
-            Eigen::Vector2d target_H1_edge( 352.453, 413.393 );
+            Eigen::Vector2d target_H1_edge(352.453, 413.393);
             if ( H1_Isolated_Edge.isApprox(target_H1_edge, 1e-4) ) {
                 const std::string file_name_for_H2_edges = OUTPUT_FOLDER_NAME + "/hypothesize_validate_H2_data.txt";
                 std::ofstream H2_edges_outFile(file_name_for_H2_edges);
@@ -293,9 +351,10 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     }
                 }
                 H2_edges_outFile.close();
+                std::cout << "Number of clusters: " << Num_Of_Clusters_per_H1_Edge << std::endl;
             }
 #endif
-
+            bool isempty_link = true;
             //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Second loop:loop over all validation views >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
             for (int VALID_INDX = 0; VALID_INDX < Num_Of_Total_Imgs; VALID_INDX++) {
                 //> Skip the two hypothesis views
@@ -338,15 +397,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 Eigen::MatrixXd vali_idx31 = PairHypo->getHYPO2_idx_Ore(OreListdegree31, epip_angle_range_from_H1_edge_to_V1);
                 Eigen::MatrixXd edgels_31  = PairHypo->getedgels_HYPO2_Ore(TO_Edges_VALID, OreListdegree31, epip_angle_range_from_H1_edge_to_V1);
 
-#if ISOLATE_DATA
-                if (found_data) {
-                    // std::cout << "check: " << VALID_INDX << " - (" << vali_idx31.rows() << ", " << edgels_31.rows() << ")" << std::endl;
-                    for (int m = 0; m < vali_idx31.rows(); m++) {
-                        V_edges_in_H1_wedges_outFile << VALID_INDX << "\t" << vali_idx31(m) << "\t";
-                        V_edges_in_H1_wedges_outFile << edgels_31(m,0) << "\t" << edgels_31(m,1) << "\t" << edgels_31(m,2) << "\n";
-                    }
-                }
-#endif
                 //> An array indicating if the two epipolar edges are "almost" parallel (if so, discard the edge pair as too much uncertainty is given)
                 Eigen::VectorXd isparallel = Eigen::VectorXd::Ones(Edges_HYPO2_final.rows());
 
@@ -367,22 +417,13 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         V_edges_outFile << edge_loc_tgt_gamma3(idx_pair, 0) << "\t" << edge_loc_tgt_gamma3(idx_pair, 1) << "\t" << edge_loc_tgt_gamma3(idx_pair, 2) << "\t" << edge_loc_tgt_gamma3(idx_pair, 3) << "\t";
                     }
 #endif
-                    //> CH: SOMETHING'S WRONG IN vali_idx32
                     //> Find the epipolar angle range of the epipolar wedge on the validation view arising from Edges_HYPO2_final, and parse the corresponding edgels on the validation view
                     Eigen::MatrixXd vali_idx32 = PairHypo->getHYPO2_idx_Ore(OreListdegree32, epip_angle_range_from_H2_edge_to_V1);
                     Eigen::MatrixXd edgels_32  = PairHypo->getedgels_HYPO2_Ore(TO_Edges_VALID, OreListdegree32, epip_angle_range_from_H2_edge_to_V1);
-                    
-#if ISOLATE_DATA
-                    if ( found_data ) {
-                        if ( is_Epipolar_Wedges_in_Parallel( epip_angle_range_from_H1_edge_to_V1, epip_angle_range_from_H2_edge_to_V1, idx_pair, isparallel, supported_indice_current ) )
-                            V_edges_outFile << "0\n";
-                    }
-#endif
 
                     //> Check if the two epipolar wedges are almost parallel
-                    if ( is_Epipolar_Wedges_in_Parallel( epip_angle_range_from_H1_edge_to_V1, epip_angle_range_from_H2_edge_to_V1, idx_pair, isparallel, supported_indice_current ) )
-                        continue;
-
+                    if ( is_Epipolar_Wedges_in_Parallel( epip_angle_range_from_H1_edge_to_V1, epip_angle_range_from_H2_edge_to_V1, idx_pair, isparallel, supported_indice_current ) ) continue;
+                    
                     //> Find all the edges fall inside the two epipolar wedges intersection on validation view, (Hypo1 --> Vali) && (Hypo2 --> Vali)
                     std::vector<double> v_intersection;
                     std::vector<double> v1(vali_idx31.data(), vali_idx31.data() + vali_idx31.rows());
@@ -390,19 +431,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     set_intersection(v1.begin(), v1.end(), v2.begin(), v2.end(), back_inserter(v_intersection));
                     Eigen::VectorXd idxVector = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(v_intersection.data(), v_intersection.size());
                     Eigen::MatrixXd inliner(idxVector);
-
-#if ISOLATE_DATA
-                    if (found_data) {
-                        for (int m = 0; m < vali_idx32.rows(); m++) {
-                            V_edges_in_H2_wedges_outFile << VALID_INDX << "\t" << idx_pair << "\t" << vali_idx32(m) << "\t";
-                            V_edges_in_H2_wedges_outFile << edgels_32(m,0) << "\t" << edgels_32(m,1) << "\t" << edgels_32(m,2) << "\n";
-                        }
-                        for (int m = 0; m < inliner.rows(); m++) {
-                            V_edges_intersection << VALID_INDX << "\t" << idx_pair << "\t" << inliner(m) << "\n";
-                        }
-                    }
-#endif
-                    
 
                     //> Calculate orientation of gamma 3 (the reprojected edge)
                     Eigen::Vector2d edgels_tgt_reproj = {edge_tgt_gamma3(idx_pair,0), edge_tgt_gamma3(idx_pair,1)};
@@ -422,14 +450,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         isempty_link = false;
                         stack_idx++;
                     }
-#if ISOLATE_DATA
-                    if (found_data) {
-                        if (supported_link_indx == -2)
-                            V_edges_outFile << "0\n";
-                        else
-                            V_edges_outFile << "1\n";
-                    }
-#endif
                 }
                 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  End of third loop >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
                 supported_indices.col(valid_view_counter) << supported_indice_current.col(0);
@@ -441,7 +461,11 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             local_thread_supported_indices.push_back(supported_indices);
 
             //> Check for Empty Supported Indices
-            if (isempty_link) continue;
+            if (isempty_link) {
+                num_of_wrong_edges_after_validation += Num_Of_Clusters_per_H1_Edge;
+                PR_after_validation[thread_id].push_back(std::make_pair(0.0, 0.0));
+                continue;
+            }
 
             //> Find a list of H2 edge indices (which are paired up with the current H1 edge) where each H2 edge index is unique => indices_stack_unique
             std::vector<double> indices_stack(supported_indices_stack.data(), supported_indices_stack.data() + supported_indices_stack.rows());
@@ -466,7 +490,15 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     valid_pairs.push_back(i);
                 }
             }
-            if (valid_pairs.empty()) continue;
+            //> If there is no H2 edge supported by more than Max_Num_Of_Support_Views validation views
+            if (valid_pairs.empty()) {
+                num_of_wrong_edges_after_validation += Num_Of_Clusters_per_H1_Edge;
+                PR_after_validation[thread_id].push_back(std::make_pair(0.0, 0.0));
+                continue;
+            }
+
+            //> For each H2 edge that is validated...
+            std::vector<int> finalpair_H2_indices;
             for (int valid_idx : valid_pairs) {
                 int finalpair = int(indices_stack_unique[valid_idx]);
             
@@ -482,18 +514,51 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 if (pair_row_idx != -1) {
                     // Store the edge pair information
                     paired_edge.row(pair_row_idx) << H1_edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
+                    finalpair_H2_indices.push_back( HYPO2_idx(finalpair) );
                 } 
             }
+
+            //> ============ Calculate Precision-Recall: After Validation ============
+            std::vector<int> unique_finalpair_H2_indices = finalpair_H2_indices;
+            std::sort(unique_finalpair_H2_indices.begin(), unique_finalpair_H2_indices.end());
+            auto last_unique_it = std::unique(unique_finalpair_H2_indices.begin(), unique_finalpair_H2_indices.end());
+
+            unique_finalpair_H2_indices.erase(last_unique_it, unique_finalpair_H2_indices.end());
+            
+            find_TP_flag = false;
+            for (int i = 0; i < finalpair_H2_indices.size(); i++) {
+                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2(finalpair_H2_indices[i],0), Edges_HYPO2(finalpair_H2_indices[i],1));
+                if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
+                    find_TP_flag = true;
+                    num_of_correct_edges_after_validation++;
+                    break;
+                }
+            }
+            recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
+            precision_per_edge = (find_TP_flag) ? (1.0 / unique_finalpair_H2_indices.size()) : (0.0);
+            num_of_wrong_edges_after_validation += (find_TP_flag) ? (unique_finalpair_H2_indices.size()-1) : (unique_finalpair_H2_indices.size());
+            PR_after_validation[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
+            //> ============ Calculate Precision-Recall: After Validation ============
+
+            //> ======================== DEBUG ========================
+#if ISOLATE_DATA
+            if (found_data) {
+                std::cout << "Target GT H2 edge:" << target_H2_edge(0) << ", " << target_H2_edge(1) << std::endl;
+                std::cout << "Final pairs in H2" << std::endl;
+                for (int fi = 0; fi < finalpair_H2_indices.size(); fi++) {
+                    std::cout << finalpair_H2_indices[fi] << ", " << Edges_HYPO2(finalpair_H2_indices[fi],0) << ", " << Edges_HYPO2(finalpair_H2_indices[fi],1) << std::endl;
+                }
+                std::cout << "Number of unique indices = " << unique_finalpair_H2_indices.size() << std::endl;
+            }
+#endif
+            //> ======================== DEBUG ========================
 
 #if ISOLATE_DATA
             if (found_data) {
                 V_edges_outFile.close();
-                V_edges_in_H1_wedges_outFile.close();
-                V_edges_in_H2_wedges_outFile.close();
-                V_edges_intersection.close();
             }
 #endif
-        }
+        } //> End of the first for-loop
         //> A critical session to stack all local supported indices
         #pragma omp critical
         all_supported_indices.insert(all_supported_indices.end(), local_thread_supported_indices.begin(), local_thread_supported_indices.end());
@@ -504,14 +569,12 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         for (const auto& thread_map : map_per_thread) {
             for (const auto& pair : thread_map) {
                 //> Merge elements
-                // hypo2_clusters_CH[pair.first] = pair.second;
                 hypo2_clusters[pair.first] = pair.second;
             }
         }
     }
 
-    // if (hypo2_clusters_CH == hypo2_clusters) { LOG_INFOR_MESG("YAH! The hypo2 clusteres are equal!"); }
-    // else { LOG_INFOR_MESG("SADLY! The hypo2 clusteres are NOT equal!"); }
+    get_Avg_Precision_Recall_Rates();
 
     pair_edges_time += omp_get_wtime() - itime;
 }
@@ -747,13 +810,28 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
 
         Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D, All_R[hyp01_view_indx], All_T[hyp01_view_indx]);
 
-        if (abs(pt_H1(0) - 504.003) <0.01 && abs(pt_H1(1) - 399.142) <0.01) {
-            std::cout<<"matched pt_H2 is: "<<pt_H2.transpose()<<std::endl;
-            std::cout<<"world 3D edge is: "<<edge_pt_3D_world.transpose()<<std::endl;
-            std::cout<<"triangulated 3d edge is: "<< edge_pt_3D.transpose()<<std::endl;
-        }
+        // if (abs(pt_H1(0) - 504.003) <0.01 && abs(pt_H1(1) - 399.142) <0.01) {
+        //     std::cout<<"matched pt_H2 is: "<<pt_H2.transpose()<<std::endl;
+        //     std::cout<<"world 3D edge is: "<<edge_pt_3D_world.transpose()<<std::endl;
+        //     std::cout<<"triangulated 3d edge is: "<< edge_pt_3D.transpose()<<std::endl;
+        // }
 
         Gamma1s.row(valid_pair_idx) << edge_pt_3D(0), edge_pt_3D(1), edge_pt_3D(2);
+
+        // const double EPSILON = 1e-4;  
+        // if (std::abs(edge_pt_3D_world(0) - 0.106166) < EPSILON &&        // if (std::abs(edge_pt_3D(0) - 0.187817) < EPSILON &&
+        //     std::abs(edge_pt_3D_world(1) - 0.510666) < EPSILON &&        //     std::abs(edge_pt_3D(1) + 0.373794) < EPSILON &&
+        //     std::abs(edge_pt_3D_world(2) + 0.704824) < EPSILON) {        //     std::abs(edge_pt_3D(2) + 3.68693) < EPSILON) {
+        //     std::cout << "Matched tangents_3D: " << Gamma1s.row(valid_pair_idx) << std::endl;
+        //     std::cout<<"hyp1 is: " <<Edges_HYPO1_final <<std::endl; 
+        //     std::cout<<"hyp2 is: "<<pt_H2.transpose()<<", original hyp2 is: "<<edgel_HYPO2<<std::endl;
+        //     // for (int member_idx : cluster_members) {
+        //     //     Eigen::Vector3d member_location = Edges_HYPO2.row(member_idx).head<3>();
+        //     //     std::cout<<"hypo2 cluster member location is: "<<member_location.transpose()<<std::endl;
+        //     // }
+
+        //     exit(0);
+        // }
 
         //> Triangulate edge orientations and make them in the world coordinate
         Eigen::Vector3d Edgel_View1(edgel_HYPO1(0),  edgel_HYPO1(1), edgel_HYPO1(2));
@@ -838,6 +916,14 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
                     validation_support_edges.emplace_back(val_idx, supporting_edge);
                     //> Qiwu: Add the supporting edge to the edgeMapping for the 3D edge
                     edgeMapping->add3DToSupportingEdgesMapping(edge_pt_3D_world, tangents_3D_world, corrected_val, supporting_edge_mapping, val_idx, support_idx, All_R[val_idx], All_T[val_idx]);
+
+                    if (abs(pt_H1(0) - 394.002) <0.001 && abs(pt_H1(1) - 404.539) <0.001  && abs(pt_H2(0) - 415.064) <0.001 && abs(pt_H2(1) - 294.153) <0.001) {
+                    //if (abs(pt_H1(0) - 331.414) <0.001 && abs(pt_H1(1) - 438.007) <0.001) {
+                        int hypo2_index = int(paired_edge_final(pair_idx,1));
+                        //std::cout<<pt_H2<<std::endl;
+                        std::cout << "Validation view " << val_idx << ": "<<Edges_VAL_final.row(0)<< std::endl;
+                        //std::cout << val_idx << " "<<Edges_VAL_final.row(0)<< std::endl;
+                    }
                 }
             }
             val_indx_in_paired_edge_array++;
@@ -1137,6 +1223,100 @@ void EdgeSketch_Core::Clear_Data() {
     All_Edgels.clear();
     claimedEdgesList.clear();
     num_of_nonveridical_edge_pairs = 0;
+
+    local_hypo2_clusters.clear();
+    PR_before_clustering.clear();
+    PR_after_clustering.clear();
+    PR_after_validation.clear();
+
+    num_of_correct_edges_before_clustering = 0;
+    num_of_wrong_edges_before_clustering = 0;
+    num_of_correct_edges_after_clustering = 0;
+    num_of_wrong_edges_after_clustering = 0;
+    num_of_correct_edges_after_validation = 0;
+    num_of_wrong_edges_after_validation = 0;
+}
+
+bool EdgeSketch_Core::getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs) {
+    
+    gt_edge_pairs.clear();
+    
+    //> Sanity Check: make sure that GT data is loaded
+    if (GT_EdgePairs.empty()) {
+        LOG_ERROR("Error: Ground truth edge pairs data not loaded. Check Read_GT_EdgePairs_Data() first.");
+        return false;
+    }
+    
+    //> Loop through all ground truth 3D points
+    for (const auto& gt_row : GT_EdgePairs) {
+        //> Extract edge IDs for the two images
+        int edge_id_img1 = gt_row[hyp01_view_indx + 1]-1;
+        int edge_id_img2 = gt_row[hyp02_view_indx + 1]-1;
+        
+        //> if there is a valid pair between edges from the two hypothesis views
+        if (edge_id_img1 >= 0 && edge_id_img2 >= 0) {
+            gt_edge_pairs.push_back(std::make_pair(edge_id_img1, edge_id_img2));
+        }
+    }
+
+    if (gt_edge_pairs.size() == 0) 
+    {
+        LOG_INFOR_MESG("Exiting the program due to zero GT edge correspondences");
+        return false;
+    }
+    
+    return true;
+}
+
+void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
+    //> Calculate the average PR rates from the thread-local PR rates
+    double precision_rate = 0.0, recall_rate = 0.0;
+    unsigned count = 0;
+
+    //> Before clustering
+    for (const auto& PR_per_thread : PR_before_clustering) {
+        for (const auto& pair : PR_per_thread) {
+            precision_rate += pair.first;
+            recall_rate += pair.second;
+            count++;
+        }
+    }
+    avg_PR_before_clustering = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
+
+    //> After clustering
+    precision_rate = 0.0;
+    recall_rate = 0.0;
+    count = 0;
+    for (const auto& PR_per_thread : PR_after_clustering) {
+        for (const auto& pair : PR_per_thread) {
+            precision_rate += pair.first;
+            recall_rate += pair.second;
+            count++;
+        }
+    }
+    avg_PR_after_clustering = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
+
+    //> After validation
+    precision_rate = 0.0;
+    recall_rate = 0.0;
+    count = 0;
+    for (const auto& PR_per_thread : PR_after_validation) {
+        for (const auto& pair : PR_per_thread) {
+            precision_rate += pair.first;
+            recall_rate += pair.second;
+            count++;
+        }
+    }
+    avg_PR_after_validation = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
+
+    //> Print out the precision and recall rates for each stage
+    LOG_INFOR_MESG("Precision-Recall Rate at each step:");
+    std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << " / " << avg_PR_before_clustering.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
+    std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
+    std::cout << "     - After Validation Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_validation.first*100 << "% / " << avg_PR_after_validation.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_validation << " / " << num_of_wrong_edges_after_validation << std::endl;
 }
 
 EdgeSketch_Core::~EdgeSketch_Core() { }

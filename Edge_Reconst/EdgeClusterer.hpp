@@ -35,6 +35,7 @@ public:
     std::vector<int> cluster_labels;
     std::vector<std::vector<int> > clusters;
     std::unordered_map<int, double> cluster_avg_orientations;
+    unsigned Num_Of_Clusters;
     
     //> For each edge index, store all other edge indices in the same cluster
     std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> H2_Clusters; //<H1 edge index, H2 edge index>, cluster of H2 edges

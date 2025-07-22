@@ -48,6 +48,19 @@ public:
     std::vector< std::vector< std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> > > local_hypo2_clusters;
     std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters;
 
+    //> Precision and recall
+    //> (i) local PR rates in the scope of CPU threads
+    std::vector< std::vector< std::pair<double, double> > > PR_before_clustering;
+    std::vector< std::vector< std::pair<double, double> > > PR_after_clustering;
+    std::vector< std::vector< std::pair<double, double> > > PR_after_validation;
+    //> (ii) global PR rates
+    std::pair<double, double> avg_PR_before_clustering;
+    std::pair<double, double> avg_PR_after_clustering;
+    std::pair<double, double> avg_PR_after_validation;
+    //> (iii) Number of correct/wrong edges
+    int num_of_correct_edges_before_clustering, num_of_wrong_edges_before_clustering;
+    int num_of_correct_edges_after_clustering, num_of_wrong_edges_after_clustering;
+    int num_of_correct_edges_after_validation, num_of_wrong_edges_after_validation;
 
     std::unordered_map<std::pair<int, int>, std::vector<int>, PairHash> hypo2_clusters_CH;
 
@@ -63,6 +76,10 @@ public:
     void Stack_3D_Edges();
     void Project_3D_Edges_and_Find_Next_Hypothesis_Views();
     void Calculate_Edge_Support_Ratios_And_Select_Next_Views(std::shared_ptr<EdgeMapping> edgeMapping);
+
+    //> precision and recall experiments
+    bool getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs);
+    void get_Avg_Precision_Recall_Rates();
 
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
@@ -129,6 +146,7 @@ public:
     std::vector<Eigen::Matrix3d> All_K;
     std::vector<Eigen::MatrixXd> All_Edgels; 
     Eigen::Matrix3d K;
+    std::vector<std::vector<int>> GT_EdgePairs;
 
     //> Input Dataset Settings
     std::string Dataset_Path;
@@ -251,8 +269,6 @@ private:
     double Parallel_Epipolar_Line_Angle_Deg;
     double Reproj_Dist_Thresh;
     double Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges;
-    int circleR; //> Unknown setting
-
 
     //> Edges and camera intrinsix/extrinsic matrices of the two hypothesis views
     Eigen::Matrix3d K_HYPO1;
@@ -276,6 +292,8 @@ private:
     Eigen::MatrixXd OreListBardegree;
     Eigen::Vector3d epipole;
 
+    unsigned Num_Of_Clusters_per_H1_Edge;
+
     // data structure for tracking best matches
     std::unordered_map<int, int> hypothesis1_best_match;
     std::unordered_map<int, int> hypothesis2_best_match;
@@ -284,9 +302,6 @@ private:
     std::vector<int> valid_view_index;
 
     std::ofstream V_edges_outFile;
-    std::ofstream V_edges_in_H1_wedges_outFile;
-    std::ofstream V_edges_in_H2_wedges_outFile;
-    std::ofstream V_edges_intersection;
 
     template<typename T>
     T Uniform_Random_Number_Generator(T range_from, T range_to) {
