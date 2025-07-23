@@ -12,6 +12,14 @@
 #define EDGE_ORTHOGONAL_SHIFT_MAG       (5)         //> in pixels
 #define PATCH_SIZE                      (7)         //> in pixels
 
+//> LOWE's ratio test
+#define LOWES_RATIO_THRESHOLD           (0.6)
+
+//> SIFT
+#define ENABLE_SIFT_FILTERING           (false)
+#define SIFT_PATCH_SIZE                 (7)
+#define SIFT_DISTANCE_THRESHOLD         (100)
+
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
