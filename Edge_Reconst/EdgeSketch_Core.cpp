@@ -85,12 +85,18 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     Num_Of_OMP_Threads = (Num_Of_OMP_Threads > omp_get_max_threads()) ? omp_get_max_threads() : Num_Of_OMP_Threads;
     omp_set_num_threads(Num_Of_OMP_Threads);
 
+    sift_detector = cv::SIFT::create();
+
     num_of_correct_edges_before_clustering = 0;
     num_of_wrong_edges_before_clustering = 0;
     num_of_correct_edges_after_clustering = 0;
     num_of_wrong_edges_after_clustering = 0;
+    num_of_correct_edges_after_sift = 0;
+    num_of_wrong_edges_after_sift = 0;
     num_of_correct_edges_after_validation = 0;
     num_of_wrong_edges_after_validation = 0;
+    num_of_correct_edges_after_lowe = 0;
+    num_of_wrong_edges_after_lowe = 0;
 
 #if SHOW_OMP_NUM_OF_THREADS
     std::cout << "Using " << Num_Of_OMP_Threads << " threads for OpenMP parallelization." << std::endl;
@@ -184,6 +190,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     PR_before_clustering.resize(Num_Of_OMP_Threads);
     PR_after_clustering.resize(Num_Of_OMP_Threads);
     PR_after_validation.resize(Num_Of_OMP_Threads);
+    PR_after_lowes.resize(Num_Of_OMP_Threads);
     
     //> ======================== precision and recall related ========================
     std::vector<std::pair<int, int>> gt_pairs;
@@ -201,6 +208,12 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     std::cout << "- H1 edges in GT pairs participating the precision-recall evaluation: " << gt_h1_edges.size() << std::endl;
     //> ======================== precision and recall related ========================
 
+    //> Load images for SIFT matching
+    Load_Data->read_an_image(hyp01_view_indx, image_hypo1);
+    Load_Data->read_an_image(hyp02_view_indx, image_hypo2);
+    
+    std::cout << "Done loading images" << std::endl;
+
     #pragma omp parallel
     {
         //> Local array stacking all supported indices
@@ -212,7 +225,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         Eigen::Vector2d target_H2_edge;
        
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< First loop: loop over all edgels from hypothesis view 1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
-        #pragma omp for schedule(static, Num_Of_OMP_Threads) reduction(+: num_of_correct_edges_before_clustering, num_of_wrong_edges_before_clustering, num_of_correct_edges_after_clustering, num_of_wrong_edges_after_clustering, num_of_correct_edges_after_validation, num_of_wrong_edges_after_validation)
+        #pragma omp for schedule(static, Num_Of_OMP_Threads) reduction(+: num_of_correct_edges_before_clustering, num_of_wrong_edges_before_clustering, num_of_correct_edges_after_clustering, num_of_wrong_edges_after_clustering, num_of_correct_edges_after_validation, num_of_correct_edges_after_lowe, num_of_wrong_edges_after_lowe)
         // for (H1_edge_idx = 0; H1_edge_idx < Edges_HYPO1.rows() ; H1_edge_idx++) {
         for (int i = 0; i < h1_edges_to_process.size(); i++) {
             H1_edge_idx = h1_edges_to_process[i];
@@ -319,6 +332,51 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             PR_after_clustering[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Clustering ============
 
+            // // =========== SIFT FILTERING ===========
+            // std::vector<int> cluster_indices_for_sift;
+            // for (int c = 0; c < Num_Of_Clusters_per_H1_Edge; c++) {
+            //     cluster_indices_for_sift.push_back(c);
+            // }
+            
+            // std::vector<int> sift_filtered_indices;
+
+            // sift_filtered_indices = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2, cluster_indices_for_sift);
+            // int Num_Of_Clusters_After_SIFT = sift_filtered_indices.size();
+
+            // // Filter Edges_HYPO2_final to keep only SIFT-validated clusters
+            // if (!sift_filtered_indices.empty() && Num_Of_Clusters_After_SIFT < Num_Of_Clusters_per_H1_Edge) {
+            //     Eigen::MatrixXd Edges_HYPO2_final_sift(Num_Of_Clusters_After_SIFT, 4);
+            //     Eigen::MatrixXd HYPO2_idx_sift(Num_Of_Clusters_After_SIFT, 1);
+                
+            //     for (int s = 0; s < Num_Of_Clusters_After_SIFT; s++) {
+            //         int original_idx = sift_filtered_indices[s];
+            //         Edges_HYPO2_final_sift.row(s) = Edges_HYPO2_final.row(original_idx);
+            //         HYPO2_idx_sift(s) = HYPO2_idx(original_idx);
+            //     }
+                
+            //     Edges_HYPO2_final = Edges_HYPO2_final_sift;
+            //     HYPO2_idx = HYPO2_idx_sift;
+            //     Num_Of_Clusters_per_H1_Edge = Num_Of_Clusters_After_SIFT;
+            // }
+            
+            // //> ============ Calculate Precision-Recall: After SIFT Filtering ============
+            // find_TP_flag = false;
+            // for (int i = 0; i < Edges_HYPO2_final.rows(); i++) {
+            //     Eigen::Vector2d H2_edge_candidate(Edges_HYPO2_final(i,0), Edges_HYPO2_final(i,1));
+            //     if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
+            //         find_TP_flag = true;
+            //         num_of_correct_edges_after_sift++;
+            //         break;
+            //     }
+            // }
+            // recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
+            // precision_per_edge = (find_TP_flag) ? (1.0 / Num_Of_Clusters_per_H1_Edge) : (0.0);
+            // num_of_wrong_edges_after_sift += (find_TP_flag) ? (Num_Of_Clusters_per_H1_Edge-1) : (Num_Of_Clusters_per_H1_Edge);
+            // PR_after_sift[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
+            // //> ============ Calculate Precision-Recall: After SIFT Filtering ============
+            
+            // =========== SIFT FILTERING ===========
+
             int valid_view_counter = 0;
             int stack_idx = 0;
             Eigen::MatrixXd supported_indices;
@@ -407,16 +465,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                     std::pair<double, double> epip_angle_range_from_H2_edge_to_V1 = std::make_pair(OreListBardegree32(idx_pair,0), OreListBardegree32(idx_pair,1));
                     Eigen::Vector3d epipole2 = result2.second;
 
-#if ISOLATE_DATA
-                    if (found_data) {
-                        V_edges_outFile << VALID_INDX << "\t";;
-                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H1_edge_to_V1.first << "\t";
-                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H1_edge_to_V1.second << "\t";
-                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H2_edge_to_V1.first << "\t";
-                        V_edges_outFile << std::fixed << std::setprecision(20) << epip_angle_range_from_H2_edge_to_V1.second << "\t";
-                        V_edges_outFile << edge_loc_tgt_gamma3(idx_pair, 0) << "\t" << edge_loc_tgt_gamma3(idx_pair, 1) << "\t" << edge_loc_tgt_gamma3(idx_pair, 2) << "\t" << edge_loc_tgt_gamma3(idx_pair, 3) << "\t";
-                    }
-#endif
                     //> Find the epipolar angle range of the epipolar wedge on the validation view arising from Edges_HYPO2_final, and parse the corresponding edgels on the validation view
                     Eigen::MatrixXd vali_idx32 = PairHypo->getHYPO2_idx_Ore(OreListdegree32, epip_angle_range_from_H2_edge_to_V1);
                     Eigen::MatrixXd edgels_32  = PairHypo->getedgels_HYPO2_Ore(TO_Edges_VALID, OreListdegree32, epip_angle_range_from_H2_edge_to_V1);
@@ -463,7 +511,9 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> Check for Empty Supported Indices
             if (isempty_link) {
                 num_of_wrong_edges_after_validation += Num_Of_Clusters_per_H1_Edge;
+                num_of_wrong_edges_after_lowe += Num_Of_Clusters_per_H1_Edge;
                 PR_after_validation[thread_id].push_back(std::make_pair(0.0, 0.0));
+                PR_after_lowes[thread_id].push_back(std::make_pair(0.0, 0.0));
                 continue;
             }
 
@@ -493,15 +543,80 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> If there is no H2 edge supported by more than Max_Num_Of_Support_Views validation views
             if (valid_pairs.empty()) {
                 num_of_wrong_edges_after_validation += Num_Of_Clusters_per_H1_Edge;
+                num_of_wrong_edges_after_lowe += Num_Of_Clusters_per_H1_Edge;
                 PR_after_validation[thread_id].push_back(std::make_pair(0.0, 0.0));
+                PR_after_lowes[thread_id].push_back(std::make_pair(0.0, 0.0));
                 continue;
             }
 
-            //> For each H2 edge that is validated...
-            std::vector<int> finalpair_H2_indices;
+            //> ============ Calculate Precision-Recall: After Validation ============
+            std::vector<int> finalpair_H2_indices_after_validation;
             for (int valid_idx : valid_pairs) {
                 int finalpair = int(indices_stack_unique[valid_idx]);
+                finalpair_H2_indices_after_validation.push_back( HYPO2_idx(finalpair) );
+
+            }
+
+            std::vector<int> unique_finalpair_H2_indices_after_validation = finalpair_H2_indices_after_validation;
+            std::sort(unique_finalpair_H2_indices_after_validation.begin(), unique_finalpair_H2_indices_after_validation.end());
+            auto last_unique_it_after_validation = std::unique(unique_finalpair_H2_indices_after_validation.begin(), unique_finalpair_H2_indices_after_validation.end());
+
+            unique_finalpair_H2_indices_after_validation.erase(last_unique_it_after_validation, unique_finalpair_H2_indices_after_validation.end());
             
+            find_TP_flag = false;
+            for (int i = 0; i < finalpair_H2_indices_after_validation.size(); i++) {
+                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2(finalpair_H2_indices_after_validation[i],0), Edges_HYPO2(finalpair_H2_indices_after_validation[i],1));
+                if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
+                    find_TP_flag = true;
+                    num_of_correct_edges_after_validation++;
+                    break;
+                }
+            }
+            recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
+            precision_per_edge = (find_TP_flag) ? (1.0 / unique_finalpair_H2_indices_after_validation.size()) : (0.0);
+            num_of_wrong_edges_after_validation += (find_TP_flag) ? (unique_finalpair_H2_indices_after_validation.size()-1) : (unique_finalpair_H2_indices_after_validation.size());
+            PR_after_validation[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
+            //> ============ Calculate Precision-Recall: After Validation ============
+
+            //> For each H2 edge that is validated...
+            std::vector<int> finalpair_H2_indices;
+
+            //> Lowe's ratio test
+            // Create a vector of pairs (valid_idx, support_count) for sorting
+            std::vector<std::pair<int, int>> valid_pairs_with_counts;
+            for (int valid_idx : valid_pairs) {
+                int finalpair = int(indices_stack_unique[valid_idx]);
+                int support_count = rep_count(valid_idx);
+                valid_pairs_with_counts.push_back(std::make_pair(valid_idx, support_count));
+            }
+
+            // Sort by support count in descending order
+            std::sort(valid_pairs_with_counts.begin(), valid_pairs_with_counts.end(),
+                    [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                        return a.second > b.second; 
+                    });
+
+            // Apply Lowe's ratio test
+            std::vector<int> selected_valid_indices;
+
+            if (valid_pairs_with_counts.size() > 0) {
+                int highest_support = valid_pairs_with_counts[0].second;
+                double threshold_value = highest_support * LOWES_RATIO_THRESHOLD;
+
+                for (const auto& pair : valid_pairs_with_counts) {
+                    if (pair.second > threshold_value) {
+                        selected_valid_indices.push_back(pair.first);
+                    }
+                }
+                
+                if (selected_valid_indices.empty()) {
+                    selected_valid_indices.push_back(valid_pairs_with_counts[0].first);
+                }
+            }
+
+            for (int valid_idx : selected_valid_indices) {
+                int finalpair = int(indices_stack_unique[valid_idx]);
+                
                 // Find the next available row in paired_edge for this H1 edge
                 int pair_row_idx = -1;
                 for (int row = H1_edge_idx * Num_Of_Total_Imgs; row < (H1_edge_idx + 1) * Num_Of_Total_Imgs; row++) {
@@ -510,7 +625,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         break;
                     }
                 }
-            
+                
                 if (pair_row_idx != -1) {
                     // Store the edge pair information
                     paired_edge.row(pair_row_idx) << H1_edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
@@ -518,27 +633,27 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 } 
             }
 
-            //> ============ Calculate Precision-Recall: After Validation ============
+            //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
             std::vector<int> unique_finalpair_H2_indices = finalpair_H2_indices;
             std::sort(unique_finalpair_H2_indices.begin(), unique_finalpair_H2_indices.end());
             auto last_unique_it = std::unique(unique_finalpair_H2_indices.begin(), unique_finalpair_H2_indices.end());
 
             unique_finalpair_H2_indices.erase(last_unique_it, unique_finalpair_H2_indices.end());
-            
+
             find_TP_flag = false;
             for (int i = 0; i < finalpair_H2_indices.size(); i++) {
                 Eigen::Vector2d H2_edge_candidate(Edges_HYPO2(finalpair_H2_indices[i],0), Edges_HYPO2(finalpair_H2_indices[i],1));
                 if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
                     find_TP_flag = true;
-                    num_of_correct_edges_after_validation++;
+                    num_of_correct_edges_after_lowe++;
                     break;
                 }
             }
             recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
             precision_per_edge = (find_TP_flag) ? (1.0 / unique_finalpair_H2_indices.size()) : (0.0);
-            num_of_wrong_edges_after_validation += (find_TP_flag) ? (unique_finalpair_H2_indices.size()-1) : (unique_finalpair_H2_indices.size());
-            PR_after_validation[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
-            //> ============ Calculate Precision-Recall: After Validation ============
+            num_of_wrong_edges_after_lowe += (find_TP_flag) ? (unique_finalpair_H2_indices.size()-1) : (unique_finalpair_H2_indices.size());
+            PR_after_lowes[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
+            //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
 
             //> ======================== DEBUG ========================
 #if ISOLATE_DATA
@@ -1227,14 +1342,20 @@ void EdgeSketch_Core::Clear_Data() {
     local_hypo2_clusters.clear();
     PR_before_clustering.clear();
     PR_after_clustering.clear();
+    PR_after_sift.clear();
     PR_after_validation.clear();
+    PR_after_lowes.clear();
 
     num_of_correct_edges_before_clustering = 0;
     num_of_wrong_edges_before_clustering = 0;
     num_of_correct_edges_after_clustering = 0;
     num_of_wrong_edges_after_clustering = 0;
+    num_of_correct_edges_after_sift = 0;
+    num_of_wrong_edges_after_sift = 0;
     num_of_correct_edges_after_validation = 0;
     num_of_wrong_edges_after_validation = 0;
+    num_of_correct_edges_after_lowe = 0;
+    num_of_wrong_edges_after_lowe = 0;
 }
 
 bool EdgeSketch_Core::getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs) {
@@ -1296,6 +1417,20 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
     }
     avg_PR_after_clustering = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
 
+    //> After SIFT filtering
+    precision_rate = 0.0;
+    recall_rate = 0.0;
+    count = 0;
+    for (const auto& PR_per_thread : PR_after_sift) {
+        for (const auto& pair : PR_per_thread) {
+            precision_rate += pair.first;
+            recall_rate += pair.second;
+            count++;
+        }
+    }
+    avg_PR_after_sift = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
+
+
     //> After validation
     precision_rate = 0.0;
     recall_rate = 0.0;
@@ -1309,18 +1444,150 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
     }
     avg_PR_after_validation = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
 
+    //> After lowe's ratio test
+    precision_rate = 0.0;
+    recall_rate = 0.0;
+    count = 0;
+    for (const auto& PR_per_thread : PR_after_lowes) {
+        for (const auto& pair : PR_per_thread) {
+            precision_rate += pair.first;
+            recall_rate += pair.second;
+            count++;
+        }
+    }
+    avg_PR_after_lowes = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
+
+
     //> Print out the precision and recall rates for each stage
     LOG_INFOR_MESG("Precision-Recall Rate at each step:");
     std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << " / " << avg_PR_before_clustering.second*100 << "%, ";
     std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
     std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
     std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
+    std::cout << "     - After SIFT Filtering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_sift.first*100 << "% / " << avg_PR_after_sift.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_sift << " / " << num_of_wrong_edges_after_sift << std::endl;
     std::cout << "     - After Validation Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_validation.first*100 << "% / " << avg_PR_after_validation.second*100 << "%, ";
     std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_validation << " / " << num_of_wrong_edges_after_validation << std::endl;
+    std::cout << "     - After Lowe's Ratio Test Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_lowes.first*100 << "% / " << avg_PR_after_lowes.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_lowe << " / " << num_of_wrong_edges_after_lowe << std::endl;
+}
+
+
+//> SIFT
+// Convert edge locations to OpenCV KeyPoints
+std::vector<cv::KeyPoint> EdgeSketch_Core::convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations) {
+    std::vector<cv::KeyPoint> keypoints;
+    keypoints.reserve(edge_locations.size());
+    
+    for (const auto& edge_loc : edge_locations) {
+        cv::KeyPoint kp;
+        kp.pt.x = static_cast<float>(edge_loc(0));
+        kp.pt.y = static_cast<float>(edge_loc(1));
+        kp.size = static_cast<float>(SIFT_PATCH_SIZE); // Set appropriate size for SIFT descriptor computation
+        kp.angle = -1; // Let SIFT compute the dominant orientation
+        kp.response = 1.0f;
+        kp.octave = 0;
+        keypoints.push_back(kp);
+    }
+    
+    return keypoints;
+}
+
+// Compute SIFT descriptors at edge locations
+void EdgeSketch_Core::computeSIFTDescriptorsAtEdges(const cv::Mat& image, 
+                                                    const std::vector<Eigen::Vector2d>& edge_locations, 
+                                                    cv::Mat& descriptors) {
+    // Convert to grayscale if needed
+    cv::Mat gray;
+    if (image.channels() == 3) {
+        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    } else {
+        gray = image;
+    }
+    
+    // Convert edge locations to KeyPoints
+    std::vector<cv::KeyPoint> keypoints = convertEdgeLocationsToKeypoints(edge_locations);
+    
+    // Compute SIFT descriptors at the specified keypoint locations
+    sift_detector->compute(gray, keypoints, descriptors);
+}
+
+// Updated SIFT filtering method using edge locations as keypoints
+std::vector<int> EdgeSketch_Core::filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
+                                                     const Eigen::MatrixXd& Edges_HYPO2_final,
+                                                     const cv::Mat& image1, 
+                                                     const cv::Mat& image2,
+                                                     const std::vector<int>& valid_cluster_indices) {
+    std::vector<int> sift_filtered_indices;
+    
+    if (!ENABLE_SIFT_FILTERING || image1.empty() || image2.empty()) {
+        return valid_cluster_indices; // Return all indices if SIFT is disabled or images not available
+    }
+    
+    // Prepare edge locations for H1 and H2
+    std::vector<Eigen::Vector2d> h1_edge_locations;
+    std::vector<Eigen::Vector2d> h2_edge_locations;
+    
+    // H1 edge location (Previous_Frame equivalent)
+    Eigen::Vector2d h1_edge = Edges_HYPO1_final.row(0).head<2>();
+    h1_edge_locations.push_back(h1_edge);
+    
+    // H2 edge locations for valid clusters (Current_Frame equivalent)
+    for (int cluster_idx : valid_cluster_indices) {
+        if (cluster_idx < Edges_HYPO2_final.rows()) {
+            Eigen::Vector2d h2_edge = Edges_HYPO2_final.row(cluster_idx).head<2>();
+            h2_edge_locations.push_back(h2_edge);
+        }
+    }
+    
+    if (h2_edge_locations.empty()) {
+        return sift_filtered_indices;
+    }
+    
+    // Compute SIFT descriptors at edge locations
+    cv::Mat H1_SIFT_Descriptors, H2_SIFT_Descriptors;  // Equivalent to Previous_Frame->SIFT_Descriptors and Current_Frame->SIFT_Descriptors
+    computeSIFTDescriptorsAtEdges(image1, h1_edge_locations, H1_SIFT_Descriptors);  // H1 edge descriptors
+    computeSIFTDescriptorsAtEdges(image2, h2_edge_locations, H2_SIFT_Descriptors);  // H2 edge descriptors
+    
+    if (H1_SIFT_Descriptors.empty() || H2_SIFT_Descriptors.empty()) {
+        std::cout << "Warning: Could not compute SIFT descriptors at edge locations" << std::endl;
+        return valid_cluster_indices; // Return all if descriptor computation failed
+    }
+    
+    // Match SIFT features via OpenCV built-in KNN approach
+    // Matching direction: from H1 edge (Previous_Frame) -> H2 edges (Current_Frame)
+    cv::BFMatcher matcher;
+    std::vector<std::vector<cv::DMatch>> feature_matches;
+    
+    // matcher.knnMatch(Previous_Frame->SIFT_Descriptors, Current_Frame->SIFT_Descriptors, feature_matches, 2);
+    matcher.knnMatch(H1_SIFT_Descriptors, H2_SIFT_Descriptors, feature_matches, 2);
+    
+    // Apply distance threshold only (no Lowe's ratio test)
+    std::vector<cv::DMatch> good_matches;
+    for (const auto& match_pair : feature_matches) {
+        if (!match_pair.empty()) {
+            const cv::DMatch& best_match = match_pair[0];
+            
+            // Apply distance threshold only
+            if (best_match.distance < SIFT_DISTANCE_THRESHOLD) {
+                good_matches.push_back(best_match);
+            }
+        }
+    }
+    
+    // Filter clusters based on successful matches
+    // Each match.trainIdx corresponds to an H2 edge cluster
+    for (const auto& match : good_matches) {
+        int h2_descriptor_idx = match.trainIdx;  // Index in H2_SIFT_Descriptors
+        if (h2_descriptor_idx < valid_cluster_indices.size()) {
+            int cluster_idx = valid_cluster_indices[h2_descriptor_idx];
+            sift_filtered_indices.push_back(cluster_idx);
+        }
+    }
+    
+    return sift_filtered_indices;
 }
 
 EdgeSketch_Core::~EdgeSketch_Core() { }
-
-
 
 #endif 

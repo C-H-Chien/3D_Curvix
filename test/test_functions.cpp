@@ -11,13 +11,16 @@
 //> test header files
 #include "test_include/test_alignment.hpp"
 #include "test_include/test_epipolar_correction.hpp"
+#include "test_include/test_edge_NCC.hpp"
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
 #include "../Edge_Reconst/file_reader.hpp"
 
 //> Select the test
-#define TEST_EPIPOLAR_CORRECTION    (true)
+#define TEST_EPIPOLAR_CORRECTION    (false)
+#define TEST_EDGE_NCC               (true)
+#define TEST_EDGE_ORIENTATION_AVG   (false)
 #define TEST_READ_CURVELETS         (false)
 #define TEST_EDGE_ALIGNMENT         (false)
 #define TEST_CONNECTIVITY_GRAPH     (false)  //> TEST_EDGE_ALIGNMENT has to be true to activate this test
@@ -81,6 +84,14 @@ int main(int argc, char **argv) {
 #if TEST_EPIPOLAR_CORRECTION
     test_epipolar_correction_main( util );
     LOG_INFOR_MESG("Epipolar correction test is finished!");
+#endif
+
+#if TEST_EDGE_ORIENTATION_AVG
+    f_TEST_EDGE_ORIENTATION_AVG();
+#endif
+
+#if TEST_EDGE_NCC
+    f_TEST_NCC();
 #endif
 
 #if TEST_READ_CURVELETS

@@ -22,13 +22,23 @@ and also manually add the YAML library to ``LD_LIBRARY_PATH``:
 ```bash
 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/XXX/bin/lib64/
 ```
-where ``XXX`` is the installed prefix path of your YAML-CPP.
+where ``XXX`` is the installed prefix path of your YAML-CPP. In addition, to enable the use of OpenCV library, manually link its library we have installed under ``/gpfs/data/bkimia/opencv_4.x/`` by
+```bash
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/data/bkimia/opencv_4.x/build_install/lib64/
+```
 
 ## Outputs
 Some intermidiate data when running the code will be saved to files which are stored in a ``outputs/`` folder. All files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
 
 ## Evaluations
-A evaluation script is customized and created under ``evaluation`` folder. For ABC-NEF dataset, you can download the ground-truth sampled curve points from [Google Drive](https://drive.google.com/drive/folders/1FH8_jykq44YA4FGJ6Par4gBMZg7Ayp1q?usp=sharing). It is encouraged to launch a conda environment before running the evaluation script. Follow the commands below to install:
+
+### Dataset
+[ABC-NEF dataset](https://github.com/yunfan1202/NEF_code) provides a set of nice 3D ground-truth curves which can be sampled into 3D edges for evaluating the reconstructed 3D edges/curves. 
+- We observe that the camera absolute poses of the ABC-NEF dataset are not very accurate (this can be seen by first projecting 3D ground-truth curve points onto images, and then around 1-2 pixels of shift from the projected curve points and the true object ridge are observed.) We thus provide code (can be found under the ``refine_ABC_NEF_camera_poses`` folder) for refining absolute camera poses by bundle adjustment, minimizing the nearest neighbor points between projected points and the detected third-order edges. The refined poses for all objects are collected in this Google Drive.  <br />
+- From the projections of 3D sampled curve points, third-order edge correspondences across different views can be constructed. The occlusion is reasonsed by the orientation difference between the projected 3D edge orientation and the third-order edges, as well as the magnitude of projection rays. Again, we made the GT edge correspondences available in this Google Drive.
+
+### Quantitative Evaluation
+An evaluation script is customized and created under ``evaluation`` folder. For ABC-NEF dataset, you can download the ground-truth sampled curve points from [Google Drive](https://drive.google.com/drive/folders/1FH8_jykq44YA4FGJ6Par4gBMZg7Ayp1q?usp=sharing). It is encouraged to launch a conda environment before running the evaluation script. Follow the commands below to install:
 ```bash
 conda create -n edge_sketch python=3.8
 conda activate edge_sketch
