@@ -43,6 +43,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_library( edge_reconstruction ${control_sources} )
 target_link_libraries(edge_reconstruction 
         -L/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/bin/lib64 yaml-cpp
+        -L/gpfs/data/bkimia/opencv_4.x/build_install/lib64 opencv_core opencv_imgproc opencv_imgcodecs opencv_highgui opencv_xfeatures2d
         -L/usr/lib64 pthread
 )
 
