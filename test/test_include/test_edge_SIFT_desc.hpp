@@ -70,20 +70,23 @@ void f_TEST_SIFT_DESCP_ON_EDGES()
     std::vector<cv::KeyPoint> edge_kpts_H1;
     edge_kpts_H1.push_back(edge_kpt_H1);
     std::vector<cv::KeyPoint> edge_kpts_H2;
+    edge_kpts_H2.push_back(edge_kpt_H1);
     edge_kpts_H2.push_back(edge_kpt_H2);
 
     sift->compute(gray_img_H1, edge_kpts_H1, descriptors_H1);
     sift->compute(gray_img_H2, edge_kpts_H2, descriptors_H2);
 
     cv::Mat normalized_desc_H1, normalized_desc_H2;
+    normalized_desc_H2 = descriptors_H2;
     cv::normalize(descriptors_H1, normalized_desc_H1, 1.0, 0.0, cv::NORM_L2); 
-    cv::normalize(descriptors_H2, normalized_desc_H2, 1.0, 0.0, cv::NORM_L2); 
+    cv::normalize(descriptors_H2.row(0), normalized_desc_H2.row(0), 1.0, 0.0, cv::NORM_L2); 
+    cv::normalize(descriptors_H2.row(1), normalized_desc_H2.row(1), 1.0, 0.0, cv::NORM_L2); 
 
     std::cout << "Normalized SIFT Descriptors" << std::endl;
     std::cout << normalized_desc_H1 << std::endl;
     std::cout << normalized_desc_H2 << std::endl;
 
-    double similarity = cv::norm(normalized_desc_H1, normalized_desc_H2, cv::NORM_L2);
-    std::cout << "Descriptor-based similarity: " << similarity << std::endl;
+    // double similarity = cv::norm(normalized_desc_H1, normalized_desc_H2, cv::NORM_L2);
+    // std::cout << "Descriptor-based similarity: " << similarity << std::endl;
 }
 

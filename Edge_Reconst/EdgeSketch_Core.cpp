@@ -85,8 +85,6 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     Num_Of_OMP_Threads = (Num_Of_OMP_Threads > omp_get_max_threads()) ? omp_get_max_threads() : Num_Of_OMP_Threads;
     omp_set_num_threads(Num_Of_OMP_Threads);
 
-    sift_detector = cv::SIFT::create();
-
     num_of_correct_edges_before_clustering = 0;
     num_of_wrong_edges_before_clustering = 0;
     num_of_correct_edges_after_clustering = 0;
@@ -189,6 +187,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     local_hypo2_clusters.resize(Num_Of_OMP_Threads);
     PR_before_clustering.resize(Num_Of_OMP_Threads);
     PR_after_clustering.resize(Num_Of_OMP_Threads);
+    PR_after_sift.resize(Num_Of_OMP_Threads);
     PR_after_validation.resize(Num_Of_OMP_Threads);
     PR_after_lowes.resize(Num_Of_OMP_Threads);
     
@@ -208,11 +207,9 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     std::cout << "- H1 edges in GT pairs participating the precision-recall evaluation: " << gt_h1_edges.size() << std::endl;
     //> ======================== precision and recall related ========================
 
-    //> Load images for SIFT matching
+    //> Load images for SIFT matching and NCC evaluation
     Load_Data->read_an_image(hyp01_view_indx, image_hypo1);
     Load_Data->read_an_image(hyp02_view_indx, image_hypo2);
-    
-    std::cout << "Done loading images" << std::endl;
 
     #pragma omp parallel
     {
@@ -332,37 +329,46 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             PR_after_clustering[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Clustering ============
 
-            // // =========== SIFT FILTERING ===========
-            // std::vector<int> cluster_indices_for_sift;
-            // for (int c = 0; c < Num_Of_Clusters_per_H1_Edge; c++) {
-            //     cluster_indices_for_sift.push_back(c);
-            // }
-            
-            // std::vector<int> sift_filtered_indices;
+            // =========== SIFT FILTERING ===========
+            // std::cout << "After clustering (Edges_HYPO2_final):\n" << Edges_HYPO2_final << std::endl;
+            //std::cout<<"After clustering number of clusters: "<<Num_Of_Clusters_per_H1_Edge<<std::endl;
 
-            // sift_filtered_indices = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2, cluster_indices_for_sift);
-            // int Num_Of_Clusters_After_SIFT = sift_filtered_indices.size();
-
-            // // Filter Edges_HYPO2_final to keep only SIFT-validated clusters
-            // if (!sift_filtered_indices.empty() && Num_Of_Clusters_After_SIFT < Num_Of_Clusters_per_H1_Edge) {
-            //     Eigen::MatrixXd Edges_HYPO2_final_sift(Num_Of_Clusters_After_SIFT, 4);
-            //     Eigen::MatrixXd HYPO2_idx_sift(Num_Of_Clusters_After_SIFT, 1);
-                
-            //     for (int s = 0; s < Num_Of_Clusters_After_SIFT; s++) {
-            //         int original_idx = sift_filtered_indices[s];
-            //         Edges_HYPO2_final_sift.row(s) = Edges_HYPO2_final.row(original_idx);
-            //         HYPO2_idx_sift(s) = HYPO2_idx(original_idx);
-            //     }
-                
-            //     Edges_HYPO2_final = Edges_HYPO2_final_sift;
-            //     HYPO2_idx = HYPO2_idx_sift;
-            //     Num_Of_Clusters_per_H1_Edge = Num_Of_Clusters_After_SIFT;
-            // }
+            std::vector<int> valid_indices;
+            valid_indices = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2);
             
+            int num_valid = static_cast<int>(valid_indices.size());
+            if (num_valid == 0) {
+                std::cerr << "Error: No valid indices after SIFT filtering." << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            Eigen::MatrixXd filtered_edges(num_valid, Edges_HYPO2_final.cols());
+            Eigen::MatrixXd filtered_hypo2_idx(num_valid, HYPO2_idx.cols());
+
+            for (int i = 0; i < num_valid; ++i) {
+                int idx = valid_indices[i];
+                if (idx < 0 || idx >= Edges_HYPO2_final.rows()) {
+                    std::cerr << "Invalid index in valid_indices: " << idx << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+
+                filtered_edges.row(i) = Edges_HYPO2_final.row(idx);
+                filtered_hypo2_idx.row(i) = HYPO2_idx.row(idx);
+            }
+
+            // Overwrite the originals AFTER allocation succeeds to avoid heap corruption
+            Edges_HYPO2_final = filtered_edges;
+            HYPO2_idx = filtered_hypo2_idx;
+
+            // Update cluster count after filtering
+            Num_Of_Clusters_per_H1_Edge = countUniqueClusters(Edges_HYPO2_final);
+
+            // //std::cout<<"After SIFT number of clusters: "<<Num_Of_Clusters_per_H1_Edge<<std::endl;
+
             // //> ============ Calculate Precision-Recall: After SIFT Filtering ============
             // find_TP_flag = false;
-            // for (int i = 0; i < Edges_HYPO2_final.rows(); i++) {
-            //     Eigen::Vector2d H2_edge_candidate(Edges_HYPO2_final(i,0), Edges_HYPO2_final(i,1));
+            // for (int i = 0; i < filtered_edges.rows(); i++) {
+            //     Eigen::Vector2d H2_edge_candidate(filtered_edges(i,0), filtered_edges(i,1));
             //     if (target_H2_edge.isApprox(H2_edge_candidate, GT_PROXIMITY_THRESH)) {
             //         find_TP_flag = true;
             //         num_of_correct_edges_after_sift++;
@@ -370,12 +376,10 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //     }
             // }
             // recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
-            // precision_per_edge = (find_TP_flag) ? (1.0 / Num_Of_Clusters_per_H1_Edge) : (0.0);
-            // num_of_wrong_edges_after_sift += (find_TP_flag) ? (Num_Of_Clusters_per_H1_Edge-1) : (Num_Of_Clusters_per_H1_Edge);
+            // precision_per_edge = (find_TP_flag) ? (1.0 / Num_Of_Clusters_per_H1_Edge_after_sift) : (0.0);
+            // num_of_wrong_edges_after_sift += (find_TP_flag) ? (Num_Of_Clusters_per_H1_Edge_after_sift-1) : (Num_Of_Clusters_per_H1_Edge_after_sift);
             // PR_after_sift[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
-            // //> ============ Calculate Precision-Recall: After SIFT Filtering ============
-            
-            // =========== SIFT FILTERING ===========
+            // //> =========== SIFT FILTERING ===========
 
             int valid_view_counter = 0;
             int stack_idx = 0;
@@ -1473,119 +1477,184 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
 }
 
 
-//> SIFT
-// Convert edge locations to OpenCV KeyPoints
-std::vector<cv::KeyPoint> EdgeSketch_Core::convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations) {
-    std::vector<cv::KeyPoint> keypoints;
-    keypoints.reserve(edge_locations.size());
+// //> SIFT
+// // Convert edge locations to OpenCV KeyPoints
+// std::vector<cv::KeyPoint> EdgeSketch_Core::convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations) {
+//     std::vector<cv::KeyPoint> keypoints;
+//     keypoints.reserve(edge_locations.size());
     
-    for (const auto& edge_loc : edge_locations) {
-        cv::KeyPoint kp;
-        kp.pt.x = static_cast<float>(edge_loc(0));
-        kp.pt.y = static_cast<float>(edge_loc(1));
-        kp.size = static_cast<float>(SIFT_PATCH_SIZE); // Set appropriate size for SIFT descriptor computation
-        kp.angle = -1; // Let SIFT compute the dominant orientation
-        kp.response = 1.0f;
-        kp.octave = 0;
-        keypoints.push_back(kp);
-    }
+//     for (const auto& edge_loc : edge_locations) {
+//         cv::KeyPoint kp;
+//         kp.pt.x = static_cast<float>(edge_loc(0));
+//         kp.pt.y = static_cast<float>(edge_loc(1));
+//         kp.size = static_cast<float>(SIFT_PATCH_SIZE); // Set appropriate size for SIFT descriptor computation
+//         kp.angle = -1; // Let SIFT compute the dominant orientation
+//         kp.response = 1.0f;
+//         kp.octave = 0;
+//         keypoints.push_back(kp);
+//     }
     
-    return keypoints;
-}
+//     return keypoints;
+// }
 
-// Compute SIFT descriptors at edge locations
-void EdgeSketch_Core::computeSIFTDescriptorsAtEdges(const cv::Mat& image, 
-                                                    const std::vector<Eigen::Vector2d>& edge_locations, 
-                                                    cv::Mat& descriptors) {
-    // Convert to grayscale if needed
-    cv::Mat gray;
-    if (image.channels() == 3) {
-        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-    } else {
-        gray = image;
-    }
+// // Compute SIFT descriptors at edge locations
+// void EdgeSketch_Core::computeSIFTDescriptorsAtEdges(const cv::Mat& image, 
+//                                                     const std::vector<Eigen::Vector2d>& edge_locations, 
+//                                                     cv::Mat& descriptors) {
+//     // Convert to grayscale if needed
+//     cv::Mat gray;
+//     if (image.channels() == 3) {
+//         cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+//     } else {
+//         gray = image;
+//     }
     
-    // Convert edge locations to KeyPoints
-    std::vector<cv::KeyPoint> keypoints = convertEdgeLocationsToKeypoints(edge_locations);
+//     // Convert edge locations to KeyPoints
+//     std::vector<cv::KeyPoint> keypoints = convertEdgeLocationsToKeypoints(edge_locations);
     
-    // Compute SIFT descriptors at the specified keypoint locations
-    sift_detector->compute(gray, keypoints, descriptors);
-}
+//     // Compute SIFT descriptors at the specified keypoint locations
+//     sift_detector->compute(gray, keypoints, descriptors);
+// }
 
 // Updated SIFT filtering method using edge locations as keypoints
 std::vector<int> EdgeSketch_Core::filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
                                                      const Eigen::MatrixXd& Edges_HYPO2_final,
                                                      const cv::Mat& image1, 
-                                                     const cv::Mat& image2,
-                                                     const std::vector<int>& valid_cluster_indices) {
+                                                     const cv::Mat& image2) {
     std::vector<int> sift_filtered_indices;
-    
-    if (!ENABLE_SIFT_FILTERING || image1.empty() || image2.empty()) {
-        return valid_cluster_indices; // Return all indices if SIFT is disabled or images not available
+
+    //> Sanity check
+    if (image1.type() != CV_8U) image1.convertTo(image1, CV_8U);
+    if (image2.type() != CV_8U) image2.convertTo(image2, CV_8U);
+
+    //> Convert edge locations in H1 nad H2 to their KeyPoint data type
+    std::vector<cv::KeyPoint> h1_edge_keypoints;
+    cv::Point2d h1_edge(Edges_HYPO1_final(0,0), Edges_HYPO1_final(0,1));
+    cv::KeyPoint edge_kpt_H1(h1_edge, 1.0f);
+    h1_edge_keypoints.push_back(edge_kpt_H1);
+
+    std::vector<cv::KeyPoint> h2_edge_keypoints;
+    for (int i = 0; i < Edges_HYPO2_final.rows(); i++ ) {
+        // Eigen::Vector2d h2_edge = Edges_HYPO2_final.row(cluster_idx).head<2>();
+        cv::Point2d h2_edge(Edges_HYPO2_final(i,0), Edges_HYPO2_final(i,1));
+        cv::KeyPoint edge_kpt_H2(h2_edge, 1.0f);
+        h2_edge_keypoints.push_back(edge_kpt_H2);
+    }
+
+    cv::Mat h1_edge_descp, h2_edge_descp;
+    cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
+    sift->compute(image1, h1_edge_keypoints, h1_edge_descp);
+    sift->compute(image2, h2_edge_keypoints, h2_edge_descp);
+
+    cv::Mat normalized_h1_edge_descp, normalized_h2_edge_descp;
+    normalized_h2_edge_descp = h2_edge_descp;
+    cv::normalize(h1_edge_descp, normalized_h1_edge_descp, 1.0, 0.0, cv::NORM_L2); 
+    // std::vector<double> similarity;
+    for (int i = 0; i < h2_edge_descp.rows; i++) {
+        cv::normalize(h2_edge_descp.row(i), normalized_h2_edge_descp.row(i), 1.0, 0.0, cv::NORM_L2);
+        double similarity = cv::norm(normalized_h1_edge_descp, normalized_h2_edge_descp.row(i), cv::NORM_L2); 
+        if (similarity < SIFT_DISTANCE_THRESHOLD)
+            sift_filtered_indices.push_back(i);
     }
     
-    // Prepare edge locations for H1 and H2
-    std::vector<Eigen::Vector2d> h1_edge_locations;
-    std::vector<Eigen::Vector2d> h2_edge_locations;
+    return sift_filtered_indices;
+
     
-    // H1 edge location (Previous_Frame equivalent)
-    Eigen::Vector2d h1_edge = Edges_HYPO1_final.row(0).head<2>();
-    h1_edge_locations.push_back(h1_edge);
+    // //-------------------------------------------------------------
     
-    // H2 edge locations for valid clusters (Current_Frame equivalent)
-    for (int cluster_idx : valid_cluster_indices) {
-        if (cluster_idx < Edges_HYPO2_final.rows()) {
-            Eigen::Vector2d h2_edge = Edges_HYPO2_final.row(cluster_idx).head<2>();
-            h2_edge_locations.push_back(h2_edge);
-        }
-    }
+    // // Prepare edge locations for H1 and H2
+    // std::vector<Eigen::Vector2d> h1_edge_locations;
+    // std::vector<Eigen::Vector2d> h2_edge_locations;
     
-    if (h2_edge_locations.empty()) {
-        return sift_filtered_indices;
-    }
+    // // H1 edge location (Previous_Frame equivalent)
+    // Eigen::Vector2d h1_edge = Edges_HYPO1_final.row(0).head<2>();
+    // h1_edge_locations.push_back(h1_edge);
     
-    // Compute SIFT descriptors at edge locations
-    cv::Mat H1_SIFT_Descriptors, H2_SIFT_Descriptors;  // Equivalent to Previous_Frame->SIFT_Descriptors and Current_Frame->SIFT_Descriptors
-    computeSIFTDescriptorsAtEdges(image1, h1_edge_locations, H1_SIFT_Descriptors);  // H1 edge descriptors
-    computeSIFTDescriptorsAtEdges(image2, h2_edge_locations, H2_SIFT_Descriptors);  // H2 edge descriptors
+    // // H2 edge locations for valid clusters (Current_Frame equivalent)
+    // for (int cluster_idx : valid_cluster_indices) {
+    //     if (cluster_idx < Edges_HYPO2_final.rows()) {
+    //         Eigen::Vector2d h2_edge = Edges_HYPO2_final.row(cluster_idx).head<2>();
+    //         h2_edge_locations.push_back(h2_edge);
+    //     }
+    // }
     
-    if (H1_SIFT_Descriptors.empty() || H2_SIFT_Descriptors.empty()) {
-        std::cout << "Warning: Could not compute SIFT descriptors at edge locations" << std::endl;
-        return valid_cluster_indices; // Return all if descriptor computation failed
-    }
+    // if (h2_edge_locations.empty()) {
+    //     return sift_filtered_indices;
+    // }
     
-    // Match SIFT features via OpenCV built-in KNN approach
-    // Matching direction: from H1 edge (Previous_Frame) -> H2 edges (Current_Frame)
-    cv::BFMatcher matcher;
-    std::vector<std::vector<cv::DMatch>> feature_matches;
+    // // Compute SIFT descriptors at edge locations
+    // cv::Mat H1_SIFT_Descriptors, H2_SIFT_Descriptors;  // Equivalent to Previous_Frame->SIFT_Descriptors and Current_Frame->SIFT_Descriptors
+    // computeSIFTDescriptorsAtEdges(image1, h1_edge_locations, H1_SIFT_Descriptors);  // H1 edge descriptors
+    // computeSIFTDescriptorsAtEdges(image2, h2_edge_locations, H2_SIFT_Descriptors);  // H2 edge descriptors
     
-    // matcher.knnMatch(Previous_Frame->SIFT_Descriptors, Current_Frame->SIFT_Descriptors, feature_matches, 2);
-    matcher.knnMatch(H1_SIFT_Descriptors, H2_SIFT_Descriptors, feature_matches, 2);
+    // if (H1_SIFT_Descriptors.empty() || H2_SIFT_Descriptors.empty()) {
+    //     std::cout << "Warning: Could not compute SIFT descriptors at edge locations" << std::endl;
+    //     return valid_cluster_indices; // Return all if descriptor computation failed
+    // }
     
-    // Apply distance threshold only (no Lowe's ratio test)
-    std::vector<cv::DMatch> good_matches;
-    for (const auto& match_pair : feature_matches) {
-        if (!match_pair.empty()) {
-            const cv::DMatch& best_match = match_pair[0];
+    // // Match SIFT features via OpenCV built-in KNN approach
+    // // Matching direction: from H1 edge (Previous_Frame) -> H2 edges (Current_Frame)
+    // cv::BFMatcher matcher;
+    // std::vector<std::vector<cv::DMatch>> feature_matches;
+    
+    // // matcher.knnMatch(Previous_Frame->SIFT_Descriptors, Current_Frame->SIFT_Descriptors, feature_matches, 2);
+    // matcher.knnMatch(H1_SIFT_Descriptors, H2_SIFT_Descriptors, feature_matches, 2);
+    
+    // // Apply distance threshold only (no Lowe's ratio test)
+    // std::vector<cv::DMatch> good_matches;
+    // for (const auto& match_pair : feature_matches) {
+    //     if (!match_pair.empty()) {
+    //         const cv::DMatch& best_match = match_pair[0];
             
-            // Apply distance threshold only
-            if (best_match.distance < SIFT_DISTANCE_THRESHOLD) {
-                good_matches.push_back(best_match);
+    //         // Apply distance threshold only
+    //         if (best_match.distance < SIFT_DISTANCE_THRESHOLD) {
+    //             good_matches.push_back(best_match);
+    //         }
+    //     }
+    // }
+    
+    // // Filter clusters based on successful matches
+    // // Each match.trainIdx corresponds to an H2 edge cluster
+    // for (const auto& match : good_matches) {
+    //     int h2_descriptor_idx = match.trainIdx;  // Index in H2_SIFT_Descriptors
+    //     if (h2_descriptor_idx < valid_cluster_indices.size()) {
+    //         int cluster_idx = valid_cluster_indices[h2_descriptor_idx];
+    //         sift_filtered_indices.push_back(cluster_idx);
+    //     }
+    // }
+    
+    // return sift_filtered_indices;
+}
+
+int EdgeSketch_Core::countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance) {
+    if (edges.rows() == 0) return 0;
+    
+    std::vector<bool> processed(edges.rows(), false);
+    int cluster_count = 0;
+    
+    for (int i = 0; i < edges.rows(); ++i) {
+        if (processed[i]) continue;
+        
+        cluster_count++;
+        processed[i] = true;
+        
+        // Find all similar rows
+        for (int j = i + 1; j < edges.rows(); ++j) {
+            if (!processed[j]) {
+                bool is_similar = true;
+                for (int col = 0; col < edges.cols() && is_similar; ++col) {
+                    if (std::abs(edges(i, col) - edges(j, col)) > tolerance) {
+                        is_similar = false;
+                    }
+                }
+                if (is_similar) {
+                    processed[j] = true;
+                }
             }
         }
     }
     
-    // Filter clusters based on successful matches
-    // Each match.trainIdx corresponds to an H2 edge cluster
-    for (const auto& match : good_matches) {
-        int h2_descriptor_idx = match.trainIdx;  // Index in H2_SIFT_Descriptors
-        if (h2_descriptor_idx < valid_cluster_indices.size()) {
-            int cluster_idx = valid_cluster_indices[h2_descriptor_idx];
-            sift_filtered_indices.push_back(cluster_idx);
-        }
-    }
-    
-    return sift_filtered_indices;
+    return cluster_count;
 }
 
 EdgeSketch_Core::~EdgeSketch_Core() { }
