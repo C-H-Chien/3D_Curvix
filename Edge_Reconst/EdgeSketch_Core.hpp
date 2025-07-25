@@ -74,15 +74,11 @@ public:
     int num_of_correct_edges_after_lowe, num_of_wrong_edges_after_lowe;
 
     //> SIFT
-    cv::Ptr<cv::SIFT> sift_detector;
+    int countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance = 1e-6);
     std::vector<int> filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
-                                        const Eigen::MatrixXd& Edges_HYPO2_final,
-                                        const cv::Mat& image1, 
-                                        const cv::Mat& image2,
-                                        const std::vector<int>& valid_cluster_indices);
-    void computeSIFTDescriptorsAtEdges(const cv::Mat& image, 
-                                      const std::vector<Eigen::Vector2d>& edge_locations, 
-                                      cv::Mat& descriptors);
+                                    const Eigen::MatrixXd& Edges_HYPO2_final,
+                                    const cv::Mat& image1, 
+                                    const cv::Mat& image2);
     
     std::vector<cv::KeyPoint> convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations);
 

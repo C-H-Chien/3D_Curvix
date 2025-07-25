@@ -64,7 +64,8 @@ bool file_reader::read_an_image( int file_idx, cv::Mat &grayscale_img )
   }
   if (original_img.channels() == 3) {
     cv::cvtColor(original_img, grayscale_img, cv::COLOR_BGR2GRAY);
-  }  
+  }
+  
   return true;
 }
 
