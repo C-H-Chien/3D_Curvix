@@ -12,6 +12,7 @@
 #include "test_include/test_alignment.hpp"
 #include "test_include/test_epipolar_correction.hpp"
 #include "test_include/test_edge_NCC.hpp"
+#include "test_include/test_edge_SIFT_desc.hpp"
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
@@ -20,6 +21,7 @@
 //> Select the test
 #define TEST_EPIPOLAR_CORRECTION    (false)
 #define TEST_EDGE_NCC               (true)
+#define TEST_SIFT_DESC_ON_EDGES     (true)
 #define TEST_EDGE_ORIENTATION_AVG   (false)
 #define TEST_READ_CURVELETS         (false)
 #define TEST_EDGE_ALIGNMENT         (false)
@@ -92,6 +94,10 @@ int main(int argc, char **argv) {
 
 #if TEST_EDGE_NCC
     f_TEST_NCC();
+#endif
+
+#if TEST_SIFT_DESC_ON_EDGES
+    f_TEST_SIFT_DESCP_ON_EDGES();
 #endif
 
 #if TEST_READ_CURVELETS

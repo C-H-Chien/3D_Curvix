@@ -20,6 +20,8 @@
 #include <vector>
 #include <chrono>
 
+#include <opencv2/core.hpp>
+
 //> Eigen library
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -101,6 +103,8 @@ namespace MultiviewGeometryUtil {
         double deg_to_rad( double theta ) {
             return theta * (M_PI / 180.0);
         }
+
+        std::string cvMat_Type(int type);
 
     private:
         
