@@ -78,7 +78,8 @@ public:
     std::vector<int> filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
                                     const Eigen::MatrixXd& Edges_HYPO2_final,
                                     const cv::Mat& image1, 
-                                    const cv::Mat& image2);
+                                    const cv::Mat& image2,
+                                    bool debug_flag = false);
     
     std::vector<cv::KeyPoint> convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations);
 
@@ -98,6 +99,7 @@ public:
     //> precision and recall experiments
     bool getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs);
     void get_Avg_Precision_Recall_Rates();
+    void construct_3D_edges_from_ground_truth();
 
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,
@@ -322,6 +324,29 @@ private:
 
     //> a list of validation view indices
     std::vector<int> valid_view_index;
+
+    std::vector<std::pair<int, int>> get_Unique_GT_H1_Edge_Index_Pairs(const std::vector<std::pair<int, int>>& input_vector) {
+      std::set<int> unique_first_elements;
+      std::vector<std::pair<int, int>> result_pairs;
+
+      // Collect unique first elements
+      for (const auto& p : input_vector) {
+        unique_first_elements.insert(p.first);
+      }
+
+      // Collect corresponding pairs for unique first elements
+      for (int unique_val : unique_first_elements) {
+        // Find the first occurrence of a pair with this unique_val as its first element
+        auto it = std::find_if(input_vector.begin(), input_vector.end(),
+                              [unique_val](const std::pair<int, int>& p) {
+                                  return p.first == unique_val;
+                              });
+        if (it != input_vector.end()) {
+          result_pairs.push_back(*it);
+        }
+      }
+      return result_pairs;
+    }
 
     std::ofstream V_edges_outFile;
 
