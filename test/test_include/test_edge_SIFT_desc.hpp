@@ -64,8 +64,8 @@ void f_TEST_SIFT_DESCP_ON_EDGES()
     cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
 
     //> Convert an edge location to a KeyPoint data type
-    cv::KeyPoint edge_kpt_H1(target_edge_H1, 1.0f);
-    cv::KeyPoint edge_kpt_H2(target_edge_H2, 1.0f);
+    cv::KeyPoint edge_kpt_H1(target_edge_H1, SIFT_PATCH_SIZE, util->rad_to_deg(edges_H1(edge_pair_index.first,  2)));
+    cv::KeyPoint edge_kpt_H2(target_edge_H2, SIFT_PATCH_SIZE, util->rad_to_deg(edges_H1(edge_pair_index.second, 2)));
 
     std::vector<cv::KeyPoint> edge_kpts_H1;
     edge_kpts_H1.push_back(edge_kpt_H1);

@@ -66,6 +66,16 @@ namespace MultiviewGeometryUtil {
         Eigen::Vector3d findClosestVectorFromPointToLine(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2);
         double getLineVariable(Eigen::Vector3d P1, Eigen::Vector3d d1, Eigen::Vector3d P2);
         bool checkOrientationConsistency(Eigen::Vector3d source_tangent, Eigen::Vector3d target_tangent);
+
+        double get_Vector_Diff_Norm(Eigen::Vector2d vec1, Eigen::Vector2d vec2) {
+            Eigen::Vector2d vec_diff = vec1 - vec2;
+            return vec_diff.norm();
+        }
+
+        double get_Vector_Diff_Norm(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
+            Eigen::Vector3d vec_diff = vec1 - vec2;
+            return vec_diff.norm();
+        }
         
         Eigen::Vector3d linearTriangulation(int N, const std::vector<Eigen::Vector2d> pts,  \
                                                    const std::vector<Eigen::Matrix3d> & Rs, \

@@ -78,7 +78,8 @@ public:
     std::vector<int> filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
                                     const Eigen::MatrixXd& Edges_HYPO2_final,
                                     const cv::Mat& image1, 
-                                    const cv::Mat& image2);
+                                    const cv::Mat& image2,
+                                    bool debug_flag = false);
     
     std::vector<cv::KeyPoint> convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations);
 
@@ -98,6 +99,7 @@ public:
     //> precision and recall experiments
     bool getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs);
     void get_Avg_Precision_Recall_Rates();
+    void construct_3D_edges_from_ground_truth();
 
     std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
                            const std::unordered_map<int, int>& hypothesis2ToBestMatch,

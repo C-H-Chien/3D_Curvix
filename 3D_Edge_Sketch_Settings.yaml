@@ -4,7 +4,7 @@
 Num_Of_OMP_Threads: 32                #> Number of CPU cores to run 3D Edge Sketch in parallel
 Init_Hypo1_View_Index: 25 #44            #> Initial hypothesis view 1 index
 Init_Hypo2_View_Index: 49 #29            #> Initial hypothesis view 2 index
-delta: 0.3                            #> edge location perturbation
+delta: 0.4                            #> edge location perturbation
 delta_theta: 15                       #> \Delta \theta: orientation threshold
 Max_Num_Of_Support_Views: 4           #> N: minimal number of validation views supporting a hypothesis edge pair
 Multi_Thresh_Init_Thresh: 1           #> third-order edge threshold for 1st round of multi-thresholding

@@ -17,16 +17,16 @@
 #define LOWES_RATIO_THRESHOLD           (0.6)
 
 //> SIFT
-#define ENABLE_SIFT_FILTERING           (false)
-#define SIFT_PATCH_SIZE                 (7)
-#define SIFT_DISTANCE_THRESHOLD         (3)
+#define ENABLE_SIFT_FILTERING           (true)
+#define SIFT_PATCH_SIZE                 (16.0f)
+#define SIFT_SIMILARITY_THRESHOLD       (700)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
 //> hypotheses formation settings
 #define EPIP_TANGENCY_DISPL_THRESH      (3)         //> in pixels
-#define LOCATION_PERTURBATION           (0.3)         //> in pixels
+#define LOCATION_PERTURBATION           (0.4)         //> in pixels
 #define ORIENT_PERTURBATION             (0.174533)  //> in radians. 0.174533 is 10 degrees
 #define CLUSTER_DIST_THRESH             (1)         //> τc, in pixels
 #define CLUSTER_ORIENT_THRESH           (20.0)      //> in degrees
@@ -57,6 +57,7 @@
 #define SHOW_DATA_LOADING_INFO     (false)
 #define SHOW_OMP_NUM_OF_THREADS    (true)
 #define ISOLATE_DATA               (false)
+#define SIFT_DEBUG                 (false)
 
 //> Constant values (no change)
 #define PI                            (3.1415926)
