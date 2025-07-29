@@ -325,6 +325,29 @@ private:
     //> a list of validation view indices
     std::vector<int> valid_view_index;
 
+    std::vector<std::pair<int, int>> get_Unique_GT_H1_Edge_Index_Pairs(const std::vector<std::pair<int, int>>& input_vector) {
+      std::set<int> unique_first_elements;
+      std::vector<std::pair<int, int>> result_pairs;
+
+      // Collect unique first elements
+      for (const auto& p : input_vector) {
+        unique_first_elements.insert(p.first);
+      }
+
+      // Collect corresponding pairs for unique first elements
+      for (int unique_val : unique_first_elements) {
+        // Find the first occurrence of a pair with this unique_val as its first element
+        auto it = std::find_if(input_vector.begin(), input_vector.end(),
+                              [unique_val](const std::pair<int, int>& p) {
+                                  return p.first == unique_val;
+                              });
+        if (it != input_vector.end()) {
+          result_pairs.push_back(*it);
+        }
+      }
+      return result_pairs;
+    }
+
     std::ofstream V_edges_outFile;
 
     template<typename T>

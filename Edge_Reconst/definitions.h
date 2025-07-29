@@ -19,7 +19,7 @@
 //> SIFT
 #define ENABLE_SIFT_FILTERING           (true)
 #define SIFT_PATCH_SIZE                 (16.0f)
-#define SIFT_SIMILARITY_THRESHOLD       (700)
+#define SIFT_SIMILARITY_THRESHOLD       (1000)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)

@@ -196,6 +196,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     //> ======================== precision and recall related ========================
     std::vector<std::pair<int, int>> gt_pairs;
     if ( !getGTEdgePairsBetweenImages(hyp01_view_indx, hyp02_view_indx, gt_pairs) ) exit(1);
+    gt_pairs = get_Unique_GT_H1_Edge_Index_Pairs(gt_pairs);
     std::cout << "Found " << gt_pairs.size() << " GT pairs between images "<<hyp01_view_indx<<" and "<< hyp02_view_indx << std::endl;
     std::cout << "GT edge pairs indices:" << std::endl;
     
