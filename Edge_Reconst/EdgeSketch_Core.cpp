@@ -309,6 +309,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Edges_HYPO2_final = edge_cluster_engine.Epip_Correct_H2_Edges;
             local_hypo2_clusters[thread_id].push_back(edge_cluster_engine.H2_Clusters);
             Num_Of_Clusters_per_H1_Edge = edge_cluster_engine.Num_Of_Clusters;
+            // std::vector<int> Cluster_Labels = edge_cluster_engine.clster_labels;
             //> =========== CLUSTERING H2 EDGES ===========
 
             // if(exit_flag){
@@ -334,50 +335,11 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> ============ Calculate Precision-Recall: After Clustering ============
 
             // =========== SIFT FILTERING ===========
-            std::vector<int> valid_indices;
 #if SIFT_DEBUG
-            valid_indices = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2, debug_flag);
+            Edges_HYPO2_final = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2, debug_flag);
 #else
-            valid_indices = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2);
+            Edges_HYPO2_final = filterEdgesWithSIFT(Edges_HYPO1_final, Edges_HYPO2_final, image_hypo1, image_hypo2);
 #endif
-            // if(valid_indices.size() < Edges_HYPO2_final.rows()){
-            //     std::cout << "Edges_HYPO2_final size decreased from " << Edges_HYPO2_final.rows() 
-            //     << " to " << valid_indices.size() << " after sift" << std::endl;
-                
-            //     // std::cout << "valid_indices: [";
-            //     // for (size_t i = 0; i < valid_indices.size(); ++i) {
-            //     //     std::cout << valid_indices[i];
-            //     //     if (i < valid_indices.size() - 1) std::cout << ", ";
-            //     // }
-            //     // std::cout << "]" << std::endl;
-                
-            //     // std::cout << "Original Edges_HYPO2_final:\n" << Edges_HYPO2_final << std::endl;
-            //     // std::cout << "Filtered edges:\n" << filtered_edges << std::endl;
-            //     exit(0);
-            // }
-
-            int num_valid = static_cast<int>(valid_indices.size());
-
-            Eigen::MatrixXd filtered_edges(num_valid, Edges_HYPO2_final.cols());
-            Eigen::MatrixXd filtered_hypo2_idx(num_valid, HYPO2_idx.cols());
-
-            for (int i = 0; i < num_valid; ++i) {
-                int idx = valid_indices[i];
-                if (idx < 0 || idx >= Edges_HYPO2_final.rows()) {
-                    std::cout << "Invalid index in valid_indices: " << idx << std::endl;
-                    exit(EXIT_FAILURE);
-                }
-
-                filtered_edges.row(i) = Edges_HYPO2_final.row(idx);
-                filtered_hypo2_idx.row(i) = HYPO2_idx.row(idx);
-            }
-
-            Edges_HYPO2_final = filtered_edges;
-            HYPO2_idx = filtered_hypo2_idx;
-
-            // if(countUniqueClusters(Edges_HYPO2_final) != Num_Of_Clusters_per_H1_Edge){
-            //     std::cout<<"cluster reduced from "<<Num_Of_Clusters_per_H1_Edge <<" to "<<countUniqueClusters(Edges_HYPO2_final)<<std::endl;
-            // }
             Num_Of_Clusters_per_H1_Edge = countUniqueClusters(Edges_HYPO2_final);
 
             // //std::cout<<"After SIFT number of clusters: "<<Num_Of_Clusters_per_H1_Edge<<std::endl;
@@ -396,13 +358,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             precision_per_edge = (find_TP_flag) ? (1.0 / Num_Of_Clusters_per_H1_Edge) : (0.0);
             num_of_wrong_edges_after_sift += (find_TP_flag) ? (Num_Of_Clusters_per_H1_Edge-1) : (Num_Of_Clusters_per_H1_Edge);
             PR_after_sift[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
-            // std::cout<<"recall_per_edge after SIFT: "<<recall_per_edge<<std::endl;
-            // std::cout<<"precision_per_edge after SIFT: "<<precision_per_edge<<std::endl;
-            
-            // if(num_of_wrong_edges_after_clustering != num_of_wrong_edges_after_sift){
-            //     std::cout<<"num_of_wrong_edges_after_clustering: "<<num_of_wrong_edges_after_clustering<<std::endl;
-            //     std::cout<<"num_of_wrong_edges_after_sift: "<<num_of_wrong_edges_after_sift<<std::endl;
-            // }
             //> =========== SIFT FILTERING ===========
 
             int valid_view_counter = 0;
@@ -561,6 +516,27 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 rep_count.row(unique_idx) << count(indices_stack.begin(), indices_stack.end(), indices_stack_unique[unique_idx]);
             }
 
+            // //> ======== DEBUG ============
+            // Eigen::MatrixXd H1_Isolated_Edge_Row = Edges_HYPO1.row(H1_edge_idx);
+            // Eigen::Vector2d H1_Isolated_Edge(H1_Isolated_Edge_Row(0), H1_Isolated_Edge_Row(1));
+            // Eigen::Vector2d target_H1_edge(249.211, 428.018);
+            // if ( H1_Isolated_Edge.isApprox(target_H1_edge, 1e-4) ) {
+            //     std::cout << "supported_indices_stack:" << std::endl;
+            //     for (int i = 0; i < supported_indices_stack.rows(); i++) {
+            //         std::cout << supported_indices_stack(i,0) << std::endl;
+            //     }
+
+            //     std::cout << "Edges_HYPO2_final from supported_indices_stack:" << std::endl;
+            //     for (int i = 0; i < supported_indices_stack.rows(); i++) {
+            //         std::cout << "(" << Edges_HYPO2_final(i,0) << ", " << Edges_HYPO2_final(i,1) << ", " << Edges_HYPO2_final(i,2) << ")" << std::endl;
+            //     }
+            //     std::cout << "rep_count:" << std::endl;
+            //     for (int i = 0; i < rep_count.size(); i++) {
+            //         std::cout << rep_count(i) << std::endl;
+            //     }
+            // }
+            // //> ======== DEBUG ============
+
             //> Find all edge pairs that have more than 4 supporting validation views
             std::vector<int> valid_pairs;
             for (int i = 0; i < rep_count.size(); i++) {
@@ -581,19 +557,19 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             std::vector<int> finalpair_H2_indices_after_validation;
             for (int valid_idx : valid_pairs) {
                 int finalpair = int(indices_stack_unique[valid_idx]);
-                finalpair_H2_indices_after_validation.push_back( HYPO2_idx(finalpair) );
-
+                finalpair_H2_indices_after_validation.push_back( finalpair );
             }
 
-            std::vector<int> unique_finalpair_H2_indices_after_validation = finalpair_H2_indices_after_validation;
-            std::sort(unique_finalpair_H2_indices_after_validation.begin(), unique_finalpair_H2_indices_after_validation.end());
-            auto last_unique_it_after_validation = std::unique(unique_finalpair_H2_indices_after_validation.begin(), unique_finalpair_H2_indices_after_validation.end());
-
-            unique_finalpair_H2_indices_after_validation.erase(last_unique_it_after_validation, unique_finalpair_H2_indices_after_validation.end());
+            //> get the validated H2 edges and the unique number of clusters
+            Eigen::MatrixXd finalpair_H2_edges(finalpair_H2_indices_after_validation.size(), 4);
+            for (int i = 0; i < finalpair_H2_indices_after_validation.size(); i++) {
+                finalpair_H2_edges.row(i) = Edges_HYPO2_final.row(finalpair_H2_indices_after_validation[i]);
+            }
+            int Num_Of_Validated_Clusters = countUniqueClusters(finalpair_H2_edges);
             
             find_TP_flag = false;
             for (int i = 0; i < finalpair_H2_indices_after_validation.size(); i++) {
-                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2(finalpair_H2_indices_after_validation[i],0), Edges_HYPO2(finalpair_H2_indices_after_validation[i],1));
+                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2_final(finalpair_H2_indices_after_validation[i],0), Edges_HYPO2_final(finalpair_H2_indices_after_validation[i],1));
                 if ( util->get_Vector_Diff_Norm(target_H2_edge, H2_edge_candidate) <= GT_PROXIMITY_THRESH ) {
                     find_TP_flag = true;
                     num_of_correct_edges_after_validation++;
@@ -601,8 +577,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 }
             }
             recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
-            precision_per_edge = (find_TP_flag) ? (1.0 / unique_finalpair_H2_indices_after_validation.size()) : (0.0);
-            num_of_wrong_edges_after_validation += (find_TP_flag) ? (unique_finalpair_H2_indices_after_validation.size()-1) : (unique_finalpair_H2_indices_after_validation.size());
+            precision_per_edge = (find_TP_flag) ? (1.0 / (double)Num_Of_Validated_Clusters) : (0.0);
+            num_of_wrong_edges_after_validation += (find_TP_flag) ? (Num_Of_Validated_Clusters-1) : (Num_Of_Validated_Clusters);
             PR_after_validation[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Validation ============
 
@@ -657,20 +633,21 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 if (pair_row_idx != -1) {
                     // Store the edge pair information
                     paired_edge.row(pair_row_idx) << H1_edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
-                    finalpair_H2_indices.push_back( HYPO2_idx(finalpair) );
+                    finalpair_H2_indices.push_back( finalpair );
                 } 
             }
 
             //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
-            std::vector<int> unique_finalpair_H2_indices = finalpair_H2_indices;
-            std::sort(unique_finalpair_H2_indices.begin(), unique_finalpair_H2_indices.end());
-            auto last_unique_it = std::unique(unique_finalpair_H2_indices.begin(), unique_finalpair_H2_indices.end());
-
-            unique_finalpair_H2_indices.erase(last_unique_it, unique_finalpair_H2_indices.end());
+            //> get the validated H2 edges passing Lowe's ratio test and the corresponding unique number of clusters
+            Eigen::MatrixXd finalpair_H2_edges_lowe(finalpair_H2_indices.size(), 4);
+            for (int i = 0; i < finalpair_H2_indices.size(); i++) {
+                finalpair_H2_edges_lowe.row(i) = Edges_HYPO2_final.row(finalpair_H2_indices[i]);
+            }
+            int Num_Of_Validated_Clusters_w_Lowe = countUniqueClusters(finalpair_H2_edges_lowe);
 
             find_TP_flag = false;
             for (int i = 0; i < finalpair_H2_indices.size(); i++) {
-                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2(finalpair_H2_indices[i],0), Edges_HYPO2(finalpair_H2_indices[i],1));
+                Eigen::Vector2d H2_edge_candidate(Edges_HYPO2_final(finalpair_H2_indices[i],0), Edges_HYPO2_final(finalpair_H2_indices[i],1));
                 if ( util->get_Vector_Diff_Norm(target_H2_edge, H2_edge_candidate) <= GT_PROXIMITY_THRESH ) {
                     find_TP_flag = true;
                     num_of_correct_edges_after_lowe++;
@@ -678,8 +655,8 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 }
             }
             recall_per_edge = (find_TP_flag) ? (1.0) : (0.0);
-            precision_per_edge = (find_TP_flag) ? (1.0 / unique_finalpair_H2_indices.size()) : (0.0);
-            num_of_wrong_edges_after_lowe += (find_TP_flag) ? (unique_finalpair_H2_indices.size()-1) : (unique_finalpair_H2_indices.size());
+            precision_per_edge = (find_TP_flag) ? (1.0 / (double)Num_Of_Validated_Clusters_w_Lowe) : (0.0);
+            num_of_wrong_edges_after_lowe += (find_TP_flag) ? (Num_Of_Validated_Clusters_w_Lowe-1) : (Num_Of_Validated_Clusters_w_Lowe);
             PR_after_lowes[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
 
@@ -1541,7 +1518,7 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
 // }
 
 // Updated SIFT filtering method using edge locations as keypoints
-std::vector<int> EdgeSketch_Core::filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
+Eigen::MatrixXd EdgeSketch_Core::filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
                                                      const Eigen::MatrixXd& Edges_HYPO2_final,
                                                      const cv::Mat& image1, 
                                                      const cv::Mat& image2,
@@ -1584,13 +1561,19 @@ std::vector<int> EdgeSketch_Core::filterEdgesWithSIFT(const Eigen::MatrixXd& Edg
 
 #if SIFT_DEBUG
         if (debug_flag) {
-            std::cout << "edge_kpt_H2 = (" << h2_edge_keypoints[i].pt.x << ", " << h2_edge_keypoints[i].pt.y << "), ";
+            std::cout << "edge_kpt_H2 = (" << h2_edge_keypoints[i].pt.x << ", " << h2_edge_keypoints[i].pt.y << ", " << Edges_HYPO2_final(i,2) << "), ";
             std::cout << "Similarity = " << similarity << std::endl;
         }
 #endif
     }
+
+    Eigen::MatrixXd Filtered_Edges_HYPO2(sift_filtered_indices.size(), 4);
+    for (int i = 0; i < sift_filtered_indices.size(); i++) {
+        Filtered_Edges_HYPO2.row(i) = Edges_HYPO2_final.row(sift_filtered_indices[i]);
+    }
     
-    return sift_filtered_indices;
+    return Filtered_Edges_HYPO2;
+    // return sift_filtered_indices;
 
     // //-------------------------------------------------------------
     

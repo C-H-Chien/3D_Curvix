@@ -75,7 +75,7 @@ public:
 
     //> SIFT
     int countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance = 1e-6);
-    std::vector<int> filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
+    Eigen::MatrixXd filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
                                     const Eigen::MatrixXd& Edges_HYPO2_final,
                                     const cv::Mat& image1, 
                                     const cv::Mat& image2,
@@ -317,6 +317,7 @@ private:
     Eigen::Vector3d epipole;
 
     unsigned Num_Of_Clusters_per_H1_Edge;
+    // std::vector<int> Cluster_Labels;
 
     // data structure for tracking best matches
     std::unordered_map<int, int> hypothesis1_best_match;
