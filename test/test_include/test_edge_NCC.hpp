@@ -29,8 +29,47 @@ void f_TEST_EDGE_ORIENTATION_AVG() {
     //> TODO
 }
 
-double Bilinear_Interpolation(const cv::Mat &meshGrid, cv::Point2d P)
+bool test_getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, \
+                                      std::vector<std::pair<int, int>>& gt_edge_pairs, \
+                                      std::vector<std::vector<int>> GT_EdgePairs ) 
+{    
+    gt_edge_pairs.clear();
+    
+    //> Sanity Check: make sure that GT data is loaded
+    if (GT_EdgePairs.empty()) {
+        LOG_ERROR("Error: Ground truth edge pairs data not loaded. Check Read_GT_EdgePairs_Data() first.");
+        return false;
+    }
+    
+    //> Loop through all ground truth 3D points
+    for (const auto& gt_row : GT_EdgePairs) {
+        //> Extract edge IDs for the two images
+        int edge_id_img1 = gt_row[hyp01_view_indx + 1]-1;
+        int edge_id_img2 = gt_row[hyp02_view_indx + 1]-1;
+        
+        //> if there is a valid pair between edges from the two hypothesis views
+        if (edge_id_img1 >= 0 && edge_id_img2 >= 0) {
+            gt_edge_pairs.push_back(std::make_pair(edge_id_img1, edge_id_img2));
+        }
+    }
+
+    if (gt_edge_pairs.size() == 0) 
+    {
+        LOG_INFOR_MESG("Exiting the program due to zero GT edge correspondences");
+        return false;
+    }
+    return true;
+}
+
+template <typename T>
+double Bilinear_Interpolation(cv::Mat meshGrid, cv::Point2d P)
 {
+    //> y2 Q12--------Q22
+    //      |          |
+    //      |    P     |
+    //      |          |
+    //  y1 Q11--------Q21
+    //      x1         x2
     cv::Point2d Q12(floor(P.x), floor(P.y));
     cv::Point2d Q22(ceil(P.x), floor(P.y));
     cv::Point2d Q11(floor(P.x), ceil(P.y));
@@ -42,13 +81,8 @@ double Bilinear_Interpolation(const cv::Mat &meshGrid, cv::Point2d P)
         return std::numeric_limits<double>::quiet_NaN();
     }
 
-    double fQ11 = meshGrid.at<float>(Q11.y, Q11.x);
-    double fQ21 = meshGrid.at<float>(Q21.y, Q21.x);
-    double fQ12 = meshGrid.at<float>(Q12.y, Q12.x);
-    double fQ22 = meshGrid.at<float>(Q22.y, Q22.x);
-
-    double f_x_y1 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * fQ11 + ((P.x - Q11.x) / (Q21.x - Q11.x)) * fQ21;
-    double f_x_y2 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * fQ12 + ((P.x - Q11.x) / (Q21.x - Q11.x)) * fQ22;
+    double f_x_y1 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * meshGrid.at<T>(Q11.y, Q11.x) + ((P.x - Q11.x) / (Q21.x - Q11.x)) * meshGrid.at<T>(Q21.y, Q21.x);
+    double f_x_y2 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * meshGrid.at<T>(Q12.y, Q12.x) + ((P.x - Q11.x) / (Q21.x - Q11.x)) * meshGrid.at<T>(Q22.y, Q22.x);
     return ((Q12.y - P.y) / (Q12.y - Q11.y)) * f_x_y1 + ((P.y - Q11.y) / (Q12.y - Q11.y)) * f_x_y2;
 }
 
@@ -86,13 +120,30 @@ void get_patch_on_one_edge_side( cv::Point2d shifted_point, double theta, \
             patch_coord_y.at<double>(i + half_patch_size, j + half_patch_size) = rotated_point.y;
 
             //> get the image intensity of the rotated coordinate
-            double interp_val = Bilinear_Interpolation(img, rotated_point);
+            double interp_val = Bilinear_Interpolation<double>(img, rotated_point);
             patch_val.at<double>(i + half_patch_size, j + half_patch_size) = interp_val;
         }
     }
 }
 
-void f_TEST_NCC() 
+double ComputeNCC(const cv::Mat patch_one, const cv::Mat patch_two)
+{
+    double mean_one = (cv::mean(patch_one))[0];
+    double mean_two = (cv::mean(patch_two))[0];
+    double sum_of_squared_one = (cv::sum((patch_one - mean_one).mul(patch_one - mean_one))).val[0];
+    double sum_of_squared_two = (cv::sum((patch_two - mean_two).mul(patch_two - mean_two))).val[0];
+
+    cv::Mat norm_one = (patch_one - mean_one) / sqrt(sum_of_squared_one);
+    cv::Mat norm_two = (patch_two - mean_two) / sqrt(sum_of_squared_two);
+    return norm_one.dot(norm_two);
+}
+
+double get_normalized_SSD(const cv::Mat patch_one, const cv::Mat patch_two) 
+{
+    
+}
+
+void f_TEST_ROTATED_PATCH() 
 {
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
@@ -102,7 +153,8 @@ void f_TEST_NCC()
     std::string object_name = "00000006";
     cv::Mat gray_img;
 
-    file_reader data_loader(source_dataset_folder, dataset_name, object_name, 50);
+    file_reader data_loader(source_dataset_folder, dataset_name, object_name, 50);    
+
     Eigen::MatrixXd edges = data_loader.read_Edgels_Of_a_File(0, 1);              //> Edge_0_t1.txt
     bool b_get_img = data_loader.read_an_image(0, gray_img);
     if (!b_get_img) exit(1);
@@ -133,23 +185,119 @@ void f_TEST_NCC()
     get_patch_on_one_edge_side( shifted_points.first,  target_edge(2), patch_coord_x_plus,  patch_coord_y_plus,  patch_plus,  gray_img );
     get_patch_on_one_edge_side( shifted_points.second, target_edge(2), patch_coord_x_minus, patch_coord_y_minus, patch_minus, gray_img );
 
-    std::cout << "Shifted point (+) location: (" << shifted_points.first.x << ", " << shifted_points.first.y << ")" << std::endl;
-    std::cout << "Patch (+) coordinates: " << std::endl;
-    std::cout << patch_coord_x_plus << std::endl;
-    std::cout << patch_coord_y_plus << std::endl;
+    // std::cout << "Shifted point (+) location: (" << shifted_points.first.x << ", " << shifted_points.first.y << ")" << std::endl;
+    // std::cout << "Patch (+) coordinates: " << std::endl;
+    // std::cout << patch_coord_x_plus << std::endl;
+    // std::cout << patch_coord_y_plus << std::endl;
 
-    std::cout << "Shifted point (-) location: (" << shifted_points.second.x << ", " << shifted_points.second.y << ")" << std::endl;
-    std::cout << "Patch (-) coordinates: " << std::endl;
-    std::cout << patch_coord_x_minus << std::endl;
-    std::cout << patch_coord_y_minus << std::endl;
+    // std::cout << "Shifted point (-) location: (" << shifted_points.second.x << ", " << shifted_points.second.y << ")" << std::endl;
+    // std::cout << "Patch (-) coordinates: " << std::endl;
+    // std::cout << patch_coord_x_minus << std::endl;
+    // std::cout << patch_coord_y_minus << std::endl;
+}
 
-    if (patch_plus.type() != CV_32F) {
-        patch_plus.convertTo(patch_plus, CV_32F);
-    }
-    if (patch_minus.type() != CV_32F) {
-        patch_minus.convertTo(patch_minus, CV_32F);
-    }
+void f_TEST_NCC() 
+{
+    std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
+    util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+
+    std::string source_dataset_folder = "/gpfs/data/bkimia/Datasets/";
+    std::string dataset_name = "ABC-NEF/";
+    std::string object_name = "00000006";
+    cv::Mat gray_img_H1, gray_img_H2;
+    const int H1_index = 25;
+    const int H2_index = 49;
+
+    file_reader data_loader(source_dataset_folder, dataset_name, object_name, 50);
+
+    //> get the GT edge pairs for testing the NCC scores
+    std::vector<std::vector<int>> GT_EdgePairs;
+    std::vector<std::pair<int, int>> gt_edge_pairs;
+    data_loader.readGT_EdgePairs( GT_EdgePairs );
+    test_getGTEdgePairsBetweenImages( H1_index, H2_index, gt_edge_pairs, GT_EdgePairs );
+    
+    //> Read the two images 
+    if (!data_loader.read_an_image( H1_index, gray_img_H1 )) exit(1);
+    if (!data_loader.read_an_image( H2_index, gray_img_H2 )) exit(1);
+
+    if (gray_img_H1.type() != CV_64F) gray_img_H1.convertTo(gray_img_H1, CV_64F);
+    if (gray_img_H2.type() != CV_64F) gray_img_H2.convertTo(gray_img_H2, CV_64F);
+
+    //> Read the third-order edges from the two images
+    Eigen::MatrixXd edges_H1 = data_loader.read_Edgels_Of_a_File(H1_index, 1);
+    Eigen::MatrixXd edges_H2 = data_loader.read_Edgels_Of_a_File(H2_index, 1);
+
+    //> Randomly select a GT edge pair
+    int rand_GT_edge_pair_idx = Uniform_Random_Number_Generator< int >(0, gt_edge_pairs.size()-1);
+    std::pair<int, int> edge_pair_index = gt_edge_pairs[ rand_GT_edge_pair_idx ];
+    std::cout << "Selected edge pair index = (" << edge_pair_index.first << ", " << edge_pair_index.second << ")" << std::endl;
+    Eigen::Vector3d target_edge_H1(edges_H1(edge_pair_index.first, 0), edges_H1(edge_pair_index.first, 1), edges_H1(edge_pair_index.first, 2));
+    Eigen::Vector3d target_edge_H2(edges_H2(edge_pair_index.second, 0), edges_H2(edge_pair_index.second, 1), edges_H2(edge_pair_index.second, 2));
+
+    std::cout << "Picked H1 edge: (" << target_edge_H1(0) << ", " << target_edge_H1(1) << ", " << target_edge_H1(2) << ")" << std::endl;
+    std::cout << "Orientation in degree: " << util->rad_to_deg(target_edge_H1(2)) << std::endl;
+    std::cout << "Picked H2 edge: (" << target_edge_H2(0) << ", " << target_edge_H2(1) << ", " << target_edge_H2(2) << ")" << std::endl;
+    std::cout << "Orientation in degree: " << util->rad_to_deg(target_edge_H2(2)) << std::endl;
+
+    std::pair<cv::Point2d, cv::Point2d> shifted_points_H1 = get_Orthogonal_Shifted_Points( target_edge_H1 );
+    std::pair<cv::Point2d, cv::Point2d> shifted_points_H2 = get_Orthogonal_Shifted_Points( target_edge_H2 );
+
+    std::cout << "Orthogoanl shifted point for H1 edge: (" << shifted_points_H1.first.x << ", " << shifted_points_H1.second.y << ")" << std::endl;
+    std::cout << "Orthogoanl shifted point for H2 edge: (" << shifted_points_H2.first.x << ", " << shifted_points_H2.second.y << ")" << std::endl;
+
+    cv::Mat patch_coord_x_plus  = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_coord_y_plus  = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_coord_x_minus = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_coord_y_minus = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_plus_H1       = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_minus_H1      = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_plus_H2       = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+    cv::Mat patch_minus_H2      = cv::Mat_<double>(PATCH_SIZE, PATCH_SIZE);
+
+    //> get the two patches on the two sides of the edge in H1
+    get_patch_on_one_edge_side( shifted_points_H1.first,  target_edge_H1(2), patch_coord_x_plus,  patch_coord_y_plus,  patch_plus_H1,  gray_img_H1 );
+    get_patch_on_one_edge_side( shifted_points_H1.second, target_edge_H1(2), patch_coord_x_minus, patch_coord_y_minus, patch_minus_H1, gray_img_H1 );
+
+    //> get the two patches on the two sides of the edge in H2
+    get_patch_on_one_edge_side( shifted_points_H2.first,  target_edge_H2(2), patch_coord_x_plus,  patch_coord_y_plus,  patch_plus_H2,  gray_img_H2 );
+    get_patch_on_one_edge_side( shifted_points_H2.second, target_edge_H2(2), patch_coord_x_minus, patch_coord_y_minus, patch_minus_H2, gray_img_H2 );
+
+    if (patch_plus_H1.type() != CV_32F)     patch_plus_H1.convertTo(patch_plus_H1, CV_32F);
+    if (patch_minus_H1.type() != CV_32F)    patch_minus_H1.convertTo(patch_minus_H1, CV_32F);
+    if (patch_plus_H2.type() != CV_32F)     patch_plus_H2.convertTo(patch_plus_H2, CV_32F);
+    if (patch_minus_H2.type() != CV_32F)    patch_minus_H2.convertTo(patch_minus_H2, CV_32F);
+
+    std::cout << "patch_plus_H1 = \n" << patch_plus_H1 << std::endl;
+    std::cout << "patch_minus_H1 = \n" << patch_minus_H1 << std::endl;
+    std::cout << "patch_plus_H2 = \n" << patch_plus_H2 << std::endl;
+    std::cout << "patch_minus_H2 = \n" << patch_minus_H2 << std::endl;
 
     //> compare the patches to get NCC scores
+    double ncc_pp = ComputeNCC(patch_plus_H1, patch_plus_H2);   //> (A+, B+)
+    double ncc_nn = ComputeNCC(patch_minus_H1, patch_minus_H2); //> (A-, B-)
+    double ncc_pn = ComputeNCC(patch_plus_H1, patch_minus_H2);  //> (A+, B-)
+    double ncc_np = ComputeNCC(patch_minus_H1, patch_plus_H2);  //> (A-, B+)
+
+
+    // Create a result matrix to store the NCC value
+    // cv::Mat result_pp, result_nn, result_pn, result_np;
+
+    // Perform template matching with NCC (TM_CCOEFF_NORMED)
+    // cv::matchTemplate(patch_plus_H1, patch_plus_H2, result_pp, cv::TM_CCOEFF_NORMED);
+    // cv::matchTemplate(patch_minus_H1, patch_minus_H2, result_nn, cv::TM_CCOEFF_NORMED);
+    // cv::matchTemplate(patch_plus_H1, patch_minus_H2, result_pn, cv::TM_CCOEFF_NORMED);
+    // cv::matchTemplate(patch_minus_H1, patch_plus_H2, result_np, cv::TM_CCOEFF_NORMED);
+
+    // The result matrix will contain a single value if the input matrices are the same size
+    // Extract the NCC value
+    // double ncc_pp = result_pp.at<float>(0, 0); 
+    // double ncc_nn = result_nn.at<float>(0, 0); 
+    // double ncc_pn = result_pn.at<float>(0, 0); 
+    // double ncc_np = result_np.at<float>(0, 0); 
+
+    std::cout << "NCC scores: (" << ncc_pp << ", " << ncc_nn << ", " << ncc_pn << ", " << ncc_np << ")" << std::endl;
+    double final_NCC_score = std::max({ncc_pp, ncc_nn, ncc_pn, ncc_np});
+
+    std::cout << "NCC score = " << final_NCC_score << std::endl;
 }
 
