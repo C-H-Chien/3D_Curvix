@@ -27,6 +27,14 @@ void f_TEST_EDGE_ORIENTATION_AVG() {
     edge_set.row(5) << 611.4730, 4.9990, -1.5429;
 
     //> TODO
+    Eigen::Vector2d avg_unit_vec(0.0, 0.0);
+    for (int i = 0; i < 6; i++) {
+        Eigen::Vector2d mapped_unit_vec(cos(2*edge_set(i,2)), sin(2*edge_set(i,2)));
+        avg_unit_vec += mapped_unit_vec;
+    }
+    avg_unit_vec /= 6.0;
+
+
 }
 
 bool test_getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, \
@@ -138,9 +146,29 @@ double ComputeNCC(const cv::Mat patch_one, const cv::Mat patch_two)
     return norm_one.dot(norm_two);
 }
 
+double apply_Sigmoid_regularization(double x, const double a, const double b)
+{
+    return 1.0 / (1.0 + exp(-a*(x - b)));
+}
+
 double get_normalized_SSD(const cv::Mat patch_one, const cv::Mat patch_two) 
 {
-    
+    //> numerator
+    cv::Mat patch_element_mul = patch_one.mul(patch_two);
+    double sum_of_squared_element_mul = (cv::sum((patch_element_mul).mul(patch_element_mul))).val[0];
+
+    //> denominator
+    double normalize_term = sqrt(cv::sum(patch_one.mul(patch_one)).val[0]) * sqrt(cv::sum(patch_two.mul(patch_two)).val[0]);
+
+    return sum_of_squared_element_mul / normalize_term;
+    // return apply_Sigmoid_regularization(sum_of_squared_element_mul / normalize_term, 1.0, 10000.0);
+}
+
+double get_similarity_CH(const cv::Mat patch_one, const cv::Mat patch_two) 
+{
+    double numerator_term = cv::sum((patch_one - patch_two).mul(patch_one - patch_two)).val[0];
+    double normalize_term = cv::sum(patch_one.mul(patch_one)).val[0] + cv::sum(patch_two.mul(patch_two)).val[0];
+    return 1 - numerator_term / normalize_term;
 }
 
 void f_TEST_ROTATED_PATCH() 
@@ -272,32 +300,35 @@ void f_TEST_NCC()
     std::cout << "patch_plus_H2 = \n" << patch_plus_H2 << std::endl;
     std::cout << "patch_minus_H2 = \n" << patch_minus_H2 << std::endl;
 
-    //> compare the patches to get NCC scores
+    //> compare the patches to get the scores of:
+    //> (i) NCC scores
     double ncc_pp = ComputeNCC(patch_plus_H1, patch_plus_H2);   //> (A+, B+)
     double ncc_nn = ComputeNCC(patch_minus_H1, patch_minus_H2); //> (A-, B-)
     double ncc_pn = ComputeNCC(patch_plus_H1, patch_minus_H2);  //> (A+, B-)
-    double ncc_np = ComputeNCC(patch_minus_H1, patch_plus_H2);  //> (A-, B+)
-
-
-    // Create a result matrix to store the NCC value
-    // cv::Mat result_pp, result_nn, result_pn, result_np;
-
-    // Perform template matching with NCC (TM_CCOEFF_NORMED)
-    // cv::matchTemplate(patch_plus_H1, patch_plus_H2, result_pp, cv::TM_CCOEFF_NORMED);
-    // cv::matchTemplate(patch_minus_H1, patch_minus_H2, result_nn, cv::TM_CCOEFF_NORMED);
-    // cv::matchTemplate(patch_plus_H1, patch_minus_H2, result_pn, cv::TM_CCOEFF_NORMED);
-    // cv::matchTemplate(patch_minus_H1, patch_plus_H2, result_np, cv::TM_CCOEFF_NORMED);
-
-    // The result matrix will contain a single value if the input matrices are the same size
-    // Extract the NCC value
-    // double ncc_pp = result_pp.at<float>(0, 0); 
-    // double ncc_nn = result_nn.at<float>(0, 0); 
-    // double ncc_pn = result_pn.at<float>(0, 0); 
-    // double ncc_np = result_np.at<float>(0, 0); 
-
-    std::cout << "NCC scores: (" << ncc_pp << ", " << ncc_nn << ", " << ncc_pn << ", " << ncc_np << ")" << std::endl;
+    double ncc_np = ComputeNCC(patch_minus_H1, patch_plus_H2);  //> (A-, B+) 
+    std::cout << "- NCC scores of (pp, nn, pn, np) = (" << ncc_pp << ", " << ncc_nn << ", " << ncc_pn << ", " << ncc_np << ")" << std::endl;
     double final_NCC_score = std::max({ncc_pp, ncc_nn, ncc_pn, ncc_np});
+    std::cout << "  Final NCC score = " << final_NCC_score << std::endl;
 
-    std::cout << "NCC score = " << final_NCC_score << std::endl;
+    //> (ii) NSSD scores
+    double nssd_pp = get_normalized_SSD(patch_plus_H1, patch_plus_H2);   //> (A+, B+)
+    double nssd_nn = get_normalized_SSD(patch_minus_H1, patch_minus_H2); //> (A-, B-)
+    double nssd_pn = get_normalized_SSD(patch_plus_H1, patch_minus_H2);  //> (A+, B-)
+    double nssd_np = get_normalized_SSD(patch_minus_H1, patch_plus_H2);  //> (A-, B+) 
+    std::cout << "- NSSD scores of (pp, nn, pn, np) = (" << nssd_pp << ", " << nssd_nn << ", " << nssd_pn << ", " << nssd_np << ")" << std::endl;
+    double final_NSSD_score = std::max({nssd_pp, nssd_nn, nssd_pn, nssd_np});
+    std::cout << "  Final NSSD score = " << final_NSSD_score << std::endl;
+
+    //> (iii) CH's similarity scores
+    double sim_pp = get_similarity_CH(patch_plus_H1, patch_plus_H2);   //> (A+, B+)
+    double sim_nn = get_similarity_CH(patch_minus_H1, patch_minus_H2); //> (A-, B-)
+    double sim_pn = get_similarity_CH(patch_plus_H1, patch_minus_H2);  //> (A+, B-)
+    double sim_np = get_similarity_CH(patch_minus_H1, patch_plus_H2);  //> (A-, B+)
+    std::cout << "- CH's Similarity scores of (pp, nn, pn, np) = (" << sim_pp << ", " << sim_nn << ", " << sim_pn << ", " << sim_np << ")" << std::endl;
+    double final_SIM_score = std::max({sim_pp, sim_nn, sim_pn, sim_np});
+    std::cout << "  Final CH's Similarity score = " << final_SIM_score << std::endl;
+    
+
+
 }
 

@@ -516,27 +516,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 rep_count.row(unique_idx) << count(indices_stack.begin(), indices_stack.end(), indices_stack_unique[unique_idx]);
             }
 
-            // //> ======== DEBUG ============
-            // Eigen::MatrixXd H1_Isolated_Edge_Row = Edges_HYPO1.row(H1_edge_idx);
-            // Eigen::Vector2d H1_Isolated_Edge(H1_Isolated_Edge_Row(0), H1_Isolated_Edge_Row(1));
-            // Eigen::Vector2d target_H1_edge(249.211, 428.018);
-            // if ( H1_Isolated_Edge.isApprox(target_H1_edge, 1e-4) ) {
-            //     std::cout << "supported_indices_stack:" << std::endl;
-            //     for (int i = 0; i < supported_indices_stack.rows(); i++) {
-            //         std::cout << supported_indices_stack(i,0) << std::endl;
-            //     }
-
-            //     std::cout << "Edges_HYPO2_final from supported_indices_stack:" << std::endl;
-            //     for (int i = 0; i < supported_indices_stack.rows(); i++) {
-            //         std::cout << "(" << Edges_HYPO2_final(i,0) << ", " << Edges_HYPO2_final(i,1) << ", " << Edges_HYPO2_final(i,2) << ")" << std::endl;
-            //     }
-            //     std::cout << "rep_count:" << std::endl;
-            //     for (int i = 0; i < rep_count.size(); i++) {
-            //         std::cout << rep_count(i) << std::endl;
-            //     }
-            // }
-            // //> ======== DEBUG ============
-
             //> Find all edge pairs that have more than 4 supporting validation views
             std::vector<int> valid_pairs;
             for (int i = 0; i < rep_count.size(); i++) {
@@ -1465,7 +1444,7 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
 
     //> Print out the precision and recall rates for each stage
     LOG_INFOR_MESG("Precision-Recall Rate at each step:");
-    std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << " / " << avg_PR_before_clustering.second*100 << "%, ";
+    std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << "% / " << avg_PR_before_clustering.second*100 << "%, ";
     std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
     std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
     std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
