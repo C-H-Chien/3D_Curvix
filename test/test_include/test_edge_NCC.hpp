@@ -15,28 +15,6 @@
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
 
-void f_TEST_EDGE_ORIENTATION_AVG() {
-
-    Eigen::MatrixXd edge_set;
-    edge_set.conservativeResize(6, 3);
-    edge_set.row(0) << 611.3950, 7.4897, 1.5623;
-    edge_set.row(1) << 611.4090, 7.9915, 1.5564;
-    edge_set.row(2) << 611.4210, 8.4932, 1.5637;
-    edge_set.row(3) << 611.5030, 4.5006, -1.5276;
-    edge_set.row(4) << 611.4360, 5.4918, -1.4957;
-    edge_set.row(5) << 611.4730, 4.9990, -1.5429;
-
-    //> TODO
-    Eigen::Vector2d avg_unit_vec(0.0, 0.0);
-    for (int i = 0; i < 6; i++) {
-        Eigen::Vector2d mapped_unit_vec(cos(2*edge_set(i,2)), sin(2*edge_set(i,2)));
-        avg_unit_vec += mapped_unit_vec;
-    }
-    avg_unit_vec /= 6.0;
-
-
-}
-
 bool test_getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, \
                                       std::vector<std::pair<int, int>>& gt_edge_pairs, \
                                       std::vector<std::vector<int>> GT_EdgePairs ) 

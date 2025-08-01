@@ -14,6 +14,7 @@
 #include "test_include/test_edge_NCC.hpp"
 #include "test_include/test_edge_SIFT_desc.hpp"
 #include "test_include/test_GT_edge_pair.hpp"
+#include "test_include/test_edge_clustering.hpp"
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
@@ -22,9 +23,9 @@
 //> Select the test
 #define TEST_EPIPOLAR_CORRECTION    (false)
 #define TEST_EDGE_NCC               (false)
+#define TEST_EDGE_CLUSTERING        (true)
 #define TEST_SIFT_DESC_ON_EDGES     (false)
-#define TEST_GT_EDGE_PAIR           (true)
-#define TEST_EDGE_ORIENTATION_AVG   (false)
+#define TEST_GT_EDGE_PAIR           (false)
 #define TEST_READ_CURVELETS         (false)
 #define TEST_EDGE_ALIGNMENT         (false)
 #define TEST_CONNECTIVITY_GRAPH     (false)  //> TEST_EDGE_ALIGNMENT has to be true to activate this test
@@ -90,8 +91,9 @@ int main(int argc, char **argv) {
     LOG_INFOR_MESG("Epipolar correction test is finished!");
 #endif
 
-#if TEST_EDGE_ORIENTATION_AVG
-    f_TEST_EDGE_ORIENTATION_AVG();
+#if TEST_EDGE_CLUSTERING
+    test_edge_clustering_main( util );
+    LOG_INFOR_MESG("Edge clustering test is finished!");
 #endif
 
 #if TEST_EDGE_NCC

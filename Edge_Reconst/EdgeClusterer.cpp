@@ -16,6 +16,23 @@ EdgeClusterer::EdgeClusterer( int N, Eigen::MatrixXd Edges_HYPO2_final, int H1_e
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 }
 
+EdgeClusterer::EdgeClusterer( int N, std::vector<Eigen::Vector3d> Edges_HYPO2_final, int H1_edge_idx ) 
+    : Num_Of_Epipolar_Corrected_H2_Edges(N), H1_edge_idx(H1_edge_idx)
+{
+    //> Initialize each H2 edge as a single cluster. The cluster label of edge i is i-1, i.e., cluster_labels[i] = i-1
+    // std::vector<int> cluster_labels(Num_Of_Epipolar_Corrected_H2_Edges);
+    cluster_labels.resize(Num_Of_Epipolar_Corrected_H2_Edges);
+    std::iota(cluster_labels.begin(), cluster_labels.end(), 0); // Each point starts in its own cluster
+
+    Epip_Correct_H2_Edges.conservativeResize(Edges_HYPO2_final.size(), 3);
+    for (int i = 0; i < Edges_HYPO2_final.size(); i++) {
+        Epip_Correct_H2_Edges.row(i) = Edges_HYPO2_final[i];
+    }
+
+    //> util class object
+    util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
+}
+
 //> If orientation (radians) is less than -90 + threshold/2, add 180 degrees
 double EdgeClusterer::normalizeOrientation(double orientation) {
 
@@ -105,7 +122,7 @@ std::tuple<double, double, double> EdgeClusterer::computeGaussianAverage( int la
     return std::make_tuple(gaussian_weighted_x, gaussian_weighted_y, gaussian_weighted_orientation);
 }
 
-Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw, Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd edgels_HYPO2_corrected ) 
+Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw, Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd edgels_HYPO2_corrected, bool use_edge_sketch_H2_index_format ) 
 {
     //> Track average orientations for each cluster in degrees
     for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
@@ -257,10 +274,12 @@ Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw,
             Epip_Correct_H2_Edges.row(idx) = gaussian_weighted_avg;
             
             // Preserve the original index for reference
-            if (edgels_HYPO2_corrected.cols() > 8) {
-                HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);
-            } else {
-                HYPO2_idx(idx, 0) = -2;
+            if (use_edge_sketch_H2_index_format) {
+                if (edgels_HYPO2_corrected.cols() > 8) {
+                    HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);
+                } else {
+                    HYPO2_idx(idx, 0) = -2;
+                }
             }
         }
     }
