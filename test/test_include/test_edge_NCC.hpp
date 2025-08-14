@@ -202,7 +202,7 @@ void f_TEST_ROTATED_PATCH()
     // std::cout << patch_coord_y_minus << std::endl;
 }
 
-void f_TEST_NCC() 
+void f_TEST_NCC_veridical_edge_pair() 
 {
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());

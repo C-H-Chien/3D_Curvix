@@ -22,8 +22,8 @@
 
 //> Select the test
 #define TEST_EPIPOLAR_CORRECTION    (false)
-#define TEST_EDGE_NCC               (false)
-#define TEST_EDGE_CLUSTERING        (true)
+#define TEST_EDGE_NCC               (true)
+#define TEST_EDGE_CLUSTERING        (false)
 #define TEST_SIFT_DESC_ON_EDGES     (false)
 #define TEST_GT_EDGE_PAIR           (false)
 #define TEST_READ_CURVELETS         (false)
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
 #endif
 
 #if TEST_EDGE_NCC
-    f_TEST_NCC();
+    f_TEST_NCC_veridical_edge_pair();
 #endif
 
 #if TEST_SIFT_DESC_ON_EDGES

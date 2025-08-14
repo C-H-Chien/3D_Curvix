@@ -111,6 +111,9 @@ void test_edge_clustering_main( MultiviewGeometryUtil::multiview_geometry_util u
         //> (i) H2 edge index
         Eigen::MatrixXd HYPO2_idx_raw = PairHypo.getHYPO2_idx_Ore(OreListdegree, epip_angle_range_from_H1_edge);
         if (HYPO2_idx_raw.rows() == 0) continue;
+        for (int i = 0; i < HYPO2_idx_raw.rows(); i++)
+            std::cout << HYPO2_idx_raw(i,0) << std::endl;
+        
         //> (ii) H2 edge location and orientation
         Eigen::MatrixXd edgels_HYPO2 = PairHypo.getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, epip_angle_range_from_H1_edge);
 
@@ -138,9 +141,10 @@ void test_edge_clustering_main( MultiviewGeometryUtil::multiview_geometry_util u
         // }
         // if (!b_has_orient_perturbed) continue;
 
+        //> MARK: CLUSTERING
         //> Do clustering on epipolar corrected H2 edges
-        EdgeClusterer edge_cluster_engine(Num_Of_Epipolar_Corrected_H2_Edges, corrected_edges_HYPO2, H1_edge_idx);
-        Eigen::MatrixXd HYPO2_idx = edge_cluster_engine.performClustering( HYPO2_idx_raw, Edges_HYPO2, edgels_HYPO2_corrected, false );
+        EdgeClusterer edge_cluster_engine(Num_Of_Epipolar_Corrected_H2_Edges, corrected_edges_HYPO2);
+        Eigen::MatrixXd HYPO2_idx = edge_cluster_engine.performClustering( HYPO2_idx_raw, Edges_HYPO2, edgels_HYPO2_corrected, false, false );
 
         Eigen::MatrixXd clustered_edges_HYPO2 = edge_cluster_engine.Epip_Correct_H2_Edges;
         int Num_Of_Clusters_per_H1_Edge = edge_cluster_engine.Num_Of_Clusters;
