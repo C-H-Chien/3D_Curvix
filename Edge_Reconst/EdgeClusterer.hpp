@@ -28,11 +28,11 @@ public:
 
     //> Constructor
     EdgeClusterer( int, Eigen::MatrixXd, int );
-    EdgeClusterer( int, std::vector<Eigen::Vector3d>, int );
+    EdgeClusterer( int, std::vector<Eigen::Vector3d> );
 
     //> main code for edge clustering
-    Eigen::MatrixXd performClustering( Eigen::MatrixXd HYPO2_idx_raw, Eigen::MatrixXd Edges_HYPO2, \
-                                       Eigen::MatrixXd edgels_HYPO2_corrected, bool use_edge_sketch_H2_index_format = true );
+    Eigen::MatrixXd performClustering( Eigen::MatrixXd HYPO2_idx_raw, Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd edgels_HYPO2_corrected, \
+                                       bool b_use_edge_sketch_H2_index_format = true, bool b_pair_up_with_H1_edge = true );
 
     Eigen::MatrixXd Epip_Correct_H2_Edges;
     std::vector<int> cluster_labels;

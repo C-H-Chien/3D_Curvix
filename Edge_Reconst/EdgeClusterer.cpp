@@ -16,8 +16,7 @@ EdgeClusterer::EdgeClusterer( int N, Eigen::MatrixXd Edges_HYPO2_final, int H1_e
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
 }
 
-EdgeClusterer::EdgeClusterer( int N, std::vector<Eigen::Vector3d> Edges_HYPO2_final, int H1_edge_idx ) 
-    : Num_Of_Epipolar_Corrected_H2_Edges(N), H1_edge_idx(H1_edge_idx)
+EdgeClusterer::EdgeClusterer( int N, std::vector<Eigen::Vector3d> Edges_HYPO2_final ) : Num_Of_Epipolar_Corrected_H2_Edges(N)
 {
     //> Initialize each H2 edge as a single cluster. The cluster label of edge i is i-1, i.e., cluster_labels[i] = i-1
     // std::vector<int> cluster_labels(Num_Of_Epipolar_Corrected_H2_Edges);
@@ -28,6 +27,9 @@ EdgeClusterer::EdgeClusterer( int N, std::vector<Eigen::Vector3d> Edges_HYPO2_fi
     for (int i = 0; i < Edges_HYPO2_final.size(); i++) {
         Epip_Correct_H2_Edges.row(i) = Edges_HYPO2_final[i];
     }
+
+    //> Don't care about H1_edge_idx
+    H1_edge_idx = 0;
 
     //> util class object
     util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());
@@ -122,7 +124,8 @@ std::tuple<double, double, double> EdgeClusterer::computeGaussianAverage( int la
     return std::make_tuple(gaussian_weighted_x, gaussian_weighted_y, gaussian_weighted_orientation);
 }
 
-Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw, Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd edgels_HYPO2_corrected, bool use_edge_sketch_H2_index_format ) 
+Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw, Eigen::MatrixXd Edges_HYPO2, Eigen::MatrixXd edgels_HYPO2_corrected, \
+                                                  bool b_use_edge_sketch_H2_index_format, bool b_pair_up_with_H1_edge ) 
 {
     //> Track average orientations for each cluster in degrees
     for (int i = 0; i < Num_Of_Epipolar_Corrected_H2_Edges; ++i) {
@@ -195,40 +198,42 @@ Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw,
 
     //////////// push to clusters////////////
     
-    std::unordered_map<int, std::vector<int>> thread_local_clusters;
-    // thread_local_clusters.clear(); // Clears the thread-local cluster storage for the current hypothesis 1 edge
+    if (b_pair_up_with_H1_edge) {
+        std::unordered_map<int, std::vector<int>> thread_local_clusters;
+        // thread_local_clusters.clear(); // Clears the thread-local cluster storage for the current hypothesis 1 edge
 
-    std::map<int, std::vector<int> >::iterator kv_it;
+        std::map<int, std::vector<int> >::iterator kv_it;
 
-    // label_to_cluster contains cluster labels as keys and vectors of local edge indices as values
-    // example: {0: [0,1], 1: [2,4], 2: [3]} 
-    for (kv_it = label_to_cluster.begin(); kv_it != label_to_cluster.end(); ++kv_it) {
-        std::vector<int> original_indices;
-        
-        //> CH: In each cluster the H2 edges are epipolar corrected edges,
-        //  but here we use HYPO2_idx_raw which comes from the original H2 edges.
-        //  
-        // Use HYPO2_idx_raw as a lookup table to convert local indices back to original edge indices in Edges_HYPO2 
-        for (size_t i = 0; i < kv_it->second.size(); ++i) {
-            int local_idx = kv_it->second[i];
-            if (local_idx >= 0 && local_idx < HYPO2_idx_raw.rows()) {
-                int original_idx = static_cast<int>(HYPO2_idx_raw(local_idx));
-                if (original_idx >= 0 && original_idx < Edges_HYPO2.rows()) {
-                    original_indices.push_back(original_idx);
+        // label_to_cluster contains cluster labels as keys and vectors of local edge indices as values
+        // example: {0: [0,1], 1: [2,4], 2: [3]} 
+        for (kv_it = label_to_cluster.begin(); kv_it != label_to_cluster.end(); ++kv_it) {
+            std::vector<int> original_indices;
+            
+            //> CH: In each cluster the H2 edges are epipolar corrected edges,
+            //  but here we use HYPO2_idx_raw which comes from the original H2 edges.
+            //  
+            // Use HYPO2_idx_raw as a lookup table to convert local indices back to original edge indices in Edges_HYPO2 
+            for (size_t i = 0; i < kv_it->second.size(); ++i) {
+                int local_idx = kv_it->second[i];
+                if (local_idx >= 0 && local_idx < HYPO2_idx_raw.rows()) {
+                    int original_idx = static_cast<int>(HYPO2_idx_raw(local_idx));
+                    if (original_idx >= 0 && original_idx < Edges_HYPO2.rows()) {
+                        original_indices.push_back(original_idx);
+                    }
                 }
             }
+            
+            // For each edge in the cluster, it stores all edges in that cluster
+            for (size_t i = 0; i < original_indices.size(); ++i) {
+                int original_idx = original_indices[i];
+                thread_local_clusters[original_idx] = original_indices;
+            }
         }
-        
-        // For each edge in the cluster, it stores all edges in that cluster
-        for (size_t i = 0; i < original_indices.size(); ++i) {
-            int original_idx = original_indices[i];
-            thread_local_clusters[original_idx] = original_indices;
-        }
-    }
 
-    std::unordered_map<int, std::vector<int> >::iterator kv_it_;
-    for (kv_it_ = thread_local_clusters.begin(); kv_it_ != thread_local_clusters.end(); ++kv_it_) {
-        H2_Clusters[std::make_pair(H1_edge_idx, kv_it_->first)] = kv_it_->second;
+        std::unordered_map<int, std::vector<int> >::iterator kv_it_;
+        for (kv_it_ = thread_local_clusters.begin(); kv_it_ != thread_local_clusters.end(); ++kv_it_) {
+            H2_Clusters[std::make_pair(H1_edge_idx, kv_it_->first)] = kv_it_->second;
+        }
     }
 
     //> CH TODO DOCUMENTATION
@@ -274,7 +279,7 @@ Eigen::MatrixXd EdgeClusterer::performClustering( Eigen::MatrixXd HYPO2_idx_raw,
             Epip_Correct_H2_Edges.row(idx) = gaussian_weighted_avg;
             
             // Preserve the original index for reference
-            if (use_edge_sketch_H2_index_format) {
+            if (b_use_edge_sketch_H2_index_format) {
                 if (edgels_HYPO2_corrected.cols() > 8) {
                     HYPO2_idx(idx, 0) = edgels_HYPO2_corrected(closest_idx, 8);
                 } else {
