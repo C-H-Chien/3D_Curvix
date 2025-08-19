@@ -6,7 +6,6 @@
 #include <sstream> 
 #include <vector>
 #include <string>
-#include <opencv2/opencv.hpp>
 #include <Eigen/Dense>
 #include "definitions.h"
 
@@ -28,7 +27,6 @@ public:
     void readTmatrix( std::vector<Eigen::Vector3d> &All_T );
     void readK( std::vector<Eigen::Matrix3d> &All_K );
     void readGT_EdgePairs( std::vector<std::vector<int>> &GT_EdgePairs );
-    bool read_an_image( int file_idx, cv::Mat &grayscale_img );
 
 private:
     std::string dataset_name_sequence_path;

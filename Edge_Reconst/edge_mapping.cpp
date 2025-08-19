@@ -457,48 +457,48 @@ EdgeMapping::EdgeNodeList EdgeMapping::buildEdgeNodeGraph(const std::unordered_m
 }
 ///////////////////////// build a map of 3d edges with its neighbors /////////////////////////
 
-void EdgeMapping::isolate_edges(EdgeNodeList& edge_nodes) {
+// void EdgeMapping::isolate_edges(EdgeNodeList& edge_nodes) {
 
-    std::cout << "Writing isolated edges..." << std::endl;
-    std::string location_file_path = "../../outputs/circle_edge_locations.txt";
-    std::ofstream edge_location_file_out(location_file_path);
-    if (!edge_location_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_locations.txt file!"); return; }
-    std::string orientation_file_path = "../../outputs/circle_edge_orientations.txt";
-    std::ofstream edge_orientation_file_out(orientation_file_path); 
-    if (!edge_orientation_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_orientations.txt file!"); return; }
-    std::string connection_file_path = "../../outputs/circle_edge_connections.txt";
-    std::ofstream edge_connection_file_out(connection_file_path);
-    if (!edge_connection_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_connections.txt file!"); return; }
+//     std::cout << "Writing isolated edges..." << std::endl;
+//     std::string location_file_path = "../../outputs/circle_edge_locations.txt";
+//     std::ofstream edge_location_file_out(location_file_path);
+//     if (!edge_location_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_locations.txt file!"); return; }
+//     std::string orientation_file_path = "../../outputs/circle_edge_orientations.txt";
+//     std::ofstream edge_orientation_file_out(orientation_file_path); 
+//     if (!edge_orientation_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_orientations.txt file!"); return; }
+//     std::string connection_file_path = "../../outputs/circle_edge_connections.txt";
+//     std::ofstream edge_connection_file_out(connection_file_path);
+//     if (!edge_connection_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_connections.txt file!"); return; }
 
-    //> Iterate over all edge nodes
-    for (size_t i = 0; i < edge_nodes.size(); ++i) {
-        const auto& node = edge_nodes[i];
+//     //> Iterate over all edge nodes
+//     for (size_t i = 0; i < edge_nodes.size(); ++i) {
+//         const auto& node = edge_nodes[i];
 
-        Eigen::Vector3d target_edge_location = node->location;
-        Eigen::Vector3d target_edge_orientation = node->orientation;
+//         Eigen::Vector3d target_edge_location = node->location;
+//         Eigen::Vector3d target_edge_orientation = node->orientation;
 
-        if ( target_edge_location(0) > 0.26 && target_edge_location(0) < 0.74 && \
-             target_edge_location(1) > 0.26 && target_edge_location(1) < 0.74 && \
-             target_edge_location(2) > 0.33 && target_edge_location(2) < 0.37 ) 
-        {
-            if ((node->neighbors).size() > 0) {
-                edge_location_file_out << target_edge_location.transpose();
-                edge_orientation_file_out << target_edge_orientation.transpose();
-                edge_connection_file_out << node->index << " ";
+//         if ( target_edge_location(0) > 0.26 && target_edge_location(0) < 0.74 && \
+//              target_edge_location(1) > 0.26 && target_edge_location(1) < 0.74 && \
+//              target_edge_location(2) > 0.33 && target_edge_location(2) < 0.37 ) 
+//         {
+//             if ((node->neighbors).size() > 0) {
+//                 edge_location_file_out << target_edge_location.transpose();
+//                 edge_orientation_file_out << target_edge_orientation.transpose();
+//                 edge_connection_file_out << node->index << " ";
 
-                for (const auto& neighbor_pair : node->neighbors) {
-                    const EdgeNode* neighbor = neighbor_pair.second;
-                    edge_connection_file_out << neighbor->index << " ";                
-                }
-                edge_location_file_out << "\n";
-                edge_orientation_file_out << "\n";
-                edge_connection_file_out << "\n";
-            }
-        }
-    }
-    edge_location_file_out.close();
-    edge_orientation_file_out.close();
-    edge_connection_file_out.close();
+//                 for (const auto& neighbor_pair : node->neighbors) {
+//                     const EdgeNode* neighbor = neighbor_pair.second;
+//                     edge_connection_file_out << neighbor->index << " ";                
+//                 }
+//                 edge_location_file_out << "\n";
+//                 edge_orientation_file_out << "\n";
+//                 edge_connection_file_out << "\n";
+//             }
+//         }
+//     }
+//     edge_location_file_out.close();
+//     edge_orientation_file_out.close();
+//     edge_connection_file_out.close();
 }
 
 
@@ -605,16 +605,13 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes) {
 
             // Normalize by total weight if it's not zero
             if (total_weight_force > 0) {
-                // sum_force /= total_weight_force;
                 sum_force /= static_cast<double>(node->neighbors.size());
             }
             if (total_weight_torque > 0) {
                 sum_euler_angles /= static_cast<double>(node->neighbors.size());
             }
-            // sum_force /= static_cast<double>(node->neighbors.size());
 
             //> Update edge location
-            // new_locations[i] = node->location + step_size_force * sum_force;
             new_locations[i] = node->location + step_size_force * sum_force;
 
             //> Update edge orientation
@@ -648,6 +645,7 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes) {
             edge_nodes[i]->orientation = new_orientations[i];
             const auto& node = edge_nodes[i];
 
+            //> Write the final updated edge locations and orientations to a file
             if(iter == NUM_OF_ITERATIONS-1){
                 after_out << node->location.transpose() << " " << node->orientation.transpose() << "\n";
             }
@@ -678,7 +676,7 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes) {
         }
     }
     pruned_graph_aligned.close();
-    std::cout << "Wrote all edge-neighbor pairs to pruned_graph_aligned.txt" << std::endl;
+    std::cout << "Write all edge-neighbor pairs to pruned_graph_aligned.txt" << std::endl;
 
     //after_out.close();
     std::string msg = "[ALIGNMENT COMPLETE] Aligned edges written to file after " + std::to_string(NUM_OF_ITERATIONS) + " iterations with force step size " + std::to_string(step_size_force) + " and torque step size " + std::to_string(step_size_torque);
@@ -969,7 +967,7 @@ std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMerga
     // crate 3d -> its neighbor data structure
     auto neighbor_map = buildEdgeNodeGraph(pruned_graph_by_projection);
 
-    isolate_edges(neighbor_map);
+    // isolate_edges(neighbor_map);
 
     align3DEdgesUsingEdgeNodes(neighbor_map); //call it align
     auto connectivity_graph = createConnectivityGraph(neighbor_map);

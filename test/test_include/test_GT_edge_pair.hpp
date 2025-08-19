@@ -9,14 +9,43 @@
 #include <cmath>
 #include <random>
 #include <chrono>
-#include <opencv2/opencv.hpp>
-#include <opencv2/features2d.hpp>
-#include <opencv2/core.hpp>
-#include <opencv2/xfeatures2d.hpp>
+#include <set>
 
 #include "../Edge_Reconst/file_reader.hpp"
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
+
+bool test_getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, \
+                                      std::vector<std::pair<int, int>>& gt_edge_pairs, \
+                                      std::vector<std::vector<int>> GT_EdgePairs ) 
+{    
+    gt_edge_pairs.clear();
+    
+    //> Sanity Check: make sure that GT data is loaded
+    if (GT_EdgePairs.empty()) {
+        LOG_ERROR("Error: Ground truth edge pairs data not loaded. Check Read_GT_EdgePairs_Data() first.");
+        return false;
+    }
+    
+    //> Loop through all ground truth 3D points
+    for (const auto& gt_row : GT_EdgePairs) {
+        //> Extract edge IDs for the two images
+        int edge_id_img1 = gt_row[hyp01_view_indx + 1]-1;
+        int edge_id_img2 = gt_row[hyp02_view_indx + 1]-1;
+        
+        //> if there is a valid pair between edges from the two hypothesis views
+        if (edge_id_img1 >= 0 && edge_id_img2 >= 0) {
+            gt_edge_pairs.push_back(std::make_pair(edge_id_img1, edge_id_img2));
+        }
+    }
+
+    if (gt_edge_pairs.size() == 0) 
+    {
+        LOG_INFOR_MESG("Exiting the program due to zero GT edge correspondences");
+        return false;
+    }
+    return true;
+}
 
 std::vector<std::pair<int, int>> get_Unique_GT_H1_Edge_Index_Pairs(const std::vector<std::pair<int, int>>& input_vector) {
     std::set<int> unique_first_elements;
@@ -49,7 +78,6 @@ void f_TEST_GT_EDGE_PAIR()
     std::string source_dataset_folder = "/gpfs/data/bkimia/Datasets/";
     std::string dataset_name = "ABC-NEF/";
     std::string object_name = "00000006";
-    cv::Mat gray_img_H1, gray_img_H2;
     const int H1_index = 25;
     const int H2_index = 49;
 

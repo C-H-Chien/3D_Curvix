@@ -23,11 +23,6 @@
 //> YAML file data reader
 #include <yaml-cpp/yaml.h>
 
-//> OpenCV library supporting SIFT
-#include <opencv2/opencv.hpp>
-#include <opencv2/features2d.hpp>
-#include <opencv2/xfeatures2d.hpp>
-
 //> shared class pointers
 #include "file_reader.hpp"
 #include "util.hpp"
@@ -57,31 +52,18 @@ public:
     //> (i) local PR rates in the scope of CPU threads
     std::vector< std::vector< std::pair<double, double> > > PR_before_clustering;
     std::vector< std::vector< std::pair<double, double> > > PR_after_clustering;
-    std::vector< std::vector< std::pair<double, double> > > PR_after_sift;
     std::vector< std::vector< std::pair<double, double> > > PR_after_validation;
     std::vector< std::vector< std::pair<double, double> > > PR_after_lowes;
     //> (ii) global PR rates
     std::pair<double, double> avg_PR_before_clustering;
     std::pair<double, double> avg_PR_after_clustering;
-    std::pair<double, double> avg_PR_after_sift;
     std::pair<double, double> avg_PR_after_validation;
     std::pair<double, double> avg_PR_after_lowes;
     //> (iii) Number of correct/wrong edges
     int num_of_correct_edges_before_clustering, num_of_wrong_edges_before_clustering;
     int num_of_correct_edges_after_clustering, num_of_wrong_edges_after_clustering;
-    int num_of_correct_edges_after_sift, num_of_wrong_edges_after_sift;
     int num_of_correct_edges_after_validation, num_of_wrong_edges_after_validation;
     int num_of_correct_edges_after_lowe, num_of_wrong_edges_after_lowe;
-
-    //> SIFT
-    int countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance = 1e-6);
-    Eigen::MatrixXd filterEdgesWithSIFT(const Eigen::MatrixXd& Edges_HYPO1_final,
-                                    const Eigen::MatrixXd& Edges_HYPO2_final,
-                                    const cv::Mat& image1, 
-                                    const cv::Mat& image2,
-                                    bool debug_flag = false);
-    
-    std::vector<cv::KeyPoint> convertEdgeLocationsToKeypoints(const std::vector<Eigen::Vector2d>& edge_locations);
 
     //> Constructor
     EdgeSketch_Core( YAML::Node );
@@ -183,10 +165,6 @@ public:
     std::string Delta_FileName_Str;
     std::string Post_File_Name_Str;
 
-    //> Hypothesis view images
-    cv::Mat image_hypo1;
-    cv::Mat image_hypo2;
-
     std::vector< Eigen::MatrixXd > all_supported_indices;
     Eigen::MatrixXd Gamma1s;
     Eigen::MatrixXd tangent3Ds;
@@ -230,6 +208,8 @@ private:
         return {hypo2_edge};
     }
     ///////////////////////////// cluster related /////////////////////////////
+
+    int countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance = 1e-6);
 
     Eigen::MatrixXd project3DEdgesToView(const Eigen::MatrixXd& edges3D, const Eigen::Matrix3d& R, const Eigen::Vector3d& T, const Eigen::Matrix3d& K, const Eigen::Matrix3d& R_hyp01, const Eigen::Vector3d& T_hpy01);
 

@@ -46,29 +46,6 @@ void file_reader::read_All_Edgels( std::vector<Eigen::MatrixXd> &All_Edgels, int
 #endif
 }
 
-//> Read only one image
-bool file_reader::read_an_image( int file_idx, cv::Mat &grayscale_img )
-{
-  std::string img_path = Image_File_Source_Path + std::to_string(file_idx) + "_colors.png";
-  cv::Mat original_img = cv::imread(img_path, cv::IMREAD_COLOR);
-
-  if (original_img.empty()) {
-    std::string err_msg = "Image in path " + img_path + " not found!";
-    LOG_ERROR(err_msg);
-    return false;
-  }
-
-  //> Check if converting to a gray-scale image is necessary
-  if (original_img.channels() == 1) {
-    grayscale_img = original_img;
-  }
-  if (original_img.channels() == 3) {
-    cv::cvtColor(original_img, grayscale_img, cv::COLOR_BGR2GRAY);
-  }
-  
-  return true;
-}
-
 //> Read edgels of a file specified by the file_idx
 Eigen::MatrixXd file_reader::read_Edgels_Of_a_File( int file_idx, int thresh_EDG ) 
 {  

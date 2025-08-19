@@ -185,7 +185,7 @@ public:
     EdgeNodeList buildEdgeNodeGraph(const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
                                 HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
 
-    void isolate_edges(EdgeNodeList& edge_nodes);
+    // void isolate_edges(EdgeNodeList& edge_nodes);
 
     void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes);
 

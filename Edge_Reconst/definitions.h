@@ -16,11 +16,6 @@
 //> LOWE's ratio test
 #define LOWES_RATIO_THRESHOLD           (0.6)
 
-//> SIFT
-#define ENABLE_SIFT_FILTERING           (true)
-#define SIFT_PATCH_SIZE                 (16.0f)
-#define SIFT_SIMILARITY_THRESHOLD       (1000)
-
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
@@ -57,7 +52,6 @@
 #define SHOW_DATA_LOADING_INFO     (false)
 #define SHOW_OMP_NUM_OF_THREADS    (true)
 #define ISOLATE_DATA               (false)
-#define SIFT_DEBUG                 (false)
 
 //> Constant values (no change)
 #define PI                            (3.1415926)
