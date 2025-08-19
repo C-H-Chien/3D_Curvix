@@ -179,7 +179,7 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 
 void EdgeSketch_Core::Run_3D_Edge_Sketch() {
 
-    construct_3D_edges_from_ground_truth();
+    // construct_3D_edges_from_ground_truth();
 
     itime = omp_get_wtime();
     reset_hypo2_clusters();
@@ -1377,15 +1377,15 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
 
 
     //> Print out the precision and recall rates for each stage
-    LOG_INFOR_MESG("Precision-Recall Rate at each step:");
-    std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << "% / " << avg_PR_before_clustering.second*100 << "%, ";
-    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
-    std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
-    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
-    std::cout << "     - After Validation Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_validation.first*100 << "% / " << avg_PR_after_validation.second*100 << "%, ";
-    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_validation << " / " << num_of_wrong_edges_after_validation << std::endl;
-    std::cout << "     - After Lowe's Ratio Test Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_lowes.first*100 << "% / " << avg_PR_after_lowes.second*100 << "%, ";
-    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_lowe << " / " << num_of_wrong_edges_after_lowe << std::endl;
+    // LOG_INFOR_MESG("Precision-Recall Rate at each step:");
+    // std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << "% / " << avg_PR_before_clustering.second*100 << "%, ";
+    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
+    // std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
+    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
+    // std::cout << "     - After Validation Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_validation.first*100 << "% / " << avg_PR_after_validation.second*100 << "%, ";
+    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_validation << " / " << num_of_wrong_edges_after_validation << std::endl;
+    // std::cout << "     - After Lowe's Ratio Test Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_lowes.first*100 << "% / " << avg_PR_after_lowes.second*100 << "%, ";
+    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_lowe << " / " << num_of_wrong_edges_after_lowe << std::endl;
 }
 
 int EdgeSketch_Core::countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance) {
@@ -1490,11 +1490,10 @@ void EdgeSketch_Core::construct_3D_edges_from_ground_truth() {
         HYPO2_idx_raw(0, 0) = hyp2_edge_idx;
 
         // Apply epipolar correction to HYPO2 edge
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(
-            edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
+        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
 
         if (edgels_HYPO2_corrected.rows() == 0) {
-            std::cout << "Epipolar correction failed for correspondence " << i << std::endl;
+            // std::cout << "Epipolar correction failed for correspondence " << i << std::endl;
             gt_3D_edges.row(i) = Eigen::Vector3d::Zero();
             continue;
         }

@@ -77,12 +77,8 @@ int main(int argc, char **argv) {
   //> Constructor
   EdgeSketch_Core MWV_Edge_Rec( Edge_Sketch_Settings_Map );
 
-  //MWV_Edge_Rec.test_3D_tangent();
-
-
   //> Read camera intrinsic and extrinsic matrices
   MWV_Edge_Rec.Read_Camera_Data();
-
 
   std::shared_ptr<EdgeMapping> edgeMapping = std::make_shared<EdgeMapping>();
 
