@@ -28,8 +28,12 @@ where ``XXX`` is the installed prefix path of your YAML-CPP. In addition, to ena
 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/data/bkimia/opencv_4.x/build_install/lib64/
 ```
 
-## Outputs
-Some intermidiate data when running the code will be saved to files which are stored in a ``outputs/`` folder. All files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
+## Outputs and Visualization
+All output files are given under the ``outputs/`` folder, including some intermediate data. Note that all files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
+### 3D edges 
+Edges arising from a pair of hypothesis views are given in the files `3D_edges_*.txt` for 3D locations and `3D_tangents_*.txt` for 3D orientation represented by a unit vector. Both are under the world coordinate. 
+### 3D curves
+3D curves can be found in `curves_from_connectivity_graph.txt`. <br />
 
 ## Evaluations
 
@@ -50,6 +54,8 @@ Then, let's say ``outputs/curves_points`` is the 3D edge locations obtained from
 python eval_main.py
 ```
 Refer to ``eval_main.py`` for more information on where the ground-truth curve points directory is specified.
+
+## Precision-Recall Experiments
 
 ## Test
 There is a test file under ``test/`` which is primarily used to test part of the functionalities of the 3D edge sketch and grouping. It is compiled in conjunction with the main code, and the executable file resides uner ``/buid/bin``.
