@@ -41,7 +41,6 @@
 class EdgeSketch_Core {
 
 public:
-    std::shared_ptr<EdgeMapping> edgeMapping = nullptr;
     std::vector<Eigen::MatrixXd> paired_edge_final_all;
 
     // For each edge index, store all other edge indices in the same cluster
@@ -82,10 +81,6 @@ public:
     bool getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs);
     void get_Avg_Precision_Recall_Rates();
     void construct_3D_edges_from_ground_truth();
-
-    std::unordered_map<int, int> saveBestMatchesToFile(const std::unordered_map<int, int>& hypothesis1ToBestMatch,
-                           const std::unordered_map<int, int>& hypothesis2ToBestMatch,
-                           const std::string& filename);
 
     //> Destructor
     ~EdgeSketch_Core();
@@ -196,7 +191,8 @@ private:
         hypo2_clusters.clear();
     }
 
-    //> get all edges in the same cluster as a given edge
+    //> CH TODO: Check if this actually returns all edges of the same cluster, or is returns the "same" edge instead
+    //> get all edges in the same cluster given an edge from that cluster
     std::vector<int> get_edges_in_same_cluster(int hypo1_edge, int hypo2_edge) {
         // Check if the edge exists in our mapping
         auto it = hypo2_clusters.find(std::make_pair(hypo1_edge, hypo2_edge));

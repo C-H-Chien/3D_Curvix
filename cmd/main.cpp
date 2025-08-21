@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
     //> Setup some constant data used throughout the 3D edge sketch
     MWV_Edge_Rec.Set_Hypothesis_Views_Camera();
 
+    //> CH TODO: Change from multiple edge thresholding to a single edge thresholding
     //> Multiple edge thresholding
     for (int edge_thresh = MWV_Edge_Rec.Edge_Detection_Init_Thresh; edge_thresh >= MWV_Edge_Rec.Edge_Detection_Final_Thresh; edge_thresh/=2) {
 
@@ -109,8 +110,6 @@ int main(int argc, char **argv) {
 
     }
     
-    //std::cout << "Size of edge_3D_to_supporting_edges: " << edgeMapping.edge_3D_to_supporting_edges.size() << std::endl;
-
     //> Finalize hypothesis edge pairs for a two-view triangulation
     MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(edgeMapping);
     
@@ -134,12 +133,8 @@ int main(int argc, char **argv) {
   
   std::cout << "====================================================================" << std::endl;
 
-  std::vector<std::vector<EdgeMapping::SupportingEdgeData>> all_groups = edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
-  // std::string outputFilePath = "../../outputs/grouped_mvt.txt";
-  // std::string outputFilePath_tangent = "../../outputs/grouped_mvt_tangent.txt";
-  // NViewsTrian::grouped_mvt(all_groups, outputFilePath, outputFilePath_tangent);
-  // std::cout << "[INFO] Triangulated 3D edges saved to " << outputFilePath << std::endl;
-
+  edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
+  
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;
   std::string out_time_str = "Total computation time: " + std::to_string(total_time) + " (s)";
   LOG_TIMEIMGS(out_time_str);

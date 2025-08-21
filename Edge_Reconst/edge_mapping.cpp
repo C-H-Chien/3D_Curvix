@@ -384,7 +384,6 @@ EdgeMapping::pruneEdgeGraphbyProjections(std::unordered_map<std::pair<Eigen::Vec
             // Eigen::Vector3d proj_tangent_2 = util->project_3DTangent_to_Image(All_R[vi], K, unit_Tangent3D_2, proj_edge_2_location);
 
             //> Rule out if the distance between the projected 3D edge points are over a threshold
-            //> TODO: make the threhold as a Macro
             prune_flag = ((proj_edge_1_location - proj_edge_2_location).norm() > PRUNE_BY_PROJ_PROX_THRESH) ? (true) : (false);
 
             if (prune_flag) break;
@@ -456,52 +455,6 @@ EdgeMapping::EdgeNodeList EdgeMapping::buildEdgeNodeGraph(const std::unordered_m
     return nodes;
 }
 ///////////////////////// build a map of 3d edges with its neighbors /////////////////////////
-
-// void EdgeMapping::isolate_edges(EdgeNodeList& edge_nodes) {
-
-//     std::cout << "Writing isolated edges..." << std::endl;
-//     std::string location_file_path = "../../outputs/circle_edge_locations.txt";
-//     std::ofstream edge_location_file_out(location_file_path);
-//     if (!edge_location_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_locations.txt file!"); return; }
-//     std::string orientation_file_path = "../../outputs/circle_edge_orientations.txt";
-//     std::ofstream edge_orientation_file_out(orientation_file_path); 
-//     if (!edge_orientation_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_orientations.txt file!"); return; }
-//     std::string connection_file_path = "../../outputs/circle_edge_connections.txt";
-//     std::ofstream edge_connection_file_out(connection_file_path);
-//     if (!edge_connection_file_out.is_open()) { LOG_ERROR("Could not open circle_edge_connections.txt file!"); return; }
-
-//     //> Iterate over all edge nodes
-//     for (size_t i = 0; i < edge_nodes.size(); ++i) {
-//         const auto& node = edge_nodes[i];
-
-//         Eigen::Vector3d target_edge_location = node->location;
-//         Eigen::Vector3d target_edge_orientation = node->orientation;
-
-//         if ( target_edge_location(0) > 0.26 && target_edge_location(0) < 0.74 && \
-//              target_edge_location(1) > 0.26 && target_edge_location(1) < 0.74 && \
-//              target_edge_location(2) > 0.33 && target_edge_location(2) < 0.37 ) 
-//         {
-//             if ((node->neighbors).size() > 0) {
-//                 edge_location_file_out << target_edge_location.transpose();
-//                 edge_orientation_file_out << target_edge_orientation.transpose();
-//                 edge_connection_file_out << node->index << " ";
-
-//                 for (const auto& neighbor_pair : node->neighbors) {
-//                     const EdgeNode* neighbor = neighbor_pair.second;
-//                     edge_connection_file_out << neighbor->index << " ";                
-//                 }
-//                 edge_location_file_out << "\n";
-//                 edge_orientation_file_out << "\n";
-//                 edge_connection_file_out << "\n";
-//             }
-//         }
-//     }
-//     edge_location_file_out.close();
-//     edge_orientation_file_out.close();
-//     edge_connection_file_out.close();
-}
-
-
 
 ///////////////////////// Smoothing 3d edges with its neighbors /////////////////////////
 void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes) {
@@ -620,23 +573,6 @@ void EdgeMapping::align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes) {
             sum_euler_angles = sum_euler_angles * M_PI / 180.0;
             Eigen::Matrix3d R_align = util->euler_to_rotation_matrix(sum_euler_angles(0), sum_euler_angles(1), sum_euler_angles(2));
             new_orientations[i] = R_align * node->orientation;
-
-            // //> Orientation aligning
-            // Eigen::Vector3d sum_tangent = Eigen::Vector3d::Zero();
-            // Eigen::Vector3d sum_euler_angles = Eigen::Vector3d::Zero();
-            // for (const auto& neighbor_pair : node->neighbors) {
-            //     const EdgeNode* neighbor = neighbor_pair.second;
-            //     Eigen::Vector3d euler_angles = util->getShortestAlignEulerAnglesDegrees(node->orientation, neighbor->orientation);
-            //     sum_euler_angles += euler_angles;
-            // }
-            // sum_euler_angles /= static_cast<double>(node->neighbors.size());
-            // sum_euler_angles *= step_size_torque;
-            // //> convert from degrees to radians
-            // sum_euler_angles = sum_euler_angles * M_PI / 180.0;
-            // Eigen::Matrix3d R_align = util->euler_to_rotation_matrix(sum_euler_angles(0), sum_euler_angles(1), sum_euler_angles(2));
-
-            // //> Update edge orientation
-            // new_orientations[i] = R_align * node->orientation;
         }
 
         //> Update all edge locations and orientations
@@ -700,23 +636,25 @@ struct NeighborWithOrientation {
     }
 };
 
-EdgeMapping::ConnectivityGraph EdgeMapping::createConnectivityGraph(EdgeNodeList& edge_nodes) {
-
-    ConnectivityGraph connectivity_graph;
+void EdgeMapping::createConnectivityGraph(EdgeNodeList& edge_nodes) {
 
     if (!util) {util = std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util>(new MultiviewGeometryUtil::multiview_geometry_util());}
+
+    //> Make sure that the connectivity graph is clean
+    connectivity_graph.clear();
     
     std::cout<<"Creating connectivity graph for " + std::to_string(edge_nodes.size()) + " edge nodes..."<<std::endl;
 
-    // for each node in the graph
+    //> Loop over each node in the neighborhood graph
     for (size_t i = 0; i < edge_nodes.size(); ++i) {
         EdgeNode* node = edge_nodes[i].get();
 
         ConnectivityGraphNode graph_node;
         graph_node.location = node->location;
         graph_node.orientation = node->orientation;
-        graph_node.left_neighbor = std::make_pair(-1, Eigen::Vector3d::Zero());  // Default: no left neighbor
-        graph_node.right_neighbor = std::make_pair(-1, Eigen::Vector3d::Zero()); // Default: no right neighbor
+        graph_node.left_neighbor = std::make_pair(-1, Eigen::Vector3d::Zero());  //> Default: no left neighbor
+        graph_node.right_neighbor = std::make_pair(-1, Eigen::Vector3d::Zero()); //> Default: no right neighbor
+        graph_node.curve_index = -1;                                             //> Default: does not belong to any curve
         
         if (!node->neighbors.empty()) {
             std::vector<std::pair<int, Eigen::Vector3d>> updated_neighbors;
@@ -804,13 +742,134 @@ EdgeMapping::ConnectivityGraph EdgeMapping::createConnectivityGraph(EdgeNodeList
         // Add the node to the connectivity graph
         connectivity_graph[i] = graph_node;
     }
-    
-    //writeConnectivityGraphToFile(connectivity_graph, "connectivity_graph");
-    
-    return connectivity_graph;
+
+    writeConnectivityGraphToFile(connectivity_graph, "connectivity_graph");
 }
 
+std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph( ) 
+{
+    std::vector<Curve> curves;
+    std::unordered_set<int> assigned_edges;
+    int curve_count = 0;
 
+    //> Loop until all edges are assigned to a curve
+    for (const auto& [node_index, node] : connectivity_graph) {
+        //> Skip if this edge is already assigned to a curve
+        if (assigned_edges.find(node_index) != assigned_edges.end()) {
+            continue;
+        }
+        
+        //> Create a new curve starting with this edge
+        Curve curve;
+        curve.edge_indices.push_back(node_index);
+        assigned_edges.insert(node_index);
+        
+        //> Forward direction: follow right neighbors until we can't go further
+        int current_index = node_index;
+        while (true) {
+            ConnectivityGraphNode current_node = connectivity_graph.at(current_index);
+            int right_neighbor_index = current_node.right_neighbor.first;
+            (connectivity_graph.at(current_index)).curve_index = curve_count;
+
+            //> Stop if no right neighbor exists
+            if (right_neighbor_index < 0 || connectivity_graph.find(right_neighbor_index) == connectivity_graph.end() ) {
+                break;
+            }
+
+            //> If the right neighbor is already assigned, mark that the current curve needs to be merged in the later stage
+            if (assigned_edges.find(right_neighbor_index) != assigned_edges.end()) {
+
+                //> If the trace loops back to itself
+                if (std::find(curve.edge_indices.begin(), curve.edge_indices.end(), right_neighbor_index) != curve.edge_indices.end()) {
+                    curve.b_loops_back_on_right = true;
+                }
+                else {
+                    curve.to_be_merged_right_edge_index = right_neighbor_index;
+                    curve.to_be_merged_right_curve_index = (connectivity_graph.at(right_neighbor_index)).curve_index;
+                }
+                break;
+            }
+            
+            //> Add right neighbor to curve and mark as assigned
+            curve.edge_indices.push_back(right_neighbor_index);
+            assigned_edges.insert(right_neighbor_index);
+
+            current_index = right_neighbor_index;
+        }
+        
+        //> Backward direction: follow left neighbors until we can't go further
+        current_index = node_index;
+        while (true) {
+            ConnectivityGraphNode current_node = connectivity_graph.at(current_index);
+            int left_neighbor_index = current_node.left_neighbor.first;
+            (connectivity_graph.at(current_index)).curve_index = curve_count;
+            
+            //> Stop if no left neighbor exists
+            if (left_neighbor_index < 0 || connectivity_graph.find(left_neighbor_index) == connectivity_graph.end() ) {
+                break;
+            }
+
+            //> If the left neighbor is already assigned, mark that the current curve needs to be merged in the later stage
+            if (assigned_edges.find(left_neighbor_index) != assigned_edges.end()) {
+
+                //> If the trace loops back to itself
+                if (std::find(curve.edge_indices.begin(), curve.edge_indices.end(), left_neighbor_index) != curve.edge_indices.end()) {
+                    curve.b_loops_back_on_left = true;
+                }
+                else {
+                    curve.to_be_merged_left_edge_index = left_neighbor_index;
+                    curve.to_be_merged_left_curve_index = (connectivity_graph.at(left_neighbor_index)).curve_index;
+                }
+                break;
+            }
+            
+            //> Add left neighbor to beginning of curve and mark as assigned
+            curve.edge_indices.insert(curve.edge_indices.begin(), left_neighbor_index);
+            assigned_edges.insert(left_neighbor_index);
+
+            current_index = left_neighbor_index;
+        }
+        
+        curve_count++;
+        curves.push_back(curve);
+    }
+    
+    std::cout << "Complete tracing 3D edges to form 3D curves" << std::endl;
+    return curves;
+}
+
+void EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
+                                           const std::vector<Eigen::Vector3d> all_T,
+                                           const Eigen::Matrix3d K,
+                                           const int Num_Of_Total_Imgs) 
+{ 
+    // convert 3D-> 2D relationship to 2D->3D relationship
+    auto uncorrected_map = map_Uncorrected2DEdge_To_SupportingData();
+    // {3D edge 1, 3D edge 2} -> weight (how many 2d edges they have in common)
+    
+    std::vector<EdgeCurvelet> all_curvelets = read_curvelets();
+    std::vector<Eigen::MatrixXd> all_edgels = read_edgels();
+
+    auto graph = build3DEdgeWeightedGraph(uncorrected_map, all_edgels, all_curvelets, all_R, all_T);//change datapath used in this function is not using object 0006
+    auto pruned_graph = pruneEdgeGraph_by_3DProximityAndOrientation(graph);
+    auto pruned_graph_by_projection = pruneEdgeGraphbyProjections(pruned_graph, all_R, all_T, K, Num_Of_Total_Imgs);
+
+    // crate 3d -> its neighbor data structure
+    auto neighbor_map = buildEdgeNodeGraph(pruned_graph_by_projection);
+
+    //> Edge alignment
+    align3DEdgesUsingEdgeNodes(neighbor_map);
+
+    //> Construct edge connectivity graph
+    createConnectivityGraph(neighbor_map);
+
+    //> Trace edges to form curves using edge connectivity graph
+    auto curves = buildCurvesFromConnectivityGraph();
+
+    //> Write curve data to a file
+    writeCurvesToFile(curves, "curves_from_connectivity_graph", true);
+    writeCurvesToFile(curves, Scene_Name, false);
+}
 
 void EdgeMapping::writeConnectivityGraphToFile(const ConnectivityGraph& graph, const std::string& file_name) {
     std::string file_path = "../../outputs/" + file_name + ".txt";
@@ -848,19 +907,20 @@ void EdgeMapping::writeConnectivityGraphToFile(const ConnectivityGraph& graph, c
 }
 
 void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves, 
-                                   const ConnectivityGraph& connectivity_graph, 
+                                //    const ConnectivityGraph& connectivity_graph, 
                                    const std::string& file_name, bool b_write_curve_info) {
     std::string file_path = "../../outputs/" + file_name + ".txt";
     std::ofstream outfile(file_path);
     
     if (!outfile.is_open()) {
-        std::cerr << "Could not open " << file_path << " for writing." << std::endl;
+        std::string err_msg = "Cannot open " + file_path + " for writing.";
+        LOG_ERROR(err_msg);
         return;
     }
     
     if (b_write_curve_info) {
         outfile << "# Curves from Connectivity Graph\n";
-        outfile << "# Format: CurveID NodeIndex Location(x,y,z) Orientation(x,y,z)\n";
+        outfile << "# Format: CurveID 3DEdgeIndex Location(x,y,z) Orientation(x,y,z)\n";
     }
     
     for (size_t curve_id = 0; curve_id < curves.size(); ++curve_id) {
@@ -868,9 +928,12 @@ void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves,
         
         for (const auto& node_index : curve.edge_indices) {
             const auto& node = connectivity_graph.at(node_index);
-            
+
             if (b_write_curve_info) {
-                outfile << curve_id << " " << node_index << " " << (node.location).transpose() << " " << node.orientation.transpose() << "\n";
+                outfile << curve_id << " " << node_index << " " << (node.location).transpose() << " " << node.orientation.transpose();
+                outfile << " " << curve.b_loops_back_on_left << " " << curve.b_loops_back_on_right;
+                outfile << " " << curve.to_be_merged_left_edge_index << " " << curve.to_be_merged_right_edge_index;
+                outfile << " " << curve.to_be_merged_left_curve_index << " " << curve.to_be_merged_right_curve_index << "\n";
             }
             else {
                 outfile << node.location.x() << " " << node.location.y() << " " << node.location.z() << "\n";
@@ -883,184 +946,4 @@ void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves,
     
     outfile.close();
     std::cout << "Wrote " << curves.size() << " curves to " << file_path << std::endl;
-}
-
-std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph(const ConnectivityGraph& connectivity_graph) {
-    std::vector<Curve> curves;
-    std::unordered_set<int> assigned_edges;
-
-    // Loop until all edges are assigned to a curve
-    for (const auto& [node_index, node] : connectivity_graph) {
-        // Skip if this edge is already assigned to a curve
-        if (assigned_edges.find(node_index) != assigned_edges.end()) {
-            continue;
-        }
-        
-        // Create a new curve starting with this edge
-        Curve curve;
-        curve.edge_indices.push_back(node_index);
-        assigned_edges.insert(node_index);
-        
-        // Forward step: follow right neighbors until we can't go further
-        int current_index = node_index;
-        while (true) {
-            const auto& current_node = connectivity_graph.at(current_index);
-            int right_neighbor_index = current_node.right_neighbor.first;
-
-            // Stop if no right neighbor or already assigned
-            if (right_neighbor_index < 0 || 
-                connectivity_graph.find(right_neighbor_index) == connectivity_graph.end() ||
-                assigned_edges.find(right_neighbor_index) != assigned_edges.end()) {
-                break;
-            }
-            
-            // Add right neighbor to curve and mark as assigned
-            curve.edge_indices.push_back(right_neighbor_index);
-            assigned_edges.insert(right_neighbor_index);
-
-            current_index = right_neighbor_index;
-        }
-        
-        // Backward step: follow left neighbors until we can't go further
-        current_index = node_index;
-        while (true) {
-            const auto& current_node = connectivity_graph.at(current_index);
-            int left_neighbor_index = current_node.left_neighbor.first;
-            
-            // Stop if no left neighbor or already assigned
-            if (left_neighbor_index < 0 || 
-                connectivity_graph.find(left_neighbor_index) == connectivity_graph.end() ||
-                assigned_edges.find(left_neighbor_index) != assigned_edges.end()) {
-                break;
-            }
-            
-            // Add left neighbor to beginning of curve and mark as assigned
-            curve.edge_indices.insert(curve.edge_indices.begin(), left_neighbor_index);
-            assigned_edges.insert(left_neighbor_index);
-
-            current_index = left_neighbor_index;
-        }
-        
-        //if (curve.edge_indices.size() >= 10){
-            curves.push_back(curve);
-        //}
-    }
-    
-    return curves;
-}
-
-std::vector<std::vector<EdgeMapping::SupportingEdgeData>> EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
-                                                                                                const std::vector<Eigen::Vector3d> all_T,
-                                                                                                const Eigen::Matrix3d K,
-                                                                                                const int Num_Of_Total_Imgs) { 
-    // convert 3D-> 2D relationship to 2D->3D relationship
-    auto uncorrected_map = map_Uncorrected2DEdge_To_SupportingData();
-    // {3D edge 1, 3D edge 2} -> weight (how many 2d edges they have in common)
-    
-    std::vector<EdgeCurvelet> all_curvelets = read_curvelets();
-    std::vector<Eigen::MatrixXd> all_edgels = read_edgels();
-
-    auto graph = build3DEdgeWeightedGraph(uncorrected_map, all_edgels, all_curvelets, all_R, all_T);//change datapath used in this function is not using object 0006
-    auto pruned_graph = pruneEdgeGraph_by_3DProximityAndOrientation(graph);
-    auto pruned_graph_by_projection = pruneEdgeGraphbyProjections(pruned_graph, all_R, all_T, K, Num_Of_Total_Imgs);
-
-    // crate 3d -> its neighbor data structure
-    auto neighbor_map = buildEdgeNodeGraph(pruned_graph_by_projection);
-
-    // isolate_edges(neighbor_map);
-
-    align3DEdgesUsingEdgeNodes(neighbor_map); //call it align
-    auto connectivity_graph = createConnectivityGraph(neighbor_map);
-    auto curves = buildCurvesFromConnectivityGraph(connectivity_graph);
-    writeCurvesToFile(curves, connectivity_graph, "curves_from_connectivity_graph", true);
-    writeCurvesToFile(curves, connectivity_graph, Scene_Name, false);
-
-    // /////////// TEST: manually create and iteratively smooth 2 test EdgeNodes  /////////// 
-    std::vector<std::vector<SupportingEdgeData>> merged_groups;
-
-    Eigen::Vector3d target1(0.356127, 0.0903582,  0.350045);
-    Eigen::Vector3d target2(0.354024, 0.089324,  0.34985);
-    // Eigen::Vector3d target3(0.704316, 0.884627,  0.35257);
-
-    // Set to collect neighbors of target1 and target2
-    std::set<NeighborWithOrientation> neighbors_of_target1;
-    std::set<NeighborWithOrientation> neighbors_of_target2;
-    // // std::set<NeighborWithOrientation> neighbors_of_target3;
-
-    int group_id = 0;
-    for (const auto& [pair, weight] : pruned_graph_by_projection) {
-    //for (const auto& [pair, weight] : pruned_graph) {
-        const Eigen::Vector3d& p1 = pair.first;
-        const Eigen::Vector3d& p2 = pair.second;
-
-        // Retrieve tangents
-        Eigen::Vector3d tangent1 = Eigen::Vector3d::Zero();
-        Eigen::Vector3d tangent2 = Eigen::Vector3d::Zero();
-
-        auto it1 = edge_3D_to_supporting_edges.find(p1);
-        auto it2 = edge_3D_to_supporting_edges.find(p2);
-
-        bool valid_tangents = false;
-        if (it1 != edge_3D_to_supporting_edges.end() && !it1->second.empty() &&
-            it2 != edge_3D_to_supporting_edges.end() && !it2->second.empty()) {
-            tangent1 = it1->second.front().tangents_3D_world.normalized();
-            tangent2 = it2->second.front().tangents_3D_world.normalized();
-            valid_tangents = true;
-        }
-
-        ///////////// find neighbors of the target point /////////////
-        if (valid_tangents){
-            const Eigen::Vector3d& a = pair.first;
-            const Eigen::Vector3d& b = pair.second;
-
-            // if (b.isApprox(Eigen::Vector3d(0.499562, -0.00378834, 0.541387), 1e-6)) {
-            //     std::cout << "{Eigen::Vector3d(0.499562, -0.00378834, 0.541387), Eigen::Vector3d(" << tangent2.transpose() << ")}," << std::endl;
-            // }
-
-            if (a.isApprox(target1, 1e-6)) 
-                neighbors_of_target1.insert({b, tangent2});
-            else if (b.isApprox(target1, 1e-6)) 
-                neighbors_of_target1.insert({a, tangent1});
-
-            if (a.isApprox(target2, 1e-6)) 
-                neighbors_of_target2.insert({b, tangent2});
-            else if (b.isApprox(target2, 1e-6)) 
-                neighbors_of_target2.insert({a, tangent1});
-
-            // if (a.isApprox(target3, 1e-6)) 
-            //     neighbors_of_target3.insert({b, tangent2});
-            // else if (b.isApprox(target3, 1e-6)) 
-            //     neighbors_of_target3.insert({a, tangent1});
-        }
-        ///////////// find neighbors of the target point /////////////
-
-    }
-
-
-    // std::cout<<"neighbors of target 1 & 2 are: "<<std::endl;
-    // for (auto& n1 : neighbors_of_target1) {
-    //     for (const auto& n2 : neighbors_of_target2) {
-    //        if (n1.location.isApprox(n2.location, 1e-6)) {
-    //             std::cout << n1.location.transpose() << ";\n";
-    //         }
-    //    }
-    // }
-    //     std::cout<<"neighbors of target 1 are: "<<std::endl;
-    // for (auto& n1 : neighbors_of_target1) {
-    //     //for (const auto& n2 : neighbors_of_target2) {
-    //     //    if (n1.isApprox(n2, 1e-6)) {
-    //     std::cout << n1.location.transpose() << ";\n";
-    //     //    }
-    //    // }
-    // }
-    // std::cout<<"neighbors of target 2 are: "<<std::endl;
-    // for (auto& n1 : neighbors_of_target2) {
-    //     //for (const auto& n2 : neighbors_of_target2) {
-    //     //    if (n1.isApprox(n2, 1e-6)) {
-    //     std::cout << n1.location.transpose() << ";\n";
-    //     //    }
-    //    // }
-    // }
-    
-    return merged_groups;
 }

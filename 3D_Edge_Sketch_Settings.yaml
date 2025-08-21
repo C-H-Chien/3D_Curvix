@@ -11,7 +11,7 @@ Multi_Thresh_Init_Thresh: 1           #> third-order edge threshold for 1st roun
 Multi_Thresh_Final_Thresh: 1          #> third-order edge threshold for last round of multi-thresholding
 Parallel_Epipolar_Line_Angle: 15      #> decide if the picked hypothesis view should be abandoned by the angle between two epipolar lines
 Reproj_Dist_Thresh: 2                 #> distance threshold between observed edge and reprojected edge on the validation view (probably not in use)
-Ratio_Of_Claimed_Edges_to_Stop: 0.95   #> stopping 3D Edge Sketch by what ratio of the projected edges claimed by the observed edges
+Ratio_Of_Claimed_Edges_to_Stop: 0.7   #> stopping 3D Edge Sketch by what ratio of the projected edges claimed by the observed edges
 Max_Num_Of_3D_Edge_Sketch_Passes: 100
 
 #> Dataset Settings

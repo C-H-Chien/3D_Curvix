@@ -113,17 +113,26 @@ public:
         Eigen::Vector3d orientation;      
         std::pair<int, Eigen::Vector3d> left_neighbor;  
         std::pair<int, Eigen::Vector3d> right_neighbor; 
+        int curve_index;
     };
 
-    // Define a Curve as a sequence of edge node indices
+    //> A `Curve` as a sequence of edge node indices and information for curve consolidation
     struct Curve {
         std::vector<int> edge_indices;
+        int index;
+        bool b_loops_back_on_left = false;
+        bool b_loops_back_on_right = false;
+        int to_be_merged_left_edge_index = -1;
+        int to_be_merged_right_edge_index = -1;
+        int to_be_merged_left_curve_index = -1;
+        int to_be_merged_right_curve_index = -1;
     };
 
     using PointerNeighborMap = std::unordered_map<const Eigen::Vector3d*, std::vector<std::pair<const Eigen::Vector3d*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>>;
+    
+    //> This is used to map an edge index to the corresponding connectivity graph node struct
     using ConnectivityGraph = std::unordered_map<int, ConnectivityGraphNode>;
 
-    
     // Custom hash function
     struct HashUncorrected2DEdgeKey {
         std::size_t operator()(const Uncorrected2DEdgeKey& key) const {
@@ -166,7 +175,7 @@ public:
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
 
-    std::vector<std::vector<SupportingEdgeData>> findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
+    void findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
     
     std::unordered_map<Eigen::Vector3d, std::vector<SupportingEdgeData>, HashEigenVector3d> edge_3D_to_supporting_edges;
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
@@ -185,15 +194,13 @@ public:
     EdgeNodeList buildEdgeNodeGraph(const std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int,
                                 HashEigenVector3dPair, FuzzyVector3dPairEqual>& pruned_graph);
 
-    // void isolate_edges(EdgeNodeList& edge_nodes);
-
     void align3DEdgesUsingEdgeNodes(EdgeNodeList& edge_nodes);
 
-    ConnectivityGraph createConnectivityGraph(EdgeNodeList& edge_nodes);
+    void createConnectivityGraph(EdgeNodeList& edge_nodes);
 
     void writeConnectivityGraphToFile(const ConnectivityGraph& graph, const std::string& file_name);
-    std::vector<Curve> buildCurvesFromConnectivityGraph(const ConnectivityGraph& connectivity_graph);
-    void writeCurvesToFile(const std::vector<Curve>& curves, const ConnectivityGraph& connectivity_graph, const std::string& file_name, bool b_write_curve_info);
+    std::vector<Curve> buildCurvesFromConnectivityGraph();
+    void writeCurvesToFile(const std::vector<Curve>& curves, const std::string& file_name, bool b_write_curve_info);
     
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual> pruneEdgeGraphbyProjections(
                                                                                                                                                     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, 
@@ -205,11 +212,14 @@ public:
                                                                                                                                                     );
     std::vector<EdgeCurvelet> read_curvelets();
     std::vector<Eigen::MatrixXd> read_edgels();
+
 private:
     std::shared_ptr<MultiviewGeometryUtil::multiview_geometry_util> util = nullptr;
     std::shared_ptr<file_reader> file_reader_ptr = nullptr;
 
     void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
+
+    ConnectivityGraph connectivity_graph;
 
     //> Dataset configurations
     std::string Dataset_Path;
