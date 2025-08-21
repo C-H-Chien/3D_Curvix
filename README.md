@@ -1,5 +1,6 @@
-# 3D Edge Sketch and Grouping
-This is a heavily under-developed on-going research by LEMS Lab at Brown University.
+# 3D Curvix: From Multiview 2D Edges to 3D Curve Segments (BMVC 2025)
+### Research @ Brown LEMS
+The code is moving towards the final stage of cleaning and organization.
 
 ## Dependencies:
 (1) CMake 3.14 or higher <br />
