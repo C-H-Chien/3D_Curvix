@@ -7,8 +7,7 @@
 #include <assert.h>
 #include <string>
 #include <ctime>
-//> Inluce OpenMP here
-#include <omp.h>
+#include <filesystem>
 
 //> Eigen library
 #include <Eigen/Core>
@@ -36,26 +35,35 @@ using namespace MultiviewGeometryUtil;
 // main function
 //
 // Modifications
-//    Chien  24-07-06    Yilin finalizes the implementation of 3D edge sketch for reconstructing 3D edges from only one pair 
-//                       of hypothesis view.
-//    Chien  24-10-24    Qiwu continues the implementation enabling 3D edge sketch from multiple pairs of hypothesis images
-//                       selected based on the projecting the 3D edges to 2D images.
-//    Chien  24-11-07    Finish organizing the code so that everything is clean.
+//    Chien  25-08-23     This repository is made puclic for the community in support of the BMVC 2025 paper. 
+//                        See README for more information.
 //
 //> (c) LEMS, Brown University
-//> Yilin Zheng (yilin_zheng@brown.edu)
-//> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 //> Qiwu Zhang (qiwu_zhang@brown.edu)
+//> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 // =========================================================================================================================
 
 int main(int argc, char **argv) {
 
+  //> Create the `outputs` folder if it does not exist
+  std::filesystem::path output_folder_path = OUTPUT_FOLDER_NAME;
+  if (!std::filesystem::exists(output_folder_path)) {
+    //> Attempt to create the output directory
+    if (std::filesystem::create_directories(output_folder_path)) {
+      LOG_INFOR_MESG("Folder `output` has been created successfully.");
+    } 
+    else {
+      LOG_ERROR("Failed to create the `3D_Curvix/output/` folder. Maybe need a permission?");
+      return 0;
+    }
+  }
+
 #if DELETE_ALL_FILES_UNDER_OUTPUTS
   std::string command = "rm -f " + OUTPUT_FOLDER_NAME + "/*";
   if (system(command.c_str()) == 0) {
-      std::cout << "Files under ../../outputs/ are removed successfully." << std::endl;
+    LOG_INFOR_MESG("Files under ../../outputs/ are removed successfully.");
   } else {
-      std::cerr << "Error removing files under ../../outputs/" << std::endl;
+    LOG_ERROR("Error removing files under ../../outputs/. Maybe need a permission?");
   }
 #endif
 
