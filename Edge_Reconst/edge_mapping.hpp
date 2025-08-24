@@ -218,6 +218,7 @@ private:
     std::shared_ptr<file_reader> file_reader_ptr = nullptr;
 
     void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
+    bool b_is_in_first_or_last_two(const std::vector<int>& vec, int num);
 
     ConnectivityGraph connectivity_graph;
 
