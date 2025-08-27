@@ -114,7 +114,10 @@ public:
         std::pair<int, Eigen::Vector3d> left_neighbor;  
         std::pair<int, Eigen::Vector3d> right_neighbor; 
         int curve_index;
+        bool used = false;
     };
+
+    ConnectivityGraphNode connectivity_graph_node_member;
 
     //> A `Curve` as a sequence of edge node indices and information for curve consolidation
     struct Curve {
@@ -126,6 +129,8 @@ public:
         int to_be_merged_right_edge_index = -1;
         int to_be_merged_left_curve_index = -1;
         int to_be_merged_right_curve_index = -1;
+        int consolidation_set_from_left = -1;
+        int consolidation_set_from_right = -1;
     };
 
     using PointerNeighborMap = std::unordered_map<const Eigen::Vector3d*, std::vector<std::pair<const Eigen::Vector3d*, std::pair<Eigen::Vector3d, Eigen::Vector3d>>>>;
@@ -199,7 +204,7 @@ public:
     void createConnectivityGraph(EdgeNodeList& edge_nodes);
 
     void writeConnectivityGraphToFile(const ConnectivityGraph& graph, const std::string& file_name);
-    std::vector<Curve> buildCurvesFromConnectivityGraph();
+    std::vector<Curve> buildCurvesFromConnectivityGraph( std::vector<Curve>& curves );
     void writeCurvesToFile(const std::vector<Curve>& curves, const std::string& file_name, bool b_write_curve_info);
     
     std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual> pruneEdgeGraphbyProjections(
@@ -218,9 +223,35 @@ private:
     std::shared_ptr<file_reader> file_reader_ptr = nullptr;
 
     void write_edge_graph( std::unordered_map<std::pair<Eigen::Vector3d, Eigen::Vector3d>, int, HashEigenVector3dPair, FuzzyVector3dPairEqual>& graph, std::string file_name );
-    bool b_is_in_first_or_last_two(const std::vector<int>& vec, int num);
+    void writeCurveIndiciesForMerging( const std::vector<std::vector<int>> curve_indices_for_merging, const std::string& file_name );
+
+    void reset_curve(Curve &curve) {
+        curve.edge_indices.clear();
+        curve.index = -1;
+        curve.b_loops_back_on_left = false;
+        curve.b_loops_back_on_right = false;
+        curve.to_be_merged_left_edge_index = -1;
+        curve.to_be_merged_right_edge_index = -1;
+        curve.to_be_merged_left_curve_index = -1;
+        curve.to_be_merged_right_curve_index = -1;
+        curve.consolidation_set_from_left = -1;
+        curve.consolidation_set_from_right = -1;
+    }
+
+    std::pair<int, int> make_canonical_pair(int a, int b) {
+        return (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
+    }
 
     ConnectivityGraph connectivity_graph;
+
+    //> Curve extentions and merging
+    std::vector<int> merge_multiple_curves(const std::vector<int> curve_indices, const std::vector<Curve> all_curves);
+    std::vector<int> make_curve_orientation_consistent(const std::vector<int>& curve1, const std::vector<int>& curve2);
+    std::vector<int> merge_curve_pair(const std::vector<int>& curve1, const std::vector<int>& curve2);
+
+    std::set<std::pair<int, int>> check_duplicate_curve_ids(const std::vector<std::vector<int>>& curve_id_set);
+
+    bool b_is_in_first_or_last_two(const std::vector<int>& vec, int num);
 
     //> Dataset configurations
     std::string Dataset_Path;

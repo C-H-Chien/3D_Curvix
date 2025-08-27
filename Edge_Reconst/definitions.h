@@ -8,20 +8,15 @@
 #define WRITE_3D_EDGES                  (true)
 #define WRITE_3D_EDGE_GRAPH             (true)
 
-//> NCC on Edges Settings
-#define EDGE_ORTHOGONAL_SHIFT_MAG       (5)         //> in pixels
-#define PATCH_SIZE                      (7)         //> in pixels
-#define NCC_THRESH                      (0.5)
-
-//> LOWE's ratio test
-#define LOWES_RATIO_THRESHOLD           (0.6)
+//> LOWE's ratio test for disambiguate validated edge hypotheses
+#define LOWES_RATIO_THRESHOLD           (0.5)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
 
 //> hypotheses formation settings
 #define EPIP_TANGENCY_DISPL_THRESH      (3)         //> in pixels
-#define LOCATION_PERTURBATION           (0.4)         //> in pixels
+#define LOCATION_PERTURBATION           (0.4)       //> in pixels
 #define ORIENT_PERTURBATION             (0.174533)  //> in radians. 0.174533 is 10 degrees
 #define CLUSTER_DIST_THRESH             (1)         //> τc, in pixels
 #define CLUSTER_ORIENT_THRESH           (20.0)      //> in degrees
@@ -43,7 +38,8 @@
 #define EXPO_INCREASE_FACTOR            (sqrt(2))
 
 //> Precision-Recall evaluation parameters
-#define GT_PROXIMITY_THRESH             (1) //> in pixels
+#define DO_PR_EXPERIMENTS               (true)     //> Activate to do precision-recall experiments
+#define GT_PROXIMITY_THRESH             (1)         //> distance to the GT edge correspondences (in pixels)
 
 //> Debugging purpose
 #define DEBUG                      (0)
@@ -61,6 +57,7 @@
 #define LOG_INFOR_MESG(info_msg)        printf("\033[1;32m[INFO] %s\033[0m\n", std::string(info_msg).c_str() );
 #define LOG_TIMEIMGS(time_msg)          printf("\033[1;35m[TIME] %s\033[0m\n", std::string(time_msg).c_str() );
 #define LOG_FILE_ERROR(err_msg)         printf("\033[1;31m[ERROR] File %s not found!\033[0m\n", std::string(err_msg).c_str() );
+#define LOG_CANNOT_OPEN_FILE_ERROR(err_msg) printf("\033[1;31m[ERROR] Cannot open file %s!\033[0m\n", std::string(err_msg).c_str() );
 #define LOG_ERROR(err_msg)              printf("\033[1;31m[ERROR] %s\033[0m\n", std::string(err_msg).c_str() );
 #define LOG_WARNING(warn_msg)           printf("\033[1;35m[WARNING] %s\033[0m\n", std::string(warn_msg).c_str() );
 #define LOG_DATA_LOAD_ERROR(err_msg)    printf("\033[1;31m[DATA LOAD ERROR] %s not loaded successfully!\033[0m\n", std::string(err_msg).c_str() );

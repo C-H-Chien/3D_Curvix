@@ -27,11 +27,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include "EdgeSketch_Core.hpp"
-#include "getReprojectedEdgel.hpp"
-#include "util.hpp"
-#include "definitions.h"
-#include "../Edge_Reconst/mvt.hpp"
-
 
 //> Constructor
 EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
@@ -96,11 +91,6 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
 #if SHOW_OMP_NUM_OF_THREADS
     std::cout << "Using " << Num_Of_OMP_Threads << " threads for OpenMP parallelization." << std::endl;
 #endif
-
-#if ISOLATE_DATA
-    const std::string file_name_for_valid_edges = OUTPUT_FOLDER_NAME + "/hypothesize_validate_V_data.txt";
-    V_edges_outFile.open(file_name_for_valid_edges);
-#endif
 }
 
 void EdgeSketch_Core::Read_Camera_Data() {
@@ -111,8 +101,10 @@ void EdgeSketch_Core::Read_Camera_Data() {
     //> Read absolute camera translation vectors (all under world coordinate)
     Load_Data->readTmatrix( All_T );
 
+#if DO_PR_EXPERIMENTS
     //> Load GT edge correspondence pairs (edge indices)
     Load_Data->readGT_EdgePairs( GT_EdgePairs );
+#endif
 
     //> Read camera intrinsic matrix
     if (Use_Multiple_K)
@@ -189,6 +181,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     PR_after_validation.resize(Num_Of_OMP_Threads);
     PR_after_lowes.resize(Num_Of_OMP_Threads);
     
+#if DO_PR_EXPERIMENTS
     //> ======================== precision and recall related ========================
     std::vector<std::pair<int, int>> gt_pairs;
     if ( !getGTEdgePairsBetweenImages(hyp01_view_indx, hyp02_view_indx, gt_pairs) ) exit(1);
@@ -199,6 +192,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
     std::cout << "- Total H1 edges: " << Edges_HYPO1.rows() << std::endl;
     std::cout << "- H1 edges in GT pairs participating the precision-recall evaluation: " << gt_pairs.size() << std::endl;
     //> ======================== precision and recall related ========================
+#endif
 
     #pragma omp parallel
     {
@@ -207,18 +201,21 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
        
         //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< First loop: loop over all edgels from hypothesis view 1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
         #pragma omp for schedule(static, Num_Of_OMP_Threads) reduction(+: num_of_correct_edges_before_clustering, num_of_wrong_edges_before_clustering, num_of_correct_edges_after_clustering, num_of_wrong_edges_after_clustering, num_of_correct_edges_after_validation, num_of_correct_edges_after_lowe, num_of_wrong_edges_after_lowe)
-        // for (H1_edge_idx = 0; H1_edge_idx < Edges_HYPO1.rows() ; H1_edge_idx++) {
-        for (int gt_H1_edge_idx = 0; gt_H1_edge_idx < gt_pairs.size(); gt_H1_edge_idx++) {
+#if DO_PR_EXPERIMENTS
+        for (int gt_H1_edge_idx = 0; gt_H1_edge_idx < gt_pairs.size(); gt_H1_edge_idx++)
+        {
             const int H1_edge_idx = gt_pairs[gt_H1_edge_idx].first;
-
-            //> Get the OpenMP thread ID 
-            int thread_id = omp_get_thread_num();
-
             //> Precision-Recall data
             const int gt_H2_edge_idx = gt_pairs[gt_H1_edge_idx].second;
             const Eigen::Vector2d target_H2_edge(Edges_HYPO2(gt_H2_edge_idx, 0), Edges_HYPO2(gt_H2_edge_idx, 1));
             double recall_per_edge, precision_per_edge;
             bool find_TP_flag = false;
+#else
+        for (int H1_edge_idx = 0; H1_edge_idx < Edges_HYPO1.rows() ; H1_edge_idx++)
+        {
+#endif
+            //> Get the OpenMP thread ID 
+            int thread_id = omp_get_thread_num();
 
             //> Check if the H1 edge is not close to the image boundary or if it has been visited before
             if ( Skip_this_Edge( H1_edge_idx ) ) continue;
@@ -233,6 +230,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             //> (ii) H2 edge location and orientation
             Eigen::MatrixXd edgels_HYPO2 = PairHypo->getedgels_HYPO2_Ore(Edges_HYPO2, OreListdegree, epip_angle_range_from_H1_edge);
 
+#if DO_PR_EXPERIMENTS
             //> ============ Calculate Precision-Recall: Before Clustering ============
             find_TP_flag = false;
             for (int i = 0; i < edgels_HYPO2.rows(); i++) {
@@ -248,6 +246,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             num_of_wrong_edges_before_clustering += (find_TP_flag) ? (edgels_HYPO2.rows()-1) : (edgels_HYPO2.rows());
             PR_before_clustering[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: Before Clustering ============
+#endif
 
             //> Correct the corresponding H2 edges by shifting to the epipolar line
             Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgels_HYPO2, Edges_HYPO1.row(H1_edge_idx), F21, F12, HYPO2_idx_raw);
@@ -285,6 +284,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             Num_Of_Clusters_per_H1_Edge = edge_cluster_engine.Num_Of_Clusters;
             //> =========== CLUSTERING H2 EDGES ===========
 
+#if DO_PR_EXPERIMENTS
             //> ============ Calculate Precision-Recall: After Clustering ============
             find_TP_flag = false;
             for (int i = 0; i < Edges_HYPO2_final.rows(); i++) {
@@ -300,6 +300,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             num_of_wrong_edges_after_clustering += (find_TP_flag) ? (Num_Of_Clusters_per_H1_Edge-1) : (Num_Of_Clusters_per_H1_Edge);
             PR_after_clustering[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Clustering ============
+#endif
 
             int valid_view_counter = 0;
             int stack_idx = 0;
@@ -473,6 +474,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 continue;
             }
 
+#if DO_PR_EXPERIMENTS
             //> ============ Calculate Precision-Recall: After Validation ============
             std::vector<int> finalpair_H2_indices_after_validation;
             for (int valid_idx : valid_pairs) {
@@ -501,7 +503,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             num_of_wrong_edges_after_validation += (find_TP_flag) ? (Num_Of_Validated_Clusters-1) : (Num_Of_Validated_Clusters);
             PR_after_validation[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Validation ============
-
+#endif
             //> For each H2 edge that is validated...
             std::vector<int> finalpair_H2_indices;
 
@@ -532,7 +534,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         selected_valid_indices.push_back(pair.first);
                     }
                 }
-                
                 if (selected_valid_indices.empty()) {
                     selected_valid_indices.push_back(valid_pairs_with_counts[0].first);
                 }
@@ -549,7 +550,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                         break;
                     }
                 }
-                
                 if (pair_row_idx != -1) {
                     // Store the edge pair information
                     paired_edge.row(pair_row_idx) << H1_edge_idx, HYPO2_idx(finalpair), supported_indices.row(finalpair);
@@ -557,6 +557,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
                 } 
             }
 
+#if DO_PR_EXPERIMENTS
             //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
             //> get the validated H2 edges passing Lowe's ratio test and the corresponding unique number of clusters
             Eigen::MatrixXd finalpair_H2_edges_lowe(finalpair_H2_indices.size(), 4);
@@ -579,6 +580,7 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             num_of_wrong_edges_after_lowe += (find_TP_flag) ? (Num_Of_Validated_Clusters_w_Lowe-1) : (Num_Of_Validated_Clusters_w_Lowe);
             PR_after_lowes[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
+#endif
 
             //> ======================== DEBUG ========================
 #if ISOLATE_DATA
@@ -592,12 +594,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             }
 #endif
             //> ======================== DEBUG ========================
-
-#if ISOLATE_DATA
-            if (found_data) {
-                V_edges_outFile.close();
-            }
-#endif
         } //> End of the first for-loop
         //> A critical session to stack all local supported indices
         #pragma omp critical
@@ -614,7 +610,9 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
         }
     }
 
+#if DO_PR_EXPERIMENTS
     get_Avg_Precision_Recall_Rates();
+#endif
 
     pair_edges_time += omp_get_wtime() - itime;
 }
@@ -829,28 +827,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
 
                 Eigen::Vector2d supporting_edge = edges_for_val_frame.row(support_idx).head<2>();
                 Eigen::Vector3d supporting_edge_mapping = edges_for_val_frame.row(support_idx).head<3>();
-
-                // /////////////////////////////// epipolar correct validation edges ////////////////////////////////
-                // Eigen::Matrix3d Rot_HYPO1_val       = All_R[hyp01_view_indx];
-                // Eigen::Matrix3d Rot_HYPO3       = All_R[val_idx];
-                // Eigen::Vector3d Transl_HYPO1_val    = All_T[hyp01_view_indx];
-                // Eigen::Vector3d Transl_HYPO3    = All_T[val_idx];
-                // Eigen::Matrix3d R13;
-                // Eigen::Vector3d T13;
-                // Eigen::Matrix3d R31;
-                // Eigen::Vector3d T31;
-                // if (Use_Multiple_K) {
-                //     K_HYPO1 = All_K[hyp01_view_indx];
-                //     K_HYPO2 = All_K[hyp02_view_indx];
-                // }
-                // else {
-                //     K_HYPO1 = K;
-                //     K_HYPO2 = K;
-                // }
-
-                // util->getRelativePoses(Rot_HYPO1_val, Transl_HYPO1_val, Rot_HYPO3, Transl_HYPO3, R31, T31, R13, T13);
-                // Eigen::Matrix3d F31 = util->getFundamentalMatrix(K_HYPO1.inverse(), K_HYPO2.inverse(), R31, T31); 
-                // Eigen::Matrix3d F13 = util->getFundamentalMatrix(K_HYPO2.inverse(), K_HYPO1.inverse(), R13, T13);
                 Eigen::MatrixXd Edges_VAL_final = edges_for_val_frame.row(support_idx);
 
                 if (Edges_VAL_final.rows() > 0) {
@@ -901,16 +877,14 @@ void EdgeSketch_Core::Stack_3D_Edges() {
     tangents_file.close();
 #endif
 
-    Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt( hyp01_view_indx, hyp02_view_indx, Post_File_Name_Str );
+    //> Use multiview triangulation (still in an experimental stage)
+    // Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt( hyp01_view_indx, hyp02_view_indx, Post_File_Name_Str );
 
     //> Concatenate reconstructed 3D edges
     if (all_3D_Edges.rows() == 0) {
         all_3D_Edges = Gamma1s_world;
-        // all_3D_Edges = mvt_3d_edges;
     } 
     else {
-        // all_3D_Edges.conservativeResize(all_3D_Edges.rows() + mvt_3d_edges.rows(), 3);
-        // all_3D_Edges.bottomRows(mvt_3d_edges.rows()) = mvt_3d_edges;
         all_3D_Edges.conservativeResize(all_3D_Edges.rows() + Gamma1s_world.rows(), 3);
         all_3D_Edges.bottomRows(Gamma1s_world.rows()) = Gamma1s_world;
     }

@@ -24,6 +24,7 @@
 #include <yaml-cpp/yaml.h>
 
 //> shared class pointers
+#include "definitions.h"
 #include "file_reader.hpp"
 #include "util.hpp"
 #include "PairEdgeHypo.hpp"
