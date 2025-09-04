@@ -17,19 +17,9 @@
 #include <yaml-cpp/yaml.h>
 
 //> Include functions
-#include "../Edge_Reconst/util.hpp"
-#include "../Edge_Reconst/PairEdgeHypo.hpp"
-#include "../Edge_Reconst/getReprojectedEdgel.hpp"
-#include "../Edge_Reconst/getSupportedEdgels.hpp"
-#include "../Edge_Reconst/getOrientationList.hpp"
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/EdgeSketch_Core.hpp"
-#include "../Edge_Reconst/file_reader.hpp"
 #include "../Edge_Reconst/edge_mapping.hpp"
-
-#include "../Edge_Reconst/mvt.hpp"
-
-using namespace MultiviewGeometryUtil;
 
 // ========================================================================================================================
 // main function
@@ -45,7 +35,7 @@ using namespace MultiviewGeometryUtil;
 
 int main(int argc, char **argv) {
 
-  //> Read input argument, specifically the configuration file, e.g., 3D_Curvix_Settings.yaml file
+  //> Read input argument, specifically the configuration file, e.g., configs/3D_Curvix_ABC_NEF.yaml file
   --argc; ++argv;
   std::string arg;
   int argIndx = 0, argTotal = 4;
@@ -179,6 +169,6 @@ int main(int argc, char **argv) {
   std::cout << "     - Time for Finalizing Edge Pairs:         " << MWV_Edge_Rec.finalize_edge_pair_time << " (s)" << std::endl;
   std::cout << "     - Time for Finding Next Hypothesis Views: " << MWV_Edge_Rec.find_next_hypothesis_view_time << " (s)" << std::endl;
 
-  LOG_INFOR_MESG("3D Edge Sketch is Finished!");
+  LOG_INFOR_MESG("3D Curvix is Finished!");
   return 0;
 }

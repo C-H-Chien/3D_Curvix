@@ -22,17 +22,17 @@ set ( control_sources
   EdgeSketch_Core.hpp
 
   #>MVT Utilities
-  mvt.hpp
-  mvt.cpp
-  NViewsCertifier.h
-  NViewsCertifier.cpp
-  NViewsClass.h
-  NViewsClass.cpp
-  NViewsTypes.h
-  NViewsUtils.h
-  NViewsUtils.cpp
-  generatePointCloud.h
-  generatePointCloud.cpp
+  #mvt.hpp
+  #mvt.cpp
+  #NViewsCertifier.h
+  #NViewsCertifier.cpp
+  #NViewsClass.h
+  #NViewsClass.cpp
+  #NViewsTypes.h
+  #NViewsUtils.h
+  #NViewsUtils.cpp
+  #generatePointCloud.h
+  #generatePointCloud.cpp
 
   EdgeClusterer.hpp
   EdgeClusterer.cpp

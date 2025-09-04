@@ -872,9 +872,6 @@ void EdgeSketch_Core::Stack_3D_Edges() {
     tangents_file.close();
 #endif
 
-    //> Use multiview triangulation (still in an experimental stage)
-    // Eigen::MatrixXd mvt_3d_edges = NViewsTrian::mvt( hyp01_view_indx, hyp02_view_indx, Post_File_Name_Str );
-
     //> Concatenate reconstructed 3D edges
     if (all_3D_Edges.rows() == 0) {
         all_3D_Edges = Gamma1s_world;

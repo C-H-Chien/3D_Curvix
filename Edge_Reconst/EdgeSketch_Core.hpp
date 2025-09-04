@@ -32,7 +32,6 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
-#include "mvt.hpp"
 #include "EdgeClusterer.hpp"
 
 //> mutual best support
