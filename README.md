@@ -6,6 +6,7 @@ The code is moving towards the final stage of cleaning and organization.
 (1) CMake 3.14 or higher <br />
 (2) Eigen 3.3.2 (higher version is not compatible) <br />
 (3) YAML-CPP, can be built from its [official repo](https://github.com/jbeder/yaml-cpp). (This is used only for parsing data from .yaml file) <br />
+Note that by default the code uses C++17. Some minor code has to be changed to turn the code compatible with C++11, but we encourage to use C++17.
 
 ## How to build and compile the code
 Follow the standard build and compile steps after cloning the repo
@@ -23,17 +24,14 @@ and also manually add the YAML library to ``LD_LIBRARY_PATH``:
 ```bash
 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/XXX/bin/lib64/
 ```
-where ``XXX`` is the installed prefix path of your YAML-CPP. In addition, to enable the use of OpenCV library, manually link its library we have installed under ``/gpfs/data/bkimia/opencv_4.x/`` by
-```bash
-$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/gpfs/data/bkimia/opencv_4.x/build_install/lib64/
-```
+where ``XXX`` is the installed prefix path of your YAML-CPP. 
 
 ## Outputs and Visualization
 All output files are given under the ``outputs/`` folder, including some intermediate data. Note that all files will be cleared out when the code starts a new run. This can be deactivated by setting the macro ``DELETE_ALL_FILES_UNDER_OUTPUTS`` defined in the ``Edge_Reconst/definitions.h`` file as _false_.
 ### 3D edges 
 Edges arising from a pair of hypothesis views are given in the files `3D_edges_*.txt` for 3D locations and `3D_tangents_*.txt` for 3D orientation represented by a unit vector. Both are under the world coordinate. 
 ### 3D curves
-3D curves can be found in `curves_from_connectivity_graph.txt`. <br />
+3D curves can be found in `final_curves.txt`. To show the curves, use `visualization/plot_curves.m` matlab file. Each curve is colored individually. <br />
 
 ## Evaluations
 

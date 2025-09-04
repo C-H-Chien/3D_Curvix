@@ -179,8 +179,8 @@ public:
     void Setup_Data_Parameters( YAML::Node Edge_Sketch_Setting_File );
     using EdgeNodeList = std::vector<std::unique_ptr<EdgeNode>>;
 
-
-    void findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
+    //> main code for consolidating 3D edges and form 3D curves
+    void consolidate_3D_edges(const std::vector<Eigen::Matrix3d> all_R,const std::vector<Eigen::Vector3d> all_T, const Eigen::Matrix3d K, const int Num_Of_Total_Imgs);
     
     std::unordered_map<Eigen::Vector3d, std::vector<SupportingEdgeData>, HashEigenVector3d> edge_3D_to_supporting_edges;
     std::unordered_map<Uncorrected2DEdgeKey, std::vector<Uncorrected2DEdgeMappingData>, HashUncorrected2DEdgeKey> map_Uncorrected2DEdge_To_SupportingData();
