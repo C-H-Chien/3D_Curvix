@@ -40,8 +40,7 @@ EdgeSketch_Core::EdgeSketch_Core(YAML::Node Edge_Sketch_Setting_File)
     Edge_Loc_Pertubation                            = Edge_Sketch_Setting_YAML_File["delta"].as<double>();
     Orien_Thresh                                    = Edge_Sketch_Setting_YAML_File["delta_theta"].as<double>();
     Max_Num_Of_Support_Views                        = Edge_Sketch_Setting_YAML_File["Max_Num_Of_Support_Views"].as<int>();
-    Edge_Detection_Init_Thresh                      = Edge_Sketch_Setting_YAML_File["Multi_Thresh_Init_Thresh"].as<int>();
-    Edge_Detection_Final_Thresh                     = Edge_Sketch_Setting_YAML_File["Multi_Thresh_Final_Thresh"].as<int>();
+    Edge_Detection_Thresh                      = Edge_Sketch_Setting_YAML_File["TOED_Thresh"].as<int>();
     Parallel_Epipolar_Line_Angle_Deg                = Edge_Sketch_Setting_YAML_File["Parallel_Epipolar_Line_Angle"].as<double>();
     Reproj_Dist_Thresh                              = Edge_Sketch_Setting_YAML_File["Reproj_Dist_Thresh"].as<double>();
     Stop_3D_Edge_Sketch_by_Ratio_Of_Claimed_Edges   = Edge_Sketch_Setting_YAML_File["Ratio_Of_Claimed_Edges_to_Stop"].as<double>();
@@ -140,9 +139,7 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Camera() {
     history_hypothesis_views_index.push_back(hyp02_view_indx);
 
     //> Define post file name for files to which 3D edge locations and tangents are written
-    Post_File_Name_Str = Dataset_Name + "_" + Scene_Name + "_hypo1_" + std::to_string(hyp01_view_indx) + "_hypo2_" + std::to_string(hyp02_view_indx) \
-                        + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" + std::to_string(Edge_Detection_Final_Thresh) + "_theta" \
-                        + std::to_string(Orien_Thresh) + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
+    Post_File_Name_Str = Dataset_Name + "_" + Scene_Name + "_hypo1_" + std::to_string(hyp01_view_indx) + "_hypo2_" + std::to_string(hyp02_view_indx) + ".txt";
 }
 
 void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
@@ -169,8 +166,6 @@ void EdgeSketch_Core::Set_Hypothesis_Views_Edgels() {
 }
 
 void EdgeSketch_Core::Run_3D_Edge_Sketch() {
-
-    // construct_3D_edges_from_ground_truth();
 
     itime = omp_get_wtime();
     reset_hypo2_clusters();
@@ -682,7 +677,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
         Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
         
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
-            std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
+            std::cout << "No valid matches found for edge " << pair_idx << std::endl;
             continue;
         }
 
@@ -751,7 +746,7 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
 
         //> Sanity check
         if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
-            std::cout << "No valid matches found for edge " << pair_idx << " at threshold " << thresh_EDG << std::endl;
+            std::cout << "No valid matches found for edge " << pair_idx << std::endl;
             continue;
         }
 
@@ -893,7 +888,7 @@ void EdgeSketch_Core::Stack_3D_Edges() {
 void EdgeSketch_Core::Calculate_Edge_Support_Ratios_And_Select_Next_Views(std::shared_ptr<EdgeMapping> edgeMapping) {
 
     itime = omp_get_wtime();
-    Load_Data->read_All_Edgels(All_Edgels, Edge_Detection_Final_Thresh);
+    Load_Data->read_All_Edgels(All_Edgels, Edge_Detection_Thresh);
     
     // For each view, track which edges are supporting any 3D edge
     std::vector<std::set<int>> supportedEdgesIndices(Num_Of_Total_Imgs);
@@ -989,9 +984,8 @@ void EdgeSketch_Core::Calculate_Edge_Support_Ratios_And_Select_Next_Views(std::s
 
 void EdgeSketch_Core::Project_3D_Edges_and_Find_Next_Hypothesis_Views() {
 
-    //> First read all edges with the final-run threshold (TODO: is this step necessary?)
     itime = omp_get_wtime();
-    Load_Data->read_All_Edgels( All_Edgels, Edge_Detection_Final_Thresh );
+    Load_Data->read_All_Edgels( All_Edgels, Edge_Detection_Thresh );
 
     //> Loop over all views
     for (int i = 0; i < Num_Of_Total_Imgs; i++) {
@@ -1235,17 +1229,16 @@ void EdgeSketch_Core::get_Avg_Precision_Recall_Rates() {
     }
     avg_PR_after_lowes = std::make_pair(precision_rate / (double)count, recall_rate / (double)count);
 
-
     //> Print out the precision and recall rates for each stage
-    // LOG_INFOR_MESG("Precision-Recall Rate at each step:");
-    // std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << "% / " << avg_PR_before_clustering.second*100 << "%, ";
-    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
-    // std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
-    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
-    // std::cout << "     - After Validation Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_validation.first*100 << "% / " << avg_PR_after_validation.second*100 << "%, ";
-    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_validation << " / " << num_of_wrong_edges_after_validation << std::endl;
-    // std::cout << "     - After Lowe's Ratio Test Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_lowes.first*100 << "% / " << avg_PR_after_lowes.second*100 << "%, ";
-    // std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_lowe << " / " << num_of_wrong_edges_after_lowe << std::endl;
+    LOG_INFOR_MESG("Precision-Recall Rate at each step:");
+    std::cout << "     - Before Clustering Precision / Recall: " << std::fixed << std::setprecision(5) << avg_PR_before_clustering.first*100 << "% / " << avg_PR_before_clustering.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_before_clustering << " / " << num_of_wrong_edges_before_clustering << std::endl;
+    std::cout << "     - After Clustering Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_clustering.first*100 << "% / " << avg_PR_after_clustering.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_clustering << " / " << num_of_wrong_edges_after_clustering << std::endl;
+    std::cout << "     - After Validation Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_validation.first*100 << "% / " << avg_PR_after_validation.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_validation << " / " << num_of_wrong_edges_after_validation << std::endl;
+    std::cout << "     - After Lowe's Ratio Test Precision / Recall:  " << std::fixed << std::setprecision(5) << avg_PR_after_lowes.first*100 << "% / " << avg_PR_after_lowes.second*100 << "%, ";
+    std::cout << "Number of Correct / Wrong Edges = " << num_of_correct_edges_after_lowe << " / " << num_of_wrong_edges_after_lowe << std::endl;
 }
 
 int EdgeSketch_Core::countUniqueClusters(const Eigen::MatrixXd& edges, double tolerance) {
@@ -1277,136 +1270,6 @@ int EdgeSketch_Core::countUniqueClusters(const Eigen::MatrixXd& edges, double to
     }
     
     return cluster_count;
-}
-
-void EdgeSketch_Core::construct_3D_edges_from_ground_truth() {
-    
-    // Get ground truth pairs between hypothesis views
-    std::vector<std::pair<int, int>> gt_pairs;
-    if (!getGTEdgePairsBetweenImages(hyp01_view_indx, hyp02_view_indx, gt_pairs)) {
-        LOG_ERROR("Failed to get ground truth pairs between images");
-        exit(1);
-    }
-    
-    std::cout << "Found " << gt_pairs.size() << " GT pairs between images " 
-              << hyp01_view_indx << " and " << hyp02_view_indx << std::endl;
-
-    if (gt_pairs.size() == 0) {
-        LOG_ERROR("No ground truth correspondences found");
-        return;
-    }
-
-    int num_correspondences = gt_pairs.size();
-    Eigen::MatrixXd gt_3D_edges(num_correspondences, 3);
-
-    // Set up camera parameters for the hypothesis views
-    Eigen::Matrix3d R_HYPO1 = All_R[hyp01_view_indx];
-    Eigen::Matrix3d R_HYPO2 = All_R[hyp02_view_indx];
-    Eigen::Vector3d T_HYPO1 = All_T[hyp01_view_indx];
-    Eigen::Vector3d T_HYPO2 = All_T[hyp02_view_indx];
-
-    Eigen::Matrix3d K_HYPO1_local, K_HYPO2_local;
-    if (Use_Multiple_K) {
-        K_HYPO1_local = All_K[hyp01_view_indx];
-        K_HYPO2_local = All_K[hyp02_view_indx];
-    } else {
-        K_HYPO1_local = K;
-        K_HYPO2_local = K;
-    }
-
-    Eigen::Matrix3d R21, R12;
-    Eigen::Vector3d T21, T12;
-    util->getRelativePoses(R_HYPO1, T_HYPO1, R_HYPO2, T_HYPO2, R21, T21, R12, T12);
-
-    // Calculate fundamental matrices for epipolar correction
-    Eigen::Matrix3d F21 = util->getFundamentalMatrix(K_HYPO1_local.inverse(), K_HYPO2_local.inverse(), R21, T21); 
-    Eigen::Matrix3d F12 = util->getFundamentalMatrix(K_HYPO2_local.inverse(), K_HYPO1_local.inverse(), R12, T12);
-
-    std::vector<Eigen::Matrix3d> Rs = {R21};
-    std::vector<Eigen::Vector3d> Ts = {T21};
-
-    std::cout << "Constructing 3D edges from " << num_correspondences << " ground truth correspondences..." << std::endl;
-
-    int valid_edges = 0;
-    for (int i = 0; i < num_correspondences; i++) {
-        int hyp1_edge_idx = gt_pairs[i].first;
-        int hyp2_edge_idx = gt_pairs[i].second;
-
-        // Validate edge indices
-        if (hyp1_edge_idx < 0 || hyp1_edge_idx >= Edges_HYPO1.rows() ||
-            hyp2_edge_idx < 0 || hyp2_edge_idx >= Edges_HYPO2.rows()) {
-            std::cout << "Invalid edge indices in ground truth correspondences" << std::endl;
-            std::cout << "Pair " << i << ": hyp1_idx=" << hyp1_edge_idx << ", hyp2_idx=" << hyp2_edge_idx << std::endl;
-            gt_3D_edges.row(i) = Eigen::Vector3d::Zero();
-            continue;
-        }
-
-        // Get edge data from hypothesis views
-        Eigen::MatrixXd edgel_HYPO1 = Edges_HYPO1.row(hyp1_edge_idx);
-        Eigen::MatrixXd edgel_HYPO2 = Edges_HYPO2.row(hyp2_edge_idx);
-
-        // Create HYPO2_idx_raw for epipolar correction (containing the edge index)
-        Eigen::MatrixXd HYPO2_idx_raw(1, 1);
-        HYPO2_idx_raw(0, 0) = hyp2_edge_idx;
-
-        // Apply epipolar correction to HYPO2 edge
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
-
-        if (edgels_HYPO2_corrected.rows() == 0) {
-            // std::cout << "Epipolar correction failed for correspondence " << i << std::endl;
-            gt_3D_edges.row(i) = Eigen::Vector3d::Zero();
-            continue;
-        }
-
-        // Extract corrected edge locations
-        Eigen::Vector2d pt_H1, pt_H2;
-        pt_H1 << edgels_HYPO2_corrected(0, 0), edgels_HYPO2_corrected(0, 1);  // HYPO1 edge (columns 0-1)
-        pt_H2 << edgels_HYPO2_corrected(0, 4), edgels_HYPO2_corrected(0, 5);  // HYPO2 corrected edge (columns 4-5)
-
-        // Triangulate 3D edge point using corrected coordinates
-        std::vector<Eigen::Vector2d> pts = {pt_H1, pt_H2};
-        Eigen::Vector3d edge_pt_3D = util->linearTriangulation(2, pts, Rs, Ts, K_HYPO1_local);
-
-        if (edge_pt_3D.hasNaN()) {
-            std::cout << "Triangulation failed (NaN) for correspondence " << i << std::endl;
-            gt_3D_edges.row(i) = Eigen::Vector3d::Zero();
-            continue;
-        }
-
-        // Transform to world coordinates
-        Eigen::Vector3d edge_pt_3D_world = util->transformToWorldCoordinates(edge_pt_3D, R_HYPO1, T_HYPO1);
-
-        gt_3D_edges.row(i) = edge_pt_3D_world.transpose();
-        valid_edges++;
-    }
-
-    std::cout << "Successfully constructed " << valid_edges << "/" << num_correspondences 
-              << " valid ground truth 3D edges with epipolar correction" << std::endl;
-
-    // Save to file
-    std::string Output_File_Path2 = "../../outputs/gt_3D_edges_epipolarcorrected_" + Dataset_Name + "_" + Scene_Name + "_hypo1_" + std::to_string(hyp01_view_indx) \
-                                    + "_hypo2_" + std::to_string(hyp02_view_indx) + "_t" + std::to_string(Edge_Detection_Init_Thresh) + "to" \
-                                    + std::to_string(Edge_Detection_Final_Thresh) + "_delta" + Delta_FileName_Str + "_theta" + std::to_string(Orien_Thresh) \
-                                    + "_N" + std::to_string(Max_Num_Of_Support_Views) + ".txt";
-    std::ofstream gt_file;
-    gt_file.open(Output_File_Path2);
-    
-    if (!gt_file.is_open()) {
-        std::cout << "Cannot open file for writing: " << Output_File_Path2 << std::endl;
-        return;
-    }
-
-    // Write only valid (non-zero) 3D edges
-    for (int i = 0; i < gt_3D_edges.rows(); i++) {
-        Eigen::Vector3d edge = gt_3D_edges.row(i);
-        // Check if the edge is valid (not all zeros)
-        if (edge.norm() > 1e-6) {
-            gt_file << edge(0) << " " << edge(1) << " " << edge(2) << std::endl;
-        }
-    }
-    
-    gt_file.close();
-    std::cout << "Ground truth 3D edges (with epipolar correction) saved to: " << Output_File_Path2 << std::endl;
 }
 
 EdgeSketch_Core::~EdgeSketch_Core() { }

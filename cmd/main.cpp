@@ -140,21 +140,12 @@ int main(int argc, char **argv) {
     //> Setup some constant data used throughout the 3D edge sketch
     MWV_Edge_Rec.Set_Hypothesis_Views_Camera();
 
-    //> CH TODO: Change from multiple edge thresholding to a single edge thresholding
-    //> Multiple edge thresholding
-    for (int edge_thresh = MWV_Edge_Rec.Edge_Detection_Init_Thresh; edge_thresh >= MWV_Edge_Rec.Edge_Detection_Final_Thresh; edge_thresh/=2) {
+    //> Load edges with specific third-order edge threshold
+    MWV_Edge_Rec.Read_Edgels_Data();
+    MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
 
-      std::cout << "- Edge Threshold = " << edge_thresh << std::endl;
-      MWV_Edge_Rec.thresh_EDG = edge_thresh;
-
-      //> Load edges with specific third-order edge threshold
-      MWV_Edge_Rec.Read_Edgels_Data();
-      MWV_Edge_Rec.Set_Hypothesis_Views_Edgels();
-
-      //> Hypothesis-Validation process
-      MWV_Edge_Rec.Run_3D_Edge_Sketch();
-
-    }
+    //> Hypothesis-Validation process
+    MWV_Edge_Rec.Run_3D_Edge_Sketch();
     
     //> Finalize hypothesis edge pairs for a two-view triangulation
     MWV_Edge_Rec.Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(edgeMapping);

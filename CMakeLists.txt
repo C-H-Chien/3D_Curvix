@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffast-math" CACHE STRIN
 
 project(3D_Curvix)
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/config/cmake/InitializeBuildType.cmake)
+#include(${CMAKE_CURRENT_SOURCE_DIR}/config/cmake/InitializeBuildType.cmake)
 
 #-----------------------------------------------------------------------------
 if(NOT COMMAND SETIFEMPTY)
@@ -37,12 +37,7 @@ SETIFEMPTY(CMAKE_INSTALL_LIBRARY_DESTINATION lib)
 SETIFEMPTY(CMAKE_INSTALL_ARCHIVE_DESTINATION lib)
 SETIFEMPTY(CMAKE_INSTALL_RUNTIME_DESTINATION bin)
 
-# -- CMake support directory --
-set(PROJ_ROOT_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
-set(PROJ_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR}/config/cmake/Modules)
-include(${PROJ_CMAKE_DIR}/StandardOptions.cmake)
-
-# -- import openmp to the compiler --
+#> import openmp to the compiler
 find_package(OpenMP REQUIRED)
 
 if (OPENMP_FOUND)
@@ -70,7 +65,7 @@ else()
 endif()
 
 
-# -- Avoid types of path names that could cause havoc with regular expressions --
+#> Avoid types of path names that could cause havoc with regular expressions
 if( ${PROJECT_BINARY_DIR} MATCHES  \\+ )
   message(SEND_ERROR "You cannot have a + in your binary path")
 endif()
@@ -78,8 +73,8 @@ if( ${CMAKE_CURRENT_LIST_DIR} MATCHES  \\+ )
   message(SEND_ERROR "You cannot have a + in your source path")
 endif()
 
-# include CMakeListsLocal.txt from source directory if it exists
-# also include it from the binary dir if different from source dir
+#> Include CMakeListsLocal.txt from source directory if it exists
+#  Also include it from the binary dir if different from source dir
 if( ${PROJECT_BINARY_DIR} MATCHES ${CMAKE_CURRENT_LIST_DIR} )
   include( ${CMAKE_CURRENT_LIST_DIR}/CMakeListsLocal.txt OPTIONAL )
 else()
@@ -92,13 +87,13 @@ set(PROJ_BINARY_INCLUDE_DIR ${PROJECT_BINARY_DIR}) #Generated includes
 set(PROJ_INCLUDE_DIRS ${PROJ_BINARY_INCLUDE_DIR} ${PROJ_INCLUDE_DIR})
 set(PROJ_INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/include/)
 
-# -- include necessary libraries in the commands / executables file --
+#> include necessary libraries in the commands / executables file
 include_directories(${PROJ_INCLUDE_DIRS})
-
 include_directories( "/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/include" )
 
-# main lib
+#> main lib
 add_subdirectory( Edge_Reconst )
-# commands / executables
+
+#> commands / executables
 add_subdirectory(cmd)
 add_subdirectory(test)

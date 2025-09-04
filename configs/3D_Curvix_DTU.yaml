@@ -1,0 +1,27 @@
+# %YAML:1.0
+
+#> 3D Edge Sketch Settings (DTU dataset)
+Num_Of_OMP_Threads: 48                #> Number of CPU cores to run 3D Edge Sketch in parallel
+Init_Hypo1_View_Index: 53             #> Initial hypothesis view 1 index
+Init_Hypo2_View_Index: 62             #> Initial hypothesis view 2 index
+delta: 0.4                            #> edge location perturbation
+delta_theta: 15                       #> \Delta \theta: orientation threshold
+Max_Num_Of_Support_Views: 6           #> N: minimal number of validation views supporting a hypothesis edge pair
+TOED_Thresh: 3                        #> third-order edge detection threshold
+Parallel_Epipolar_Line_Angle: 15      #> decide if the picked hypothesis view should be abandoned by the angle between two epipolar lines
+Reproj_Dist_Thresh: 2                 #> distance threshold between observed edge and reprojected edge on the validation view (probably not in use)
+Ratio_Of_Claimed_Edges_to_Stop: 0.8   #> stopping 3D Edge Sketch by what ratio of "tagged" edges
+Max_Num_Of_3D_Edge_Sketch_Passes: 1
+
+#> Dataset Settings
+Dataset_Path: /gpfs/data/bkimia/Datasets/
+Dataset_Name: DTU
+Scene_Name: scan122
+Total_Num_Of_Images: 63
+fx: 925.546142578125
+fy: 922.616455078125
+cx: 199.425277709961
+cy: 198.102355957031
+Image_Rows: 384
+Image_Cols: 384
+Use_Multiple_K: false

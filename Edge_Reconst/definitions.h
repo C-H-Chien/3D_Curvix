@@ -8,8 +8,10 @@
 #define WRITE_3D_EDGES                  (true)
 #define WRITE_3D_EDGE_GRAPH             (true)
 
+#define USE_REFINED_CAM_POSES           (false)     //> true only for ABC-NEF
+
 //> LOWE's ratio test for disambiguate validated edge hypotheses
-#define LOWES_RATIO_THRESHOLD           (0.5)
+#define LOWES_RATIO_THRESHOLD           (0.8)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
@@ -32,13 +34,13 @@
 
 //> Edge graph alignment parameters
 #define NUM_OF_ITERATIONS               (1000)
-#define INIT_FROCE_STEP_SIZE            (0.01)
+#define INIT_FROCE_STEP_SIZE            (0.02)
 #define INIT_TORQUE_STEP_SIZE           (0.01)
 #define ENABLE_EXPO_FORCE_AND_TORQUE    (false)
 #define EXPO_INCREASE_FACTOR            (sqrt(2))
 
 //> Precision-Recall evaluation parameters
-#define DO_PR_EXPERIMENTS               (true)     //> Activate to do precision-recall experiments
+#define DO_PR_EXPERIMENTS               (false)     //> Activate to do precision-recall experiments. Only for ABC-NEF dataset.
 #define GT_PROXIMITY_THRESH             (1)         //> distance to the GT edge correspondences (in pixels)
 
 //> Debugging purpose
@@ -65,7 +67,6 @@
 //> MVT definitions
 
 //> General Settings
-#define USE_REFINED_CAM_POSES           (true)
 #define FIX_RANDOMNESS                  (true)
 #define RUN_CERES_SOLVER_ON             (false)
 
@@ -75,6 +76,11 @@
 
 #define PRINT_VECTOR3D(name, vec)       printf("%s = [%f, %f, %f]\n", std::string(name).c_str(), vec(0), vec(1), vec(2));
 #define PRINT_VECTORXD(name, vec)       printf("%s = [", std::string(name).c_str()); for(int i = 0; i < vec.size(); i++) {printf("%f ", vec(i));} printf("]\n");
+
+#define LOG_PRINT_HELP_MESSAGE          printf("Usage: ./curvix_main [options] [path]\n\n" \
+                                               "options:\n" \
+                                               "  -h, --help     show this help message and exit\n" \
+                                               "  -c, --config   configuration file, e.g. ../../config/3D_Curvix_ABC_NEF.yaml\n");
 
 #define PRINT_ESSENTIAL(id1, id2, mat)  printf("E%d%d = [\n", id1, id2); \
                                         for(int i = 0; i < 3; i++) { \
