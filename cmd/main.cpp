@@ -45,6 +45,46 @@ using namespace MultiviewGeometryUtil;
 
 int main(int argc, char **argv) {
 
+  //> Read input argument, specifically the configuration file, e.g., 3D_Curvix_Settings.yaml file
+  --argc; ++argv;
+  std::string arg;
+  int argIndx = 0, argTotal = 4;
+  std::string config_yaml_file;
+
+  if (argc) {
+    arg = std::string(*argv);
+    if (arg == "-h" || arg == "--help") {
+      LOG_PRINT_HELP_MESSAGE;
+      return 0;
+    }
+    else if (argc <= argTotal) {
+      while(argIndx <= argTotal-1) {
+        if (arg == "-c" || arg == "--config") {
+          argv++;
+          arg = std::string(*argv);
+          config_yaml_file = arg;
+          argIndx+=2;
+          break;
+        }
+        else {
+          LOG_ERROR("Invalid input arguments!");
+          LOG_PRINT_HELP_MESSAGE;
+          return 0;
+        }
+        argv++;
+      }
+    }
+    else if (argc > argTotal) {
+      LOG_ERROR("Too many input arguments!");
+      LOG_PRINT_HELP_MESSAGE;
+      return 0;
+    }
+  }
+  else {
+    LOG_PRINT_HELP_MESSAGE;
+    return 0;
+  }
+
   //> Create the `outputs` folder if it does not exist
   std::filesystem::path output_folder_path = OUTPUT_FOLDER_NAME;
   if (!std::filesystem::exists(output_folder_path)) {
@@ -67,12 +107,10 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  //> YAML file path
-  std::string Edge_Sketch_Settings_Path = "../../3D_Edge_Sketch_Settings.yaml";
-
+  //> Load the YAML file
   YAML::Node Edge_Sketch_Settings_Map;
   try {
-		Edge_Sketch_Settings_Map = YAML::LoadFile(Edge_Sketch_Settings_Path);
+		Edge_Sketch_Settings_Map = YAML::LoadFile(config_yaml_file);
 #if SHOW_EDGE_SKETCH_SETTINGS
 		std::cout << std::endl << Edge_Sketch_Settings_Map << std::endl << std::endl;
 #endif
@@ -141,7 +179,7 @@ int main(int argc, char **argv) {
   
   std::cout << "====================================================================" << std::endl;
 
-  edgeMapping->findMergable2DEdgeGroups(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
+  edgeMapping->consolidate_3D_edges(MWV_Edge_Rec.All_R, MWV_Edge_Rec.All_T, MWV_Edge_Rec.K, MWV_Edge_Rec.Num_Of_Total_Imgs);
   
   double total_time = MWV_Edge_Rec.pair_edges_time + MWV_Edge_Rec.finalize_edge_pair_time + MWV_Edge_Rec.find_next_hypothesis_view_time;
   std::string out_time_str = "Total computation time: " + std::to_string(total_time) + " (s)";
