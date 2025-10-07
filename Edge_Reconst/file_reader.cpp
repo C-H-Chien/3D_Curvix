@@ -23,9 +23,9 @@ file_reader::file_reader( std::string dataset_path, std::string dataset_name, st
 #endif
 
   //> Read GT edge correspondences for precision-recall experiments
-  GT_File_Path = dataset_name_sequence_path + "/GT_edge_pairs_indices_0006.txt";
-
-  Image_File_Source_Path = dataset_name_sequence_path + "/train_img/";
+#if DO_PR_EXPERIMENTS
+  GT_File_Path = dataset_name_sequence_path + "/GT_edge_pairs_indices_" + scene_name + ".txt";
+#endif
 }
 
 //> Read all edgel files

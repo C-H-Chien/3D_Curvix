@@ -13,6 +13,7 @@
 #include "test_include/test_epipolar_correction.hpp"
 #include "test_include/test_GT_edge_pair.hpp"
 #include "test_include/test_edge_clustering.hpp"
+#include "test_include/test_curve_merging.hpp"
 
 #include "../Edge_Reconst/definitions.h"
 #include "../Edge_Reconst/util.hpp"
@@ -25,6 +26,7 @@
 #define TEST_READ_CURVELETS         (false)
 #define TEST_EDGE_ALIGNMENT         (false)
 #define TEST_CONNECTIVITY_GRAPH     (false)  //> TEST_EDGE_ALIGNMENT has to be true to activate this test
+#define TEST_CURVE_MERGING          (true)
 #define TANGENT_COORD_TRANSFORM     (false)
 #define ALIGN_VEC_BY_RODRIGUE       (false)
 #define TANGENT_PROJECTION          (false)
@@ -102,6 +104,10 @@ int main(int argc, char **argv) {
 
 #if TEST_EDGE_ALIGNMENT
     test_alignment( TEST_CONNECTIVITY_GRAPH );
+#endif
+
+#if TEST_CURVE_MERGING
+    f_test_curve_merging();
 #endif
 
 //> ---------------------------------------

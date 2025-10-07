@@ -114,12 +114,6 @@ namespace MultiviewGeometryUtil {
     Eigen::Vector3d multiview_geometry_util::project_3DTangent_to_Image(Eigen::Matrix3d Rot, Eigen::Matrix3d K, Eigen::Vector3d Tangent_3D_world, Eigen::Vector3d Point_Location_in_Pixels) {
         
         Eigen::Vector3d point_in_meters = K.inverse() * Point_Location_in_Pixels;
-
-        // e3     = [0;0;1];
-        // T1 = R1*pick_scene_tangent(:,:,n)';
-        // t1 = T1 - (e3' * T1)*gamma1;
-        // t1 = t1 ./ norm(t1);
-
         Eigen::Vector3d Tangent_3D_cam = Rot * Tangent_3D_world;
         Eigen::Vector3d tangent_2D   = Tangent_3D_cam - Tangent_3D_cam(2) * point_in_meters;
         tangent_2D.normalize();
@@ -321,28 +315,6 @@ namespace MultiviewGeometryUtil {
         pt3D[2] = GAMMA[2];
         
         return pt3D;
-
-        /*
-        template<typename matrix_t, typename vector_t>
-        void solveNullspaceLU(const matrix_t& A, vector_t& x){
-            x = A.fullPivLu().kernel();
-            x.normalize();
-        }
-
-        template<typename matrix_t, typename vector_t>
-        void solveNullspaceQR(const matrix_t& A, vector_t& x){
-            auto qr = A.transpose().colPivHouseholderQr();
-            matrix_t Q = qr.householderQ();
-            x = Q.col(A.rows() - 1);
-            x.normalize();
-        }
-
-        template<typename matrix_t, typename vector_t>
-        void solveNullspaceSVD(const matrix_t& A, vector_t& x){
-            x = A.jacobiSvd(Eigen::ComputeFullV).matrixV().col( A.rows() - 1 );
-            x.normalize();
-        }
-        */
     }
 
     std::vector<double> multiview_geometry_util::check_reproj_error(

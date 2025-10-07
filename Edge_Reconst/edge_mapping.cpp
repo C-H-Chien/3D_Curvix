@@ -62,7 +62,7 @@ EdgeMapping::map_Uncorrected2DEdge_To_SupportingData() {
 ///////////////////////// convert 3d->2d relationship to 2d uncorrect -> 3d /////////////////////////
 
 void EdgeMapping::Setup_Data_Parameters( YAML::Node Edge_Sketch_Setting_File ) {
-    thresh_EDG    = Edge_Sketch_Setting_File["Multi_Thresh_Final_Thresh"].as<int>();
+    thresh_EDG    = Edge_Sketch_Setting_File["TOED_Thresh"].as<int>();
     Dataset_Path  = Edge_Sketch_Setting_File["Dataset_Path"].as<std::string>();
     Dataset_Name  = Edge_Sketch_Setting_File["Dataset_Name"].as<std::string>();
     Scene_Name    = Edge_Sketch_Setting_File["Scene_Name"].as<std::string>();
@@ -746,9 +746,9 @@ void EdgeMapping::createConnectivityGraph(EdgeNodeList& edge_nodes) {
     writeConnectivityGraphToFile(connectivity_graph, "connectivity_graph");
 }
 
-std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph( ) 
+std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph( std::vector<Curve>& curves ) 
 {
-    std::vector<Curve> curves;
+    // std::vector<Curve> curves;
     std::unordered_set<int> assigned_edges;
     int curve_count = 0;
 
@@ -831,228 +831,229 @@ std::vector<EdgeMapping::Curve> EdgeMapping::buildCurvesFromConnectivityGraph( )
 
             current_index = left_neighbor_index;
         }
+
+        if (curve.to_be_merged_left_curve_index == -1 && curve.to_be_merged_right_curve_index == -1) {
+            curve.consolidation_set_from_left = curve_count;
+            curve.consolidation_set_from_right = curve_count;
+        }
+        else {
+            if (curve.to_be_merged_left_curve_index >= 0 && curve.to_be_merged_left_curve_index < curves.size()) {
+                int target_left_idx = curve.to_be_merged_left_curve_index;
+                Curve& target_left_curve = curves[target_left_idx];
+                
+                //> Check if the edge in the target_curve is either the first two or the last two edges
+                if (b_is_in_first_or_last_two(target_left_curve.edge_indices, curve.to_be_merged_left_edge_index)) {
+                    curve.consolidation_set_from_left = (curves[curve.to_be_merged_left_curve_index].consolidation_set_from_left == -1) \
+                                                    ? (curves[curve.to_be_merged_left_curve_index].consolidation_set_from_right) \
+                                                    : (curves[curve.to_be_merged_left_curve_index].consolidation_set_from_left);
+                }
+                else {
+                    curve.consolidation_set_from_left = curve_count;
+                }
+            }
+            if (curve.to_be_merged_right_curve_index >= 0 && curve.to_be_merged_right_curve_index < curves.size()) {
+                int target_right_idx = curve.to_be_merged_right_curve_index;
+                Curve& target_right_curve = curves[target_right_idx];
+                //> Check if the edge in the target_curve is either the first two or the last two edges
+                if (b_is_in_first_or_last_two(target_right_curve.edge_indices, curve.to_be_merged_right_edge_index)) {
+                    curve.consolidation_set_from_right = (curves[curve.to_be_merged_right_curve_index].consolidation_set_from_right == -1) \
+                                                    ? (curves[curve.to_be_merged_right_curve_index].consolidation_set_from_left) \
+                                                    : (curves[curve.to_be_merged_right_curve_index].consolidation_set_from_right);
+                }
+                else {
+                    curve.consolidation_set_from_right = curve_count;
+                }
+            }
+        }
         
         curve_count++;
         curves.push_back(curve);
     }
 
-    //> CURVE EXTENSION 
-    std::cout << "Starting curves extension ..." << std::endl;
-    
-    int iteration = 0;
-    bool b_extensions_occurred = true;
+    //> Grouping curves into sets that need to be consolidated
+    std::vector< std::vector<int> > curve_indices_for_merging;
+    curve_indices_for_merging.resize(curves.size());
+    std::set< std::pair<int, int> > unique_set_indices_pairs_to_be_consolidated;
 
-    bool b_flag = false;
-    
-    //> Keep iterating until no more extensions can be made
-    while (b_extensions_occurred) {
-        b_extensions_occurred = false;
-        iteration++;
-        std::cout << "Extension iteration " << iteration << std::endl;
-        
-        //> Process each curve and extend it by adding target curves
-        for (size_t i = 0; i < curves.size(); ++i) {
+    for (int curve_id = 0; curve_id < curves.size(); curve_id++) {
+        Curve& current_curve = curves[curve_id];
+        if (current_curve.consolidation_set_from_left == -1 && current_curve.consolidation_set_from_right == -1)
+            std::cout << "Something's wrong in curve " << curve_id << std::endl; 
 
-            Curve& current_curve = curves[i];
-
-            if (i <= 2) {
-                bool cond1 = (!current_curve.b_loops_back_on_left && current_curve.to_be_merged_left_curve_index >= 0 && current_curve.to_be_merged_left_curve_index < curves.size());
-                bool cond2 = (!current_curve.b_loops_back_on_right && current_curve.to_be_merged_right_curve_index >= 0 && current_curve.to_be_merged_right_curve_index < curves.size());
-                std::cout << "cond1 = " << cond1 << ", cond2 = " << cond2 << std::endl;
-                std::cout << "number of edges = " << current_curve.edge_indices.size() << std::endl;
-            }
-            
-            //> Skip if target curve is already absorbed
-            if (current_curve.edge_indices.empty()) {
-                continue;
-            }
-            
-            //> Extend with "left" target curve
-            if (!current_curve.b_loops_back_on_left && current_curve.to_be_merged_left_curve_index >= 0 && current_curve.to_be_merged_left_curve_index < curves.size()) {
-                
-                int target_idx = current_curve.to_be_merged_left_curve_index;
-                Curve& target_curve = curves[target_idx];
-                
-                //> Skip if target curve is empty (already absorbed) and clear the merge reference since the target is gone
-                if (target_curve.edge_indices.empty()) {
-                    current_curve.to_be_merged_left_curve_index = -1;
-                    current_curve.to_be_merged_left_edge_index = -1;
-                }
-                else {
-                    //> Check if the edge in the target_curve is either the first two or the last two edges
-                    if (b_is_in_first_or_last_two(target_curve.edge_indices, current_curve.to_be_merged_left_edge_index)) {
-                           
-                        //> Get edges from target curve 
-                        std::vector<int> edges_to_add;
-                        for (size_t j = 0; j < target_curve.edge_indices.size(); ++j) {
-                            // if (j != connect_pos) {
-                                edges_to_add.push_back(target_curve.edge_indices[j]);
-                            // }
-                        }
-                        
-                        //> Check to see if the target curve should be added to the "beginning" or the "end" of the curve
-                        Eigen::Vector3d first_current_edge = connectivity_graph.at( current_curve.edge_indices.front() ).location;
-                        Eigen::Vector3d last_current_edge  = connectivity_graph.at( current_curve.edge_indices.back() ).location;
-                        Eigen::Vector3d first_target_edge  = connectivity_graph.at( target_curve.edge_indices.front() ).location;
-                        Eigen::Vector3d last_target_edge   = connectivity_graph.at( target_curve.edge_indices.back() ).location;
-                        std::vector<double> link_dists = { (first_current_edge - last_target_edge).norm(), \
-                                                            (first_current_edge - first_target_edge).norm(), \
-                                                            (last_current_edge - first_target_edge).norm(), \
-                                                            (last_current_edge - last_target_edge).norm() };
-                        auto min_it = std::min_element(link_dists.begin(), link_dists.end());
-                        //> Get the index corresponding to the minimum value
-                        int min_index = std::distance(link_dists.begin(), min_it);
-                        switch (min_index) {
-                            case 0:
-                                current_curve.edge_indices.insert(current_curve.edge_indices.begin(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            case 1:
-                                //> Reverse the order of the target curve edges and add them to the beginning of current curve
-                                std::reverse(edges_to_add.begin(), edges_to_add.end());
-                                current_curve.edge_indices.insert(current_curve.edge_indices.begin(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            case 2:
-                                //> Add target curve edges to the end of current curve
-                                current_curve.edge_indices.insert(current_curve.edge_indices.end(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            case 3:
-                                //> Reverse the order of the target curve edges and add them to the end of current curve
-                                std::reverse(edges_to_add.begin(), edges_to_add.end());
-                                current_curve.edge_indices.insert(current_curve.edge_indices.end(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            default:
-                                LOG_ERROR("Something's wrong here...");
-                        }
-
-                        // Add target curve edges to the beginning of current curve
-                        // current_curve.edge_indices.insert(current_curve.edge_indices.begin(), edges_to_add.begin(), edges_to_add.end());
-                        
-                        // Inherit target curve's properties for the current curve
-                        current_curve.b_loops_back_on_left = target_curve.b_loops_back_on_left;
-                        current_curve.to_be_merged_left_edge_index = target_curve.to_be_merged_left_edge_index;
-                        current_curve.to_be_merged_left_curve_index = target_curve.to_be_merged_left_curve_index;
-                        
-                        // Reset the target curve to default values
-                        target_curve.edge_indices.clear();
-                        target_curve.index = -1;
-                        target_curve.b_loops_back_on_left = false;
-                        target_curve.b_loops_back_on_right = false;
-                        target_curve.to_be_merged_left_edge_index = -1;
-                        target_curve.to_be_merged_right_edge_index = -1;
-                        target_curve.to_be_merged_left_curve_index = -1;
-                        target_curve.to_be_merged_right_curve_index = -1;
-                        
-                        b_extensions_occurred = true;
-                        // std::cout << "  Extended curve " << i << " with curve " << target_idx << " (left extension, added " << edges_to_add.size() << " edges)" << std::endl;
-                    }
-                }
-            }
-            
-            //> Extend with "right" target curve
-            if (!current_curve.b_loops_back_on_right && current_curve.to_be_merged_right_curve_index >= 0 && current_curve.to_be_merged_right_curve_index < curves.size()) {
-                
-                int target_idx = current_curve.to_be_merged_right_curve_index;
-                Curve& target_curve = curves[target_idx];
-                
-                //> Skip if target curve is already absorbed and clear the merge reference since the target is gone
-                if (target_curve.edge_indices.empty()) {
-                    current_curve.to_be_merged_right_curve_index = -1;
-                    current_curve.to_be_merged_right_edge_index = -1;
-                    // continue;
-                }
-                else {
-                    //> Check if the edge in the target_curve is either the first two or the last two edges
-                    if (b_is_in_first_or_last_two(target_curve.edge_indices, current_curve.to_be_merged_right_edge_index)) {
-                            
-                        //> Get edges from target curve 
-                        std::vector<int> edges_to_add;
-                        for (size_t j = 0; j < target_curve.edge_indices.size(); ++j) {
-                            // if (j != connect_pos) {
-                                edges_to_add.push_back(target_curve.edge_indices[j]);
-                            // }
-                        }
-                        
-                        //> Check to see if the target curve should be added to the "beginning" or the "end" of the curve
-                        Eigen::Vector3d first_current_edge = connectivity_graph.at( current_curve.edge_indices.front() ).location;
-                        Eigen::Vector3d last_current_edge  = connectivity_graph.at( current_curve.edge_indices.back() ).location;
-                        Eigen::Vector3d first_target_edge  = connectivity_graph.at( target_curve.edge_indices.front() ).location;
-                        Eigen::Vector3d last_target_edge   = connectivity_graph.at( target_curve.edge_indices.back() ).location;
-                        std::vector<double> link_dists = { (first_current_edge - last_target_edge).norm(), \
-                                                            (first_current_edge - first_target_edge).norm(), \
-                                                            (last_current_edge - first_target_edge).norm(), \
-                                                            (last_current_edge - last_target_edge).norm() };
-                        auto min_it = std::min_element(link_dists.begin(), link_dists.end());
-                        //> Get the index corresponding to the minimum value
-                        int min_index = std::distance(link_dists.begin(), min_it);
-                        switch (min_index) {
-                            case 0:
-                                //> Add target curve edges to the beginning of current curve
-                                current_curve.edge_indices.insert(current_curve.edge_indices.begin(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            case 1:
-                                //> Reverse the order of the target curve edges and add them to the beginning of current curve
-                                std::reverse(edges_to_add.begin(), edges_to_add.end());
-                                current_curve.edge_indices.insert(current_curve.edge_indices.begin(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            case 2:
-                                //> Add target curve edges to the end of current curve
-                                current_curve.edge_indices.insert(current_curve.edge_indices.end(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            case 3:
-                                //> Reverse the order of the target curve edges and add them to the end of current curve
-                                std::reverse(edges_to_add.begin(), edges_to_add.end());
-                                current_curve.edge_indices.insert(current_curve.edge_indices.end(), edges_to_add.begin(), edges_to_add.end());
-                                break;
-                            default:
-                                LOG_ERROR("Something's wrong here...");
-                        }
-
-                        //> Add target curve edges to the end of current curve
-                        // current_curve.edge_indices.insert(current_curve.edge_indices.end(), edges_to_add.begin(), edges_to_add.end());
-                        
-                        //> Inherit target curve's right-side properties for the current curve
-                        current_curve.b_loops_back_on_right = target_curve.b_loops_back_on_right;
-                        current_curve.to_be_merged_right_edge_index = target_curve.to_be_merged_right_edge_index;
-                        current_curve.to_be_merged_right_curve_index = target_curve.to_be_merged_right_curve_index;
-                        
-                        //> Reset the target curve to default values
-                        target_curve.edge_indices.clear();
-                        target_curve.index = -1;
-                        target_curve.b_loops_back_on_left = false;
-                        target_curve.b_loops_back_on_right = false;
-                        target_curve.to_be_merged_left_edge_index = -1;
-                        target_curve.to_be_merged_right_edge_index = -1;
-                        target_curve.to_be_merged_left_curve_index = -1;
-                        target_curve.to_be_merged_right_curve_index = -1;
-                        
-                        b_extensions_occurred = true;
-                        //std::cout << "  Extended curve " << i << " with curve " << target_idx << " (right extension, added " << edges_to_add.size() << " edges)" << std::endl;
-                    }
-                }
-            }
+        if (current_curve.consolidation_set_from_left == current_curve.consolidation_set_from_right) { 
+            curve_indices_for_merging[current_curve.consolidation_set_from_left].push_back(curve_id);
         }
-        
-        if (!b_extensions_occurred) {
-            //std::cout << "No more extensions possible. Completed after " << iteration << " iterations." << std::endl;
+        else if (current_curve.consolidation_set_from_left >= 0 && (current_curve.consolidation_set_from_right == -1 || current_curve.consolidation_set_from_right == curve_id)) {
+            curve_indices_for_merging[current_curve.consolidation_set_from_left].push_back(curve_id);
+        }
+        else if ((current_curve.consolidation_set_from_left == -1 || current_curve.consolidation_set_from_left == curve_id) && current_curve.consolidation_set_from_right >= 0) {
+            curve_indices_for_merging[current_curve.consolidation_set_from_right].push_back(curve_id);
+        }
+        else {
+            curve_indices_for_merging[current_curve.consolidation_set_from_left].push_back(curve_id);
+            curve_indices_for_merging[current_curve.consolidation_set_from_right].push_back(curve_id);
+            std::pair<int, int> curve_indices_pair = make_canonical_pair(current_curve.consolidation_set_from_left, current_curve.consolidation_set_from_right);
+            unique_set_indices_pairs_to_be_consolidated.insert(curve_indices_pair);
         }
     }
-    
-    //> Remove empty curves (those that were absorbed during extensions)
-    // curves.erase(std::remove_if(curves.begin(), curves.end(),[](const Curve& curve) { return curve.edge_indices.empty(); }), curves.end());
-    
-    // Create final vector with only non-empty curves
+
+    //> Append the broken curve fragments
+    for (auto rit = unique_set_indices_pairs_to_be_consolidated.rbegin(); rit != unique_set_indices_pairs_to_be_consolidated.rend(); ++rit) {
+        std::vector<int> first_set = curve_indices_for_merging[rit->first];
+        std::vector<int> second_set = curve_indices_for_merging[rit->second];
+        first_set.insert(first_set.end(), second_set.begin(), second_set.end());
+        curve_indices_for_merging[rit->first] = first_set;
+        curve_indices_for_merging[rit->second].clear();
+    }
+
+    //> For each curve set, make sure that the set members are unique
+    for (auto& curve_set : curve_indices_for_merging) {
+        if (curve_set.empty()) continue;
+        std::sort(curve_set.begin(), curve_set.end());
+        curve_set.erase(std::unique(curve_set.begin(), curve_set.end()), curve_set.end());
+    }
+
+    //> Remove empty curve sets
+    curve_indices_for_merging.erase(std::remove_if(curve_indices_for_merging.begin(), curve_indices_for_merging.end(),
+                                    [](const std::vector<int>& crv_set) {
+                                    return crv_set.empty(); }), curve_indices_for_merging.end());
+
+    int duplicate_merge_counter = 0;
+    while (true) {
+        std::set<std::pair<int, int>> duplicate_curve_sets = check_duplicate_curve_ids(curve_indices_for_merging);
+        if (duplicate_curve_sets.empty()) break;
+
+        // writeCurveIndiciesForMerging( curve_indices_for_merging, "curve_indices_for_merging_before_removing_duplicate" );
+
+        //> merge curve sets with duplicate curve ids
+        std::cout << "duplicate_merge_counter = " << duplicate_merge_counter << std::endl;
+        for (auto rit = duplicate_curve_sets.rbegin(); rit != duplicate_curve_sets.rend(); ++rit) {
+            std::cout << "(" << rit->first << ", " << rit->second << ")" << std::endl;
+            std::vector<int> first_set = curve_indices_for_merging[rit->first];
+            std::vector<int> second_set = curve_indices_for_merging[rit->second];
+            first_set.insert(first_set.end(), second_set.begin(), second_set.end());
+            curve_indices_for_merging[rit->first] = first_set;
+            curve_indices_for_merging[rit->second].clear();
+        }
+
+        //> For each curve set, make sure that the set members are unique
+        for (auto& curve_set : curve_indices_for_merging) {
+            if (curve_set.empty()) continue;
+            std::sort(curve_set.begin(), curve_set.end());
+            curve_set.erase(std::unique(curve_set.begin(), curve_set.end()), curve_set.end());
+        }
+
+        //> Remove empty curve sets again
+        curve_indices_for_merging.erase(std::remove_if(curve_indices_for_merging.begin(), curve_indices_for_merging.end(),
+                                        [](const std::vector<int>& crv_set) {
+                                        return crv_set.empty(); }), curve_indices_for_merging.end());
+    }
+
+    std::cout << "Initial number of curves from connectivity graph = " << curves.size() << std::endl;
+    std::cout << "Number of sets of curves for consolidation       = " << curve_indices_for_merging.size() << std::endl;
+    writeCurveIndiciesForMerging( curve_indices_for_merging, "curve_indices_for_merging" );
+
     std::vector<Curve> final_curves;
-    for (const auto& curve : curves) {
-        if (!curve.edge_indices.empty()) {
-            final_curves.push_back(curve);
-        }
+    final_curves.resize(curve_indices_for_merging.size());
+    unsigned final_curve_count = 0;
+    for (const auto& set_of_curve_ids : curve_indices_for_merging) {
+        final_curves[final_curve_count].edge_indices = merge_multiple_curves(set_of_curve_ids, curves);
+        final_curve_count++;
     }
-    
+
     std::cout << "Complete tracing 3D edges to form 3D curves" << std::endl;
     return final_curves;
 }
 
-void EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> all_R,
+//> Ensure orientation consistency between two curves
+std::vector<int> EdgeMapping::make_curve_orientation_consistent(const std::vector<int>& curve1, const std::vector<int>& curve2)
+{
+    Eigen::Vector3d d1 = connectivity_graph.at(curve1.back()).location - connectivity_graph.at(curve1.front()).location;
+    Eigen::Vector3d d2 = connectivity_graph.at(curve2.back()).location - connectivity_graph.at(curve2.front()).location;
+
+    //> reversed orientation if needed
+    return (d1.dot(d2) < 0) ? std::vector<int>(curve2.rbegin(), curve2.rend()) : curve2;
+}
+
+//> Merge two curves into one
+std::vector<int> EdgeMapping::merge_curve_pair(const std::vector<int>& curve1, const std::vector<int>& curve2)
+{
+    std::vector<int> c2 = make_curve_orientation_consistent(curve1, curve2);
+
+    //> Compute endpoint distances
+    double dAthenB = (connectivity_graph.at(curve1.back()).location - connectivity_graph.at(c2.front()).location).norm();
+    double dBthenA = (connectivity_graph.at(c2.back()).location   - connectivity_graph.at(curve1.front()).location).norm();
+    double dRevBthenA = (connectivity_graph.at(c2.front()).location - connectivity_graph.at(curve1.front()).location).norm();
+    double dAthenRevB = (connectivity_graph.at(curve1.back()).location - connectivity_graph.at(c2.back()).location).norm();
+
+    //> Choose the best option
+    double bestDist = dAthenB;
+    std::string choice = "AthenB";
+    if (dBthenA < bestDist) { bestDist = dBthenA; choice = "BthenA"; }
+    if (dRevBthenA < bestDist) { bestDist = dRevBthenA; choice = "revBthenA"; }
+    if (dAthenRevB < bestDist) { bestDist = dAthenRevB; choice = "AthenrevB"; }
+
+    std::vector<int> merged;
+    if (choice == "AthenB") {
+        merged = curve1;
+        merged.insert(merged.end(), c2.begin(), c2.end());
+    } 
+    else if (choice == "BthenA") {
+        merged = c2;
+        merged.insert(merged.end(), curve1.begin(), curve1.end());
+    } 
+    else if (choice == "revBthenA") {
+        merged.assign(c2.rbegin(), c2.rend());
+        merged.insert(merged.end(), curve1.begin(), curve1.end());
+    } 
+    else { // "AthenrevB"
+        merged = curve1;
+        merged.insert(merged.end(), c2.rbegin(), c2.rend());
+    }
+
+    return merged;
+}
+
+//> Merge multiple curves
+std::vector<int> EdgeMapping::merge_multiple_curves(const std::vector<int> curve_indices, const std::vector<Curve> all_curves)
+{
+    //> Each curve in `curves` is a sequence of edge indices
+    std::vector<std::vector<int>> curves;
+    curves.resize(curve_indices.size());
+    int curve_count = 0;
+    for (const auto& crv_idx : curve_indices) {
+        curves[curve_count] = all_curves[crv_idx].edge_indices;
+        curve_count++;
+    }
+    std::vector<int> merged = curves.front();
+    curves.erase(curves.begin());
+
+    while (!curves.empty()) {
+        int bestIdx = -1;
+        double bestDist = std::numeric_limits<double>::max();
+
+        //> find the closest curve by the endpoint distance
+        for (size_t i = 0; i < curves.size(); ++i) {
+            const auto& c = curves[i];
+            double d0 = (connectivity_graph.at(merged.front()).location - connectivity_graph.at(c.front()).location).norm();
+            double d1 = (connectivity_graph.at(merged.front()).location - connectivity_graph.at(c.back()).location).norm();
+            double d2 = (connectivity_graph.at(merged.back()).location  - connectivity_graph.at(c.front()).location).norm();
+            double d3 = (connectivity_graph.at(merged.back()).location  - connectivity_graph.at(c.back()).location).norm();
+            double d = std::min({d0, d1, d2, d3});
+            if (d < bestDist) {
+                bestDist = d;
+                bestIdx = (int)i;
+            }
+        }
+
+        //> put the best curve together
+        merged = merge_curve_pair(merged, curves[bestIdx]);
+        curves.erase(curves.begin() + bestIdx);
+    }
+    return merged;
+}
+
+void EdgeMapping::consolidate_3D_edges(const std::vector<Eigen::Matrix3d> all_R,
                                            const std::vector<Eigen::Vector3d> all_T,
                                            const Eigen::Matrix3d K,
                                            const int Num_Of_Total_Imgs) 
@@ -1078,15 +1079,17 @@ void EdgeMapping::findMergable2DEdgeGroups(const std::vector<Eigen::Matrix3d> al
     createConnectivityGraph(neighbor_map);
 
     //> Trace edges to form curves using edge connectivity graph
-    auto curves = buildCurvesFromConnectivityGraph();
+    std::vector<Curve> curves_from_connectivity_graph;
+    auto final_curves = buildCurvesFromConnectivityGraph( curves_from_connectivity_graph );
 
     //> Write curve data to a file
-    writeCurvesToFile(curves, "curves_from_connectivity_graph", true);
-    writeCurvesToFile(curves, Scene_Name, false);
+    writeCurvesToFile(curves_from_connectivity_graph, "curves_from_connectivity_graph", true);
+    writeCurvesToFile(final_curves, "final_curves", false);
 }
 
-void EdgeMapping::writeConnectivityGraphToFile(const ConnectivityGraph& graph, const std::string& file_name) {
-    std::string file_path = "../../outputs/" + file_name + ".txt";
+void EdgeMapping::writeConnectivityGraphToFile(const ConnectivityGraph& graph, const std::string& file_name) 
+{
+    std::string file_path = OUTPUT_FOLDER_NAME + "/" + file_name + ".txt";
     std::ofstream outfile(file_path);
     if (!outfile.is_open()) return; 
     
@@ -1120,9 +1123,9 @@ void EdgeMapping::writeConnectivityGraphToFile(const ConnectivityGraph& graph, c
     outfile.close();
 }
 
-void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves, 
-                                   const std::string& file_name, bool b_write_curve_info) {
-    std::string file_path = "../../outputs/" + file_name + ".txt";
+void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves, const std::string& file_name, bool b_write_curve_info) 
+{
+    std::string file_path = OUTPUT_FOLDER_NAME + "/" + file_name + ".txt";
     std::ofstream outfile(file_path);
     
     if (!outfile.is_open()) {
@@ -1131,10 +1134,8 @@ void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves,
         return;
     }
     
-    if (b_write_curve_info) {
-        outfile << "# Curves from Connectivity Graph\n";
-        outfile << "# Format: CurveID 3DEdgeIndex Location(x,y,z) Orientation(x,y,z)\n";
-    }
+    outfile << "# Curves from Connectivity Graph\n";
+    outfile << "# Format: CurveID 3DEdgeIndex Location(x,y,z) Orientation(x,y,z)\n";
     
     for (size_t curve_id = 0; curve_id < curves.size(); ++curve_id) {
         const auto& curve = curves[curve_id];
@@ -1146,19 +1147,42 @@ void EdgeMapping::writeCurvesToFile(const std::vector<Curve>& curves,
                 outfile << curve_id << " " << node_index << " " << (node.location).transpose() << " " << node.orientation.transpose();
                 outfile << " " << curve.b_loops_back_on_left << " " << curve.b_loops_back_on_right;
                 outfile << " " << curve.to_be_merged_left_edge_index << " " << curve.to_be_merged_right_edge_index;
-                outfile << " " << curve.to_be_merged_left_curve_index << " " << curve.to_be_merged_right_curve_index << "\n";
+                outfile << " " << curve.to_be_merged_left_curve_index << " " << curve.to_be_merged_right_curve_index; // << "\n";
+                outfile << " " << curve.consolidation_set_from_left << " " << curve.consolidation_set_from_right << "\n";
             }
             else {
-                outfile << node.location.x() << " " << node.location.y() << " " << node.location.z() << "\n";
+                outfile << curve_id << " " << node_index << " " << (node.location).transpose() << " " << node.orientation.transpose() << "\n";
             }
         }
         
-        // Add a blank line between curves for better visualization
-        if (b_write_curve_info) outfile << "\n";
+        //> Add a blank line between curves for better visualization
+        outfile << "\n";
     }
     
     outfile.close();
     std::cout << "Wrote " << curves.size() << " curves to " << file_path << std::endl;
+}
+
+void EdgeMapping::writeCurveIndiciesForMerging( const std::vector<std::vector<int>> curve_indices_for_merging, const std::string& file_name ) 
+{
+    std::string file_path = OUTPUT_FOLDER_NAME + "/" + file_name + ".txt";
+    std::ofstream outfile(file_path);
+    
+    if (!outfile.is_open()) {
+        LOG_CANNOT_OPEN_FILE_ERROR(file_path);
+        return;
+    }
+    
+    for (size_t curve_set_id = 0; curve_set_id < curve_indices_for_merging.size(); ++curve_set_id) {
+        std::vector<int> set = curve_indices_for_merging[curve_set_id];
+
+        // outfile << "\n" << curve_set_id << "\n";
+        for (int curve_id = 0; curve_id < set.size(); curve_id++) {
+            outfile << set[curve_id] << " ";
+        }
+        outfile << "\n";
+    }
+    outfile.close();
 }
 
 //> given a vector, check if the input num is the first or last two of that vec
@@ -1183,4 +1207,40 @@ bool EdgeMapping::b_is_in_first_or_last_two(const std::vector<int>& vec, int num
     }
 
     return false;
+}
+
+std::set<std::pair<int, int>> EdgeMapping::check_duplicate_curve_ids(const std::vector<std::vector<int>>& curve_id_set) 
+{
+    //> Build a hash table from curve_id -> curve_set containing it
+    std::unordered_map<int, std::vector<int>> curve_id_to_set;
+    for (int i = 0; i < (int)curve_id_set.size(); ++i) {
+        for (int x : curve_id_set[i]) {
+            curve_id_to_set[x].push_back(i);
+        }
+    }
+
+    std::set<std::pair<int, int>> duplicate_curve_ids;
+
+    //> Loop over all curve sets
+    for (int i = 0; i < (int)curve_id_set.size(); ++i) {
+        // std::cout << "Row " << i << ":\n";
+        for (int x : curve_id_set[i]) {
+            const auto& curve_sets = curve_id_to_set[x];
+
+            if (curve_sets.size() > 2)
+                std::cout << "Something's wrong with curve id " << x << std::endl;
+
+            //> the curve_id appears in two curve sets
+            if (curve_sets.size() > 1) { 
+                std::pair<int, int> duplicate_set_ids = make_canonical_pair(curve_sets[0], curve_sets[1]);
+                duplicate_curve_ids.insert(duplicate_set_ids);
+                // for (int r : curve_sets) {
+                //     if (r != i) std::cout << r << " ";
+                // }
+                // std::cout << "\n";
+            }
+        }
+    }
+
+    return duplicate_curve_ids;
 }

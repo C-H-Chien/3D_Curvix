@@ -22,17 +22,17 @@ set ( control_sources
   EdgeSketch_Core.hpp
 
   #>MVT Utilities
-  mvt.hpp
-  mvt.cpp
-  NViewsCertifier.h
-  NViewsCertifier.cpp
-  NViewsClass.h
-  NViewsClass.cpp
-  NViewsTypes.h
-  NViewsUtils.h
-  NViewsUtils.cpp
-  generatePointCloud.h
-  generatePointCloud.cpp
+  #mvt.hpp
+  #mvt.cpp
+  #NViewsCertifier.h
+  #NViewsCertifier.cpp
+  #NViewsClass.h
+  #NViewsClass.cpp
+  #NViewsTypes.h
+  #NViewsUtils.h
+  #NViewsUtils.cpp
+  #generatePointCloud.h
+  #generatePointCloud.cpp
 
   EdgeClusterer.hpp
   EdgeClusterer.cpp
@@ -40,12 +40,10 @@ set ( control_sources
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_library( edge_reconstruction ${control_sources} )
-target_link_libraries(edge_reconstruction 
-        -L/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/bin/lib64 yaml-cpp
-        #-L/gpfs/data/bkimia/opencv_4.x/build_install/lib64 opencv_core opencv_imgproc opencv_imgcodecs opencv_highgui opencv_features2d opencv_xfeatures2d
-        -L/usr/lib64 pthread
+add_library( edges_curves_reconstruction ${control_sources} )
+target_link_libraries(edges_curves_reconstruction 
+  -L/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/bin/lib64 yaml-cpp
+  -L/usr/lib64 pthread
 )
 
-set_target_properties(edge_reconstruction PROPERTIES LINKER_LANGUAGE CXX)
-#set_target_properties(edge_reconstruction PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(edges_curves_reconstruction PROPERTIES LINKER_LANGUAGE CXX)

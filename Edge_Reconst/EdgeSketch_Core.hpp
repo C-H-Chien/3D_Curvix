@@ -24,6 +24,7 @@
 #include <yaml-cpp/yaml.h>
 
 //> shared class pointers
+#include "definitions.h"
 #include "file_reader.hpp"
 #include "util.hpp"
 #include "PairEdgeHypo.hpp"
@@ -31,7 +32,6 @@
 #include "getSupportedEdgels.hpp"
 #include "getOrientationList.hpp"
 #include "edge_mapping.hpp"
-#include "mvt.hpp"
 #include "EdgeClusterer.hpp"
 
 //> mutual best support
@@ -80,14 +80,13 @@ public:
     //> precision and recall experiments
     bool getGTEdgePairsBetweenImages(int hyp01_view_indx, int hyp02_view_indx, std::vector<std::pair<int, int>>& gt_edge_pairs);
     void get_Avg_Precision_Recall_Rates();
-    void construct_3D_edges_from_ground_truth();
 
     //> Destructor
     ~EdgeSketch_Core();
 
     void Read_Edgels_Data() {
         //> Read edgels detected at a specific threshold 
-        Load_Data->read_All_Edgels( All_Edgels, thresh_EDG );
+        Load_Data->read_All_Edgels( All_Edgels, Edge_Detection_Thresh );
     }
     
     bool Skip_this_Edge( const int edge_idx ) {
@@ -130,11 +129,9 @@ public:
 
     Eigen::MatrixXd paired_edge_final;
     double edge_sketch_time;
-    int thresh_EDG;
     int hyp01_view_indx;
     int hyp02_view_indx;
-    int Edge_Detection_Init_Thresh;
-    int Edge_Detection_Final_Thresh;
+    int Edge_Detection_Thresh;
     int Max_3D_Edge_Sketch_Passes;
 
     //> Edges and camera intrinsix/extrinsic matrices of all images

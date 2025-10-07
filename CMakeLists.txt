@@ -12,13 +12,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall" CACHE STRING "" FORCE)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native" CACHE STRING "" FORCE)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffast-math" CACHE STRING "" FORCE)
 
-project(Edge_Based_Reconstruction)
+project(3D_Curvix)
 
-# -- enable the use of cuda --
-#option(USE_CUDA "Use CUDA" ON)
-#enable_language("CUDA")
-
-include(${CMAKE_CURRENT_SOURCE_DIR}/config/cmake/InitializeBuildType.cmake)
+#include(${CMAKE_CURRENT_SOURCE_DIR}/config/cmake/InitializeBuildType.cmake)
 
 #-----------------------------------------------------------------------------
 if(NOT COMMAND SETIFEMPTY)
@@ -41,33 +37,7 @@ SETIFEMPTY(CMAKE_INSTALL_LIBRARY_DESTINATION lib)
 SETIFEMPTY(CMAKE_INSTALL_ARCHIVE_DESTINATION lib)
 SETIFEMPTY(CMAKE_INSTALL_RUNTIME_DESTINATION bin)
 
-SETIFEMPTY(MINUS_INSTALL_RUNTIME_DIR bin)
-SETIFEMPTY(MINUS_INSTALL_LIBRARY_DIR lib)
-SETIFEMPTY(MINUS_INSTALL_ARCHIVE_DIR lib)
-SETIFEMPTY(PROJ_INSTALL_INCLUDE_DIR include/)
-
-# -- CMake support directory --
-set(PROJ_ROOT_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
-set(PROJ_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR}/config/cmake/Modules)
-include(${PROJ_CMAKE_DIR}/StandardOptions.cmake)
-
-# -- Options to add extra compiler and linker flags --
-#
-# -- These options allow you to specify additional flags without --
-# -- affecting the default flags for a particular platform or build type --
-# -- This is especially useful for adding extra warning flags --
-set( MINUS_EXTRA_CMAKE_C_FLAGS             CACHE STRING "Extra flags appended to CMAKE_C_FLAGS" )
-set( MINUS_EXTRA_CMAKE_CXX_FLAGS           CACHE STRING "Extra flags appended to CMAKE_CXX_FLAGS" )
-set( MINUS_EXTRA_CMAKE_EXE_LINKER_FLAGS    CACHE STRING "Extra flags appended to CMAKE_EXE_LINKER_FLAGS" )
-set( MINUS_EXTRA_CMAKE_MODULE_LINKER_FLAGS CACHE STRING "Extra flags appended to CMAKE_MODULE_LINKER_FLAGS" )
-set( MINUS_EXTRA_CMAKE_SHARED_LINKER_FLAGS CACHE STRING "Extra flags appended to CMAKE_SHARED_LINKER_FLAGS" )
-set( CMAKE_C_FLAGS             "${CMAKE_C_FLAGS} ${MINUS_EXTRA_CMAKE_C_FLAGS}" )
-set( CMAKE_CXX_FLAGS           "${CMAKE_CXX_FLAGS} ${MINUS_EXTRA_CMAKE_CXX_FLAGS}" )
-set( CMAKE_EXE_LINKER_FLAGS    "${CMAKE_EXE_LINKER_FLAGS} ${MINUS_EXTRA_CMAKE_EXE_LINKER_FLAGS}" )
-set( CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${MINUS_EXTRA_CMAKE_MODULE_LINKER_FLAGS}" )
-set( CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${MINUS_EXTRA_CMAKE_SHARED_LINKER_FLAGS}" )
-
-# -- import openmp to the compiler --
+#> import openmp to the compiler
 find_package(OpenMP REQUIRED)
 
 if (OPENMP_FOUND)
@@ -95,7 +65,7 @@ else()
 endif()
 
 
-# -- Avoid types of path names that could cause havoc with regular expressions --
+#> Avoid types of path names that could cause havoc with regular expressions
 if( ${PROJECT_BINARY_DIR} MATCHES  \\+ )
   message(SEND_ERROR "You cannot have a + in your binary path")
 endif()
@@ -103,8 +73,8 @@ if( ${CMAKE_CURRENT_LIST_DIR} MATCHES  \\+ )
   message(SEND_ERROR "You cannot have a + in your source path")
 endif()
 
-# include CMakeListsLocal.txt from source directory if it exists
-# also include it from the binary dir if different from source dir
+#> Include CMakeListsLocal.txt from source directory if it exists
+#  Also include it from the binary dir if different from source dir
 if( ${PROJECT_BINARY_DIR} MATCHES ${CMAKE_CURRENT_LIST_DIR} )
   include( ${CMAKE_CURRENT_LIST_DIR}/CMakeListsLocal.txt OPTIONAL )
 else()
@@ -117,18 +87,13 @@ set(PROJ_BINARY_INCLUDE_DIR ${PROJECT_BINARY_DIR}) #Generated includes
 set(PROJ_INCLUDE_DIRS ${PROJ_BINARY_INCLUDE_DIR} ${PROJ_INCLUDE_DIR})
 set(PROJ_INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/include/)
 
-# -- include necessary libraries in the commands / executables file --
+#> include necessary libraries in the commands / executables file
 include_directories(${PROJ_INCLUDE_DIRS})
-
 include_directories( "/gpfs/data/bkimia/zqiwu/3D/yaml-cpp/include" )
-#include_directories( "/gpfs/data/bkimia/opencv_4.x/build_install/include/opencv4" )
 
-# adds a test for Endianness and a global variable that should be useful for file format programming -MM
-include(TestBigEndian)
-TEST_BIG_ENDIAN(MY_BIG_ENDIAN)
-
-# main lib
+#> main lib
 add_subdirectory( Edge_Reconst )
-# commands / executables
+
+#> commands / executables
 add_subdirectory(cmd)
 add_subdirectory(test)
