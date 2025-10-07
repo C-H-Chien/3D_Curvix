@@ -305,33 +305,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             supported_indice_current.conservativeResize(edgels_HYPO2.rows(),1);
             Eigen::MatrixXi supported_indices_stack;
 
-#if ISOLATE_DATA
-            bool found_data = false;
-            Eigen::MatrixXd H1_Isolated_Edge_Row = Edges_HYPO1.row(H1_edge_idx);
-            Eigen::Vector2d H1_Isolated_Edge(H1_Isolated_Edge_Row(0), H1_Isolated_Edge_Row(1));
-            Eigen::Vector2d target_H1_edge(352.453, 413.393);
-            if ( H1_Isolated_Edge.isApprox(target_H1_edge, 1e-4) ) {
-                const std::string file_name_for_H2_edges = OUTPUT_FOLDER_NAME + "/hypothesize_validate_H2_data.txt";
-                std::ofstream H2_edges_outFile(file_name_for_H2_edges);
-                found_data = true;
-                std::cout << "Found: " << H1_Isolated_Edge_Row << std::endl;
-                std::cout << "Epipolar angle range:(" << epip_angle_range_from_H1_edge.first << ", " << epip_angle_range_from_H1_edge.second << ")" << std::endl;
-                int corrected_counter = 0;
-                for (int ff = 0; ff < edgels_HYPO2.rows(); ff++) {
-                    H2_edges_outFile << edgels_HYPO2(ff,0) << "\t" << edgels_HYPO2(ff,1) << "\t" << edgels_HYPO2(ff,2) << "\t";
-                    if (ff == edgels_HYPO2_corrected(corrected_counter, 9)) {
-                        H2_edges_outFile << edgels_HYPO2_corrected(corrected_counter,4) << "\t" << edgels_HYPO2_corrected(corrected_counter,5) << "\t" << edgels_HYPO2_corrected(corrected_counter,6) << "\t" \
-                                         << Edges_HYPO2_final(corrected_counter,0) << "\t" << Edges_HYPO2_final(corrected_counter,1) << "\t" << Edges_HYPO2_final(corrected_counter,2) << "\n";
-                        corrected_counter++;
-                    }
-                    else {
-                        H2_edges_outFile << "-1\t-1\t-1\t-1\t-1\t-1\n";
-                    }
-                }
-                H2_edges_outFile.close();
-                std::cout << "Number of clusters: " << Num_Of_Clusters_per_H1_Edge << std::endl;
-            }
-#endif
             bool isempty_link = true;
             //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Second loop:loop over all validation views >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>//
             for (int VALID_INDX = 0; VALID_INDX < Num_Of_Total_Imgs; VALID_INDX++) {
@@ -576,19 +549,6 @@ void EdgeSketch_Core::Run_3D_Edge_Sketch() {
             PR_after_lowes[thread_id].push_back(std::make_pair(precision_per_edge, recall_per_edge));
             //> ============ Calculate Precision-Recall: After Lowe's Ratio Test ============
 #endif
-
-            //> ======================== DEBUG ========================
-#if ISOLATE_DATA
-            if (found_data) {
-                std::cout << "Target GT H2 edge:" << target_H2_edge(0) << ", " << target_H2_edge(1) << std::endl;
-                std::cout << "Final pairs in H2" << std::endl;
-                for (int fi = 0; fi < finalpair_H2_indices.size(); fi++) {
-                    std::cout << finalpair_H2_indices[fi] << ", " << Edges_HYPO2(finalpair_H2_indices[fi],0) << ", " << Edges_HYPO2(finalpair_H2_indices[fi],1) << std::endl;
-                }
-                std::cout << "Number of unique indices = " << unique_finalpair_H2_indices.size() << std::endl;
-            }
-#endif
-            //> ======================== DEBUG ========================
         } //> End of the first for-loop
         //> A critical session to stack all local supported indices
         #pragma omp critical
@@ -642,75 +602,6 @@ void EdgeSketch_Core::Finalize_Edge_Pairs_and_Reconstruct_3D_Edges(std::shared_p
 
     std::string info_str = "Number of edge pairs: " + std::to_string(pair_num);
     LOG_INFOR_MESG(info_str);
-
-#if DEBUG_PAIRED_EDGES
-    std::ofstream debug_file_paired_edges;
-    std::string Output_File_Path_Paired_Edges = "../../outputs/paired_edge_final.txt";
-    debug_file_paired_edges.open(Output_File_Path_Paired_Edges);
-    debug_file_paired_edges << paired_edge_final;
-    debug_file_paired_edges.close();
-
-    std::ofstream paired_edges_locations_file;
-    std::string Output_File_Path_Edge_Locations = "../../outputs/paired_edges_final_" + std::to_string(hyp01_view_indx) + "_" + std::to_string(hyp02_view_indx) + ".txt";
-    paired_edges_locations_file.open(Output_File_Path_Edge_Locations);
-
-
-    for (int pair_idx = 0; pair_idx < paired_edge_final.rows(); ++pair_idx) {
-        // Write Hypothesis 1 and Hypothesis 2 edge locations
-        int hypo1_idx = paired_edge_final(pair_idx, 0);
-        int hypo2_idx = paired_edge_final(pair_idx, 1);
-            
-        Eigen::Vector2d edge_hypo1 = Edges_HYPO1.row(hypo1_idx).head<2>();
-        Eigen::Vector2d edge_hypo2 = Edges_HYPO2.row(hypo2_idx).head<2>();
-
-        Eigen::MatrixXd edgel_HYPO1   = Edges_HYPO1.row(int(paired_edge_final(pair_idx,0)));  //> edge index in hypo 1
-        Eigen::MatrixXd edgel_HYPO2   = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));  //> edge index in hypo 2
-        Eigen::MatrixXd HYPO2_idx_raw = Edges_HYPO2.row(int(paired_edge_final(pair_idx,1)));
-
-        Eigen::MatrixXd edgels_HYPO2_corrected = PairHypo->edgelsHYPO2_epipolar_correction(edgel_HYPO2, edgel_HYPO1, F21, F12, HYPO2_idx_raw);
-        Eigen::MatrixXd Edges_HYPO1_final(edgels_HYPO2_corrected.rows(), 4);
-        Edges_HYPO1_final << edgels_HYPO2_corrected.col(0), edgels_HYPO2_corrected.col(1), edgels_HYPO2_corrected.col(2), edgels_HYPO2_corrected.col(3);
-        Eigen::MatrixXd Edges_HYPO2_final(edgels_HYPO2_corrected.rows(), 4);
-        Edges_HYPO2_final << edgels_HYPO2_corrected.col(4), edgels_HYPO2_corrected.col(5), edgels_HYPO2_corrected.col(6), edgels_HYPO2_corrected.col(7);
-
-        Eigen::Vector2d pt_H1 = Edges_HYPO1_final.row(0);
-        Eigen::Vector2d pt_H2 = Edges_HYPO2_final.row(0);
-        
-        if (HYPO2_idx_raw.rows() == 0 || edgels_HYPO2_corrected.rows() == 0) {
-            std::cout << "No valid matches found for edge " << pair_idx << std::endl;
-            continue;
-        }
-
-        paired_edges_locations_file << "Pair " << pair_idx + 1 << ":\n";
-        Eigen::RowVectorXd R_vector1 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp01_view_indx].data(), All_R[hyp01_view_indx].size());
-        Eigen::RowVectorXd R_vector2 = Eigen::Map<Eigen::RowVectorXd>(All_R[hyp02_view_indx].data(), All_R[hyp02_view_indx].size());
-    
-        paired_edges_locations_file << pt_H1(0) << " " << pt_H1(1) << " " << R_vector1 << " " << All_T[hyp01_view_indx].transpose() << "\n";
-        paired_edges_locations_file << pt_H2(0) << " " << pt_H2(1) << " " << R_vector2 << " " << All_T[hyp02_view_indx].transpose() << "\n";
-
-        int val_count = 0;
-        int val_count_pre = 0;
-        // Loop through validation views and write actual edge locations and R, T matrices
-        for (int col = 2; col < paired_edge_final.cols(); col++) {
-            
-            int val_idx = valid_view_index[col - 2]; 
-            int support_idx = paired_edge_final(pair_idx, col);
-            if (support_idx != -2) {
-                val_count_pre ++;
-                // /////////////////////////////////// epipolar correcting validation view edges ///////////////////////////////////
-                Eigen::RowVectorXd R_vector = Eigen::Map<Eigen::RowVectorXd>(All_R[val_idx].data(), All_R[val_idx].size());
-                Eigen::MatrixXd edgel_VALID = All_Edgels[val_idx].row(support_idx);
-                paired_edges_locations_file << edgel_VALID(0) << " " << edgel_VALID(1) << " " << R_vector << " " << All_T[val_idx].transpose() << "\n";
-                val_count++;
-            }
-
-        }
-        if (val_count < 4 || val_count_pre < 4) LOG_ERROR("Something's buggy here!");
-        paired_edges_locations_file << "\n"; // Newline between pairs
-    }
-    paired_edges_locations_file.close();
-
-#endif
 
     std::vector<Eigen::Matrix3d> Rs;
     Rs.push_back(R21);
