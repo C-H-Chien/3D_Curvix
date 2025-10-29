@@ -8,10 +8,10 @@
 #define WRITE_3D_EDGES                  (true)
 #define WRITE_3D_EDGE_GRAPH             (true)
 
-#define USE_REFINED_CAM_POSES           (false)     //> true only for ABC-NEF
+#define USE_REFINED_CAM_POSES           (true)     //> true only for ABC-NEF
 
 //> LOWE's ratio test for disambiguate validated edge hypotheses
-#define LOWES_RATIO_THRESHOLD           (0.8)
+#define LOWES_RATIO_THRESHOLD           (0.6)
 
 //> Print out in terminal
 #define SHOW_EDGE_SKETCH_SETTINGS       (false)
@@ -34,7 +34,7 @@
 
 //> Edge graph alignment parameters
 #define NUM_OF_ITERATIONS               (1000)
-#define INIT_FROCE_STEP_SIZE            (0.02)
+#define INIT_FROCE_STEP_SIZE            (0.01)
 #define INIT_TORQUE_STEP_SIZE           (0.01)
 #define ENABLE_EXPO_FORCE_AND_TORQUE    (false)
 #define EXPO_INCREASE_FACTOR            (sqrt(2))
