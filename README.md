@@ -4,7 +4,7 @@ This repository hosts the code for 3D Curvix, a 3D curve reconstruction framewor
 
 ## Dependencies:
 (1) CMake 3.14 or higher <br />
-(2) Eigen 3.3.2 (higher version is not compatible) <br />
+(2) [Eigen 3.3.2](https://gitlab.com/libeigen/eigen/-/releases/3.3.2) (higher version is not compatible) <br />
 (3) YAML-CPP, can be built from its [official repo](https://github.com/jbeder/yaml-cpp). (This is used only for parsing data from .yaml file) <br />
 Note that by default the code uses C++17. Some minor code has to be changed to turn the code compatible with C++11, but we encourage to use C++17.
 
